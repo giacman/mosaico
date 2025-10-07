@@ -1,6 +1,8 @@
-# Project Mosaico - Executive Summary
-**Presentazione per Leadership**  
-Data: 6 Ottobre 2025
+# Mosaico
+### Your AI Content Creation Co-Pilot
+
+**Executive Summary per Leadership**  
+Data: 7 Ottobre 2025  
 Versione: 1.0
 
 ---

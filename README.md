@@ -1,6 +1,9 @@
-# Project Mosaico
+# Mosaico
+### Your AI Content Creation Co-Pilot
 
-**Versione:** 1.0
+> *Assembling diverse pieces of intelligence to create rich, coherent content*
+
+**Versione:** 1.0  
 **Status:** Fase 1 - Kick-off
 
 ## 1. Vision & Executive Summary
