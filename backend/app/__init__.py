@@ -1,0 +1,1 @@
+"""Mosaico Backend Application"""

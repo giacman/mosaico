@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #202124;
+      padding: 16px;
+      background: #fff;
+    }
+    
+    .header {
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .header h1 {
+      font-size: 20px;
+      font-weight: 500;
+      color: #1a73e8;
+      margin-bottom: 4px;
+    }
+    
+    .header p {
+      font-size: 12px;
+      color: #5f6368;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .tab {
+      padding: 8px 12px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: #5f6368;
+      font-size: 13px;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .tab:hover {
+      color: #1a73e8;
+    }
+    
+    .tab.active {
+      color: #1a73e8;
+      border-bottom-color: #1a73e8;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #5f6368;
+      margin-bottom: 6px;
+    }
+    
+    input, select, textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #1a73e8;
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .button {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .button-primary {
+      background: #1a73e8;
+      color: white;
+    }
+    
+    .button-primary:hover {
+      background: #1557b0;
+    }
+    
+    .button-primary:disabled {
+      background: #dadce0;
+      cursor: not-allowed;
+    }
+    
+    .button-secondary {
+      background: #f1f3f4;
+      color: #5f6368;
+      margin-top: 8px;
+    }
+    
+    .button-secondary:hover {
+      background: #e8eaed;
+    }
+    
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    
+    .quick-button {
+      padding: 8px;
+      font-size: 11px;
+      background: #f8f9fa;
+      border: 1px solid #dadce0;
+    }
+    
+    .status {
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 12px;
+      font-size: 12px;
+      display: none;
+    }
+    
+    .status.success {
+      background: #e6f4ea;
+      color: #137333;
+      border-left: 3px solid #137333;
+    }
+    
+    .status.error {
+      background: #fce8e6;
+      color: #c5221f;
+      border-left: 3px solid #c5221f;
+    }
+    
+    .status.loading {
+      background: #e8f0fe;
+      color: #1967d2;
+      border-left: 3px solid #1967d2;
+    }
+    
+    .help-text {
+      font-size: 11px;
+      color: #5f6368;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>✨ Mosaico</h1>
+    <p>Your AI Content Creation Co-Pilot</p>
+  </div>
+  
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('generate')">Generate</button>
+    <button class="tab" onclick="switchTab('translate')">Translate</button>
+    <button class="tab" onclick="switchTab('refine')">Refine</button>
+  </div>
+  
+  <!-- GENERATE TAB -->
+  <div id="generate-tab" class="tab-content active">
+    <div class="form-group">
+      <label>Original Text</label>
+      <textarea id="generate-text" placeholder="Enter text to generate variations..."></textarea>
+      <button class="button-secondary" onclick="loadSelectedText('generate')">📝 Load from Selected Cell</button>
+    </div>
+    
+    <div class="form-group">
+      <label>Number of Variations</label>
+      <select id="generate-count">
+        <option value="3">3 variations</option>
+        <option value="5">5 variations</option>
+        <option value="7">7 variations</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Tone</label>
+      <select id="generate-tone">
+        <option value="professional">Professional</option>
+        <option value="casual">Casual</option>
+        <option value="enthusiastic">Enthusiastic</option>
+        <option value="elegant">Elegant</option>
+        <option value="direct">Direct</option>
+      </select>
+    </div>
+    
+    <button class="button button-primary" onclick="generateVariations()">
+      ✨ Generate Variations
+    </button>
+    
+    <div id="generate-status" class="status"></div>
+  </div>
+  
+  <!-- TRANSLATE TAB -->
+  <div id="translate-tab" class="tab-content">
+    <div class="form-group">
+      <label>Text to Translate</label>
+      <textarea id="translate-text" placeholder="Enter text to translate..."></textarea>
+      <button class="button-secondary" onclick="loadSelectedText('translate')">📝 Load from Selected Cell</button>
+    </div>
+    
+    <div class="form-group">
+      <label>Target Language</label>
+      <select id="translate-language">
+        <option value="it">Italian</option>
+        <option value="en">English</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="es">Spanish</option>
+        <option value="pt">Portuguese</option>
+      </select>
+    </div>
+    
+    <button class="button button-primary" onclick="translate()">
+      🌐 Translate
+    </button>
+    
+    <div id="translate-status" class="status"></div>
+  </div>
+  
+  <!-- REFINE TAB -->
+  <div id="refine-tab" class="tab-content">
+    <div class="form-group">
+      <label>Text to Refine</label>
+      <textarea id="refine-text" placeholder="Enter text to refine..."></textarea>
+      <button class="button-secondary" onclick="loadSelectedText('refine')">📝 Load from Selected Cell</button>
+    </div>
+    
+    <div class="form-group">
+      <label>Quick Actions</label>
+      <div class="quick-actions">
+        <button class="quick-button" onclick="refine('shorten')">Make Shorter</button>
+        <button class="quick-button" onclick="refine('fix_grammar')">Fix Grammar</button>
+        <button class="quick-button" onclick="refine('improve_clarity')">Improve Clarity</button>
+        <button class="quick-button" onclick="refine('make_formal')">Make Formal</button>
+      </div>
+    </div>
+    
+    <div id="refine-status" class="status"></div>
+  </div>
+  
+  <script>
+    // Tab switching
+    function switchTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // Show selected tab
+      document.getElementById(tabName + '-tab').classList.add('active');
+      event.target.classList.add('active');
+    }
+    
+    // Load selected text from sheet
+    function loadSelectedText(tab) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.isEmpty) {
+            showStatus(tab, 'error', 'No text selected. Please select a cell with text.');
+            return;
+          }
+          document.getElementById(tab + '-text').value = result.text;
+        })
+        .withFailureHandler(function(error) {
+          showStatus(tab, 'error', 'Error loading text: ' + error.message);
+        })
+        .getSelectedText();
+    }
+    
+    // Generate variations
+    function generateVariations() {
+      const text = document.getElementById('generate-text').value.trim();
+      const count = parseInt(document.getElementById('generate-count').value);
+      const tone = document.getElementById('generate-tone').value;
+      
+      if (!text) {
+        showStatus('generate', 'error', 'Please enter text to generate variations.');
+        return;
+      }
+      
+      showStatus('generate', 'loading', 'Generating variations...');
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            const variations = response.data.variations;
+            google.script.run
+              .withSuccessHandler(function() {
+                showStatus('generate', 'success', `✓ Generated ${variations.length} variations and wrote to sheet!`);
+              })
+              .writeVariationsToSheet(variations);
+          } else {
+            showStatus('generate', 'error', 'Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('generate', 'error', 'Failed: ' + error.message);
+        })
+        .generateVariations(text, count, tone);
+    }
+    
+    // Translate
+    function translate() {
+      const text = document.getElementById('translate-text').value.trim();
+      const language = document.getElementById('translate-language').value;
+      
+      if (!text) {
+        showStatus('translate', 'error', 'Please enter text to translate.');
+        return;
+      }
+      
+      showStatus('translate', 'loading', 'Translating...');
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            google.script.run
+              .withSuccessHandler(function() {
+                showStatus('translate', 'success', '✓ Translation written to active cell!');
+              })
+              .writeToActiveCell(response.data.translated_text);
+          } else {
+            showStatus('translate', 'error', 'Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('translate', 'error', 'Failed: ' + error.message);
+        })
+        .translateText(text, language);
+    }
+    
+    // Refine
+    function refine(operation) {
+      const text = document.getElementById('refine-text').value.trim();
+      
+      if (!text) {
+        showStatus('refine', 'error', 'Please enter text to refine.');
+        return;
+      }
+      
+      showStatus('refine', 'loading', 'Refining text...');
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            google.script.run
+              .withSuccessHandler(function() {
+                showStatus('refine', 'success', '✓ Refined text written to active cell!');
+              })
+              .writeToActiveCell(response.data.refined_text);
+          } else {
+            showStatus('refine', 'error', 'Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('refine', 'error', 'Failed: ' + error.message);
+        })
+        .refineText(text, operation);
+    }
+    
+    // Show status message
+    function showStatus(tab, type, message) {
+      const statusEl = document.getElementById(tab + '-status');
+      statusEl.className = 'status ' + type;
+      statusEl.textContent = message;
+      statusEl.style.display = 'block';
+      
+      if (type !== 'loading') {
+        setTimeout(() => {
+          statusEl.style.display = 'none';
+        }, 5000);
+      }
+    }
+  </script>
+</body>
+</html>
+
