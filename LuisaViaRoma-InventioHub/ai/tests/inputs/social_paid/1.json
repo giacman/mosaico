@@ -1,0 +1,32 @@
+{
+  "id": 1,
+  "content_type": "SOCIAL_PAID",
+  "data": {
+    "type": "BRAND_AWARENESS",
+    "name": "Estate Sneakers Launch 2025",
+    "theme": "Sneakers estive colorate",
+    "gender": "MEN",
+    "season": "SUMMER",
+    "brands": [
+      "SneakerWave"
+    ],
+    "targets": [
+      "Millennial",
+      "Gen Z"
+    ],
+    "products": [
+      "SneakerWave AirLight 2025"
+    ],
+    "product_category": "Footwear",
+    "additional_content": "Promuovere materiali ecosostenibili usati nelle scarpe"
+  },
+  "llm_name": "openai:gpt-4o",
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": ""
+}

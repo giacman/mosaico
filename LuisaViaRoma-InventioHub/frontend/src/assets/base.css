@@ -1,0 +1,28 @@
+html {
+  font-size: 14px !important;
+}
+
+
+:root {
+  --sidebar-width: 280px;
+  --sidebar-width-collapsed: 80px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition:
+    color 0.5s,
+    background-color 0.5s;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

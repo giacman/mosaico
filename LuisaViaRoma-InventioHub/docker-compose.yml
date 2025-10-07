@@ -1,0 +1,47 @@
+services:
+ 
+  uwsgi:
+    build: ./backend
+    image: lvr_platform/uwsgi
+    container_name: uwsgi
+    volumes:
+      - ./backend:/workdir_backend
+      - ./ai/models:/workdir_backend/models
+      - ./ai/tests:/workdir_backend/tests
+      - static_volume:/staticfiles
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: uwsgi --ini uwsgi.ini
+    env_file:
+      - ./backend/.env
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx 
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - /etc/letsencrypt/live/test.lvr.inventiohub.com/fullchain.pem:/etc/letsencrypt/live/test.lvr.inventiohub.com/fullchain.pem
+      - /etc/letsencrypt/live/test.lvr.inventiohub.com/privkey.pem:/etc/letsencrypt/live/test.lvr.inventiohub.com/privkey.pem
+      - static_volume:/staticfiles
+      - ./frontend/dist/:/usr/share/nginx/html/vue
+    depends_on:
+      - uwsgi
+
+  ai-core:
+    build: ./ai
+    image: lvr_platform/ai_core
+    container_name: ai-core
+    restart: always
+    ports:
+      - "127.0.0.1:8081:8081"
+    command: uvicorn server:app --host 0.0.0.0 --port 8081 --workers 1 --log-level warning
+    env_file: 
+      - ./ai/ai.env
+    depends_on:
+      - nginx
+
+volumes:
+  static_volume:

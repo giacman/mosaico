@@ -1,0 +1,28 @@
+{
+  "id": 2,
+  "content_type": "MARKETING_CAMPAIGN",
+  "data": {
+    "theme": "Summer Sale 2025",
+    "gender": "ALL",
+    "season": "Summer",
+    "brands": ["CoolThreads"],
+    "targets": ["online shoppers", "fashion enthusiasts"],
+    "products": ["T-shirts", "Shorts", "Sandals"],
+    "product_category": "Clothing",
+    "additional_content": "Evidenzia la spedizione gratuita",
+    "campaign_type": "AFFILIATION_BANNER",
+    "only_title": false,
+    "title_char_limit": 40,
+    "text_char_limit": 100,
+    "cta_char_limit": 20
+  },
+  "llm_name": "openai:gpt-4o",
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": ""
+}

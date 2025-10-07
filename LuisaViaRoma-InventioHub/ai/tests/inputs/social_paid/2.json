@@ -1,0 +1,33 @@
+{
+  "id": 2,
+  "content_type": "SOCIAL_PAID",
+  "data": {
+    "type": "CONVERSIONS",
+    "name": "Back‑to‑School Laptop Sale",
+    "theme": "Laptop leggeri per studenti",
+    "gender": "ALL",
+    "season": "FALL",
+    "brands": [
+      "TechEdge"
+    ],
+    "targets": [
+      "College Students",
+      "Parents"
+    ],
+    "products": [
+      "TechEdge SlimBook 14",
+      "TechEdge FlexBook 13"
+    ],
+    "product_category": "Electronics",
+    "additional_content": "Coupon sconto 10% solo online"
+  },
+  "llm_name": "openai:gpt-4o",
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": ""
+}

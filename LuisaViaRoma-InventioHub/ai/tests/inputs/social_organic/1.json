@@ -1,0 +1,37 @@
+{
+  "id": 3,
+  "content_type": "SOCIAL_ORGANIC",
+  "data": {
+    "type": "INSTAGRAM",
+    "theme": "Outfit estivi sostenibili",
+    "gender": "WOMEN",
+    "season": "SUMMER",
+    "brands": [
+      "EcoChic"
+    ],
+    "targets": [
+      "Eco‑conscious consumers",
+      "Fashion lovers"
+    ],
+    "products": [
+      "EcoChic Linen Dress",
+      "EcoChic Recycled Cotton Tote"
+    ],
+    "product_category": "Apparel",
+    "additional_content": "Usa l'hashtag #EcoChicSummer e invita a condividere il proprio look"
+  },
+  "llm_name": "openai:gpt-4o",
+  "llm_config": {
+    "temperature": 0.65,
+    "timeout": 180,
+    "max_retries": 3
+  },
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": ""
+}

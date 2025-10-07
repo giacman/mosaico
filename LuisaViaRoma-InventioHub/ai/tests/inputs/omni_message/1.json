@@ -1,0 +1,24 @@
+{
+  "id": 1,
+  "content_type": "OMNI_MESSAGE",
+  "data": {
+    "type": "APP",
+    "theme": "Campagna Promo Estate 2025",
+    "gender": "ALL",
+    "season": "Estate",
+    "brands": ["BrandX", "BrandY"],
+    "targets": ["Giovani", "Adulti"],
+    "products": ["Costume da bagno modello A", "Occhiali da sole modello B"],
+    "product_category": "Moda Mare",
+    "additional_content": "Offerte valide solo fino al 31 luglio"
+  },
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": "",
+  "llm_name": "openai:gpt-4o"
+}

@@ -1,0 +1,35 @@
+{
+  "id":1,
+  "content_type":"NEWSLETTER",
+  "data":{
+    "type":"PROMO",
+    "number_of_elements":3,
+    "theme":"Back to School Tech Deals",
+    "gender":"ALL",
+    "season":"Estate 2025",
+    "brands":[
+      "TechPro",
+      "SmartGadgets"
+    ],
+    "targets":[
+      "Studenti universitari",
+      "Genitori"
+    ],
+    "products":[
+      "Laptop UltraBook 14'' con processore X-Gen",
+      "Tablet KidSafe 10'' con custodia antiurto",
+      "Cuffie wireless NoiseX con cancellazione rumore"
+    ],
+    "product_category":"Elettronica",
+    "additional_content":"Spedizione gratuita sopra i 50 € + 10% di sconto con codice SCHOOL10."
+  },
+  "llm_name":"openai:gpt-4o",
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images":[ ],
+  "documents":[ ],
+  "custom_prompt":"Usa un tono informale rivolto a un pubblico giovane."
+}

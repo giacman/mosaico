@@ -1,0 +1,24 @@
+{
+  "id": 124,
+  "content_type": "OMNI_BANNER",
+  "data": {
+    "theme": "Saldi Estivi",
+    "gender": "ALL",
+    "season": "Summer 2025",
+    "brands": ["BrandA"],
+    "targets": ["Single", "Donne"],
+    "products": ["Pareo", "Costumi"],
+    "product_category": "Accessori estivi",
+    "additional_content": "Promozione valida fino al 31/07",
+    "type": "POP_UP"
+  },
+  "llm_name": "openai:gpt-4o",
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": ""
+}

@@ -1,0 +1,121 @@
+{
+  "id" :0,
+  "content_type" :"HOMEPAGE",
+  "language" :{ "name": "English(UK)", "lang_alpha2": "en", "country_alpha2": "gb"},
+  "llm_name" :"openai:gpt-4o",
+  "data" :{
+    "gender" :"MEN",
+    "device" :"APP",
+    "elements" :[
+      {
+        "type" :"TITLE",
+        "theme" :"THE CORE",
+        "label" :"LBL_THECORE_1106_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/the-core?lvrid=_gm_duq2&__s=ODIzMzcyMw"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"THE CORE",
+        "label" :"LBL_THECORE_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/the-core?lvrid=_gm_duq2&__s=ODIzMzcyMw"
+      },
+      {
+        "type" :"COMPOSED",
+        "theme" :"WIDGET - NEW ARRIVALS",
+        "label" :"LBL_NEWARRIVALSMEN_2105_WIDGET",
+        "elements" :[
+          {
+            "type" :"WIDGET",
+            "theme" :"",
+            "label" :"LBL_NEWARRIVALSMEN_2105_WIDGET",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/men/new-in?lvrid=_gm_tnewinthisw&__s=ODIzMzcyMw"
+          }
+        ]
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"BALLY",
+        "label" :"LBL_BALLY_0406_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/bally?lvrid=_gm_d470"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"BALLY",
+        "label" :"LBL_BALLY_0406_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/bally?lvrid=_gm_d470"
+      },
+      {
+        "type" :"COMPOSED",
+        "theme" :"MULTICATEGORIA TOP",
+        "label" :"",
+        "subelements" :[
+          {
+            "type" :"TITLE",
+            "theme" :"",
+            "label" :"LBL_TOPHANDLE_0904_TITLE"
+          },
+          {
+            "type" :"WIDGET",
+            "theme" :"T-SHIRT",
+            "label" :"TSHIRT_WIDGET",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/men/clothing/t-shirts?lvrid=_gm_i1_c8"
+          },
+          {
+            "type" :"WIDGET",
+            "theme" :"BLAZER",
+            "label" :"BLAZER_1110_WIDGET",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/men/clothing/jackets/blazers?lvrid=_gm_i1_c3_y317"
+          },
+          {
+            "type" :"WIDGET",
+            "theme" :"POLO",
+            "label" :"LBL_POLOS_1007_WIDGET",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/men/clothing/polos?lvrid=_gm_i1_c39"
+          },
+          {
+            "type" :"WIDGET",
+            "theme" :"SHIRT",
+            "label" :"LBL_MEN_SHIRT_WIDGET",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/men/clothing/shirts?lvrid=_gm_i1_c10"
+          }
+        ]
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"SWIMWEAR",
+        "label" :"LBL_SWIMWEAR_1707_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/clothing/swimwear?lvrid=_gm_i1_c11"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"SWIMWEAR",
+        "label" :"LBL_SWIMWEARMENS_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/clothing/swimwear?lvrid=_gm_i1_c11"
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"BAGS",
+        "label" :"LBL_INTHEBAG_2304_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/bags?lvrid=_gm_i22"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"BAGS",
+        "label" :"LBL_BAGSMEN_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/bags?lvrid=_gm_i22"
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"CELEBRATION / WEDDING GUEST",
+        "label" :"LBL_CELEBRATION_MEN_1106_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/party-evening?lvrid=_gm_tspecialocc&__s=ODIzMzcyMw"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"CELEBRATION / WEDDING GUEST",
+        "label" :"LBL_CELEBRATION_MEN_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/party-evening?lvrid=_gm_tspecialocc&__s=ODIzMzcyMw"
+      }
+    ]
+  }
+}

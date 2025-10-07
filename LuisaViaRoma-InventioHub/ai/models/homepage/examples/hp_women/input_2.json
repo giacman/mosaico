@@ -1,0 +1,98 @@
+{
+  "id" :0,
+  "content_type" :"HOMEPAGE",
+  "language" :{ "name": "English(UK)", "lang_alpha2": "en", "country_alpha2": "gb"},
+  "llm_name" :"openai:gpt-4o",
+  "data" :{
+    "gender" :"WOMEN",
+    "device" :"HP",
+    "elements" :[
+      {
+        "type" :"TITLE",
+        "theme" :"ANNAGRETA",
+        "label" :"LBL_ANNAGRETA_1106_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/annagreta?lvrid=_gw_dxn9"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"ANNAGRETA",
+        "label" :"LBL_ANNAGRETA_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/annagreta?lvrid=_gw_dxn9"
+      },
+      {
+        "type" :"COMPOSED",
+        "theme" :"WIDGET - NEW ARRIVALS",
+        "label" :"",
+        "elements" :[
+          {
+            "type" :"WIDGET",
+            "theme" :"",
+            "label" :"LBL_NEWARRIVALSWOMEN_WIDGET_0401",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/women/new-in?lvrid=_gw_tnewinthisw"
+          }
+        ]
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"BALLY",
+        "label" :"LBL_BALLY_0406_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/bally?lvrid=_gw_d470"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"BALLY",
+        "label" :"LBL_BALLY_0406_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/bally?lvrid=_gw_d470"
+      },
+      {
+        "type" :"COMPOSED",
+        "theme" :"ZIMMERMAN",
+        "label" :"",
+        "elements" :[
+          {
+            "type" :"WIDGET",
+            "theme" :"",
+            "label" :"LBL_ZIMMERMANN_2105_WIDGET",
+            "link" :"https://www.luisaviaroma.com/en-it/shop/women/zimmermann?lvrid=_gw_drsq"
+          }
+        ]
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"SKIRT",
+        "label" :"LBL_SUMMERSKIRTING_2606_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/clothing/skirts?lvrid=_gw_i1_c2"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"SKIRT",
+        "label" :"LBL_SUMMERSKIRTING_2606_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/clothing/skirts?lvrid=_gw_i1_c2"
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"BAGS",
+        "label" :"LBL_BAGSHER_1106_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/bags?lvrid=_gw_i22"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"BAGS",
+        "label" :"LBL_BAGSHER_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/women/bags?lvrid=_gw_i22"
+      },
+      {
+        "type" :"TITLE",
+        "theme" :"CELEBRATION / WEDDING GUEST",
+        "label" :"LBL_CELEBRATION_1106_TITLE",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/party-evening?lvrid=_gm_tspecialocc&__s=ODIzMzcyMw"
+      },
+      {
+        "type" :"TEXT",
+        "theme" :"CELEBRATION / WEDDING GUEST",
+        "label" :"LBL_CELEBRATION_1106_TEXT",
+        "link" :"https://www.luisaviaroma.com/en-it/shop/men/party-evening?lvrid=_gm_tspecialocc&__s=ODIzMzcyMw"
+      }
+    ]
+  }
+}

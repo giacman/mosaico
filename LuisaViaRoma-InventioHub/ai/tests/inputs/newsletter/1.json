@@ -1,0 +1,35 @@
+{
+  "id":1,
+  "content_type":"NEWSLETTER",
+  "sent_at": "2025-07-09T11:08:34+0000",
+  "data":{
+    "type":"EDITORIAL",
+    "number_of_elements":2,
+    "theme":"Sostenibilità nella moda",
+    "gender":"WOMEN",
+    "season":"Autunno 2025",
+    "brands":[
+      "EcoStyle",
+      "GreenWear"
+    ],
+    "targets":[
+      "Millennial eco-conscious",
+      "Fashion lovers"
+    ],
+    "products":[
+      "Giacca in cotone organico con tintura naturale",
+      "Jeans riciclati a vita alta"
+    ],
+    "product_category":"Abbigliamento sostenibile",
+    "additional_content":"Inserisci dati sull’impatto etico (CO₂ risparmiata, acqua non sprecata)."
+  },
+  "llm_name":"openai:gpt-4o",
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images":[ ],
+  "documents":[ ],
+  "custom_prompt":"Usa un tono informale rivolto a un pubblico giovane."
+}

@@ -1,0 +1,35 @@
+{
+  "id": 4,
+  "content_type": "SOCIAL_ORGANIC",
+  "data": {
+    "type": "LINKEDIN",
+    "theme": "Sustainability Milestones 2025",
+    "gender": "ALL",
+    "season": "ALL_SEASON",
+    "brands": [
+      "GreenTech Corp"
+    ],
+    "targets": [
+      "Sustainability professionals",
+      "Investors",
+      "Employees"
+    ],
+    "products": [],
+    "product_category": "Corporate",
+    "additional_content": "Evidenziare la riduzione del 40% delle emissioni di CO₂ nell'ultimo anno"
+  },
+  "llm_name": "openai:gpt-4o",
+  "llm_config": {
+    "temperature": 0.55,
+    "timeout": 180,
+    "max_retries": 3
+  },
+  "language": {
+    "name": "English(UK)",
+    "lang_alpha2": "en",
+    "country_alpha2": "GB"
+  },
+  "images": [],
+  "documents": [],
+  "custom_prompt": ""
+}

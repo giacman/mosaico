@@ -1,0 +1,111 @@
+{
+    "id": 1,
+    "state": "pending",
+    "state_message": "",
+    "sent_at": "2025-07-04T14:23:58.145641Z",
+    "generated_at": null,
+    "content_type": "HOMEPAGE",
+    "data": {
+        "gender": "MEN",
+        "device": "APP",
+        "elements": [
+            {
+                "type": "TITLE",
+                "theme": "SUMMER IN THE CITY",
+                "comment": "link to shop by iconic & best sellers - focus summer",
+                "label": "LBL_SUMMERINTHECITY_1706_TITLE",
+                "link": "https://www.luisaviaroma.com/en-it/shop/men/iconic-bestsellers?lvrid=_gm_tessentials&__s=OTEyMjA5NA",
+                "text": "Summer vibes"
+            },
+            {
+                "type": "TEXT",
+                "theme": "SUMMER IN THE CITY",
+                "comment": "link to shop by iconic & best sellers - focus summer",
+                "label": "LBL_SUMMERINTHECITY_1706_TEXT",
+                "link": "https://www.luisaviaroma.com/en-it/shop/men/iconic-bestsellers?lvrid=_gm_tessentials&__s=OTEyMjA5NA",
+                "text": "Style icons for the heat"
+            },
+            {
+                "type": "TITLE",
+                "theme": "EENK",
+                "comment": "ATTIVITà PATTUITA",
+                "label": "LBL_EENK_1806_TITLE",
+                "link": "",
+                "text": "EENK"
+            },
+            {
+                "type": "TEXT",
+                "theme": "EENK",
+                "comment": "ATTIVITà PATTUITA",
+                "label": "LBL_EENK_1806_TEXT",
+                "link": "",
+                "text": "Meaningful fashion moments"
+            },
+            {
+                "type": "TITLE",
+                "theme": "SNEAKERS",
+                "comment": "link cat. generica sneakers con focus light summer sneakers",
+                "label": "LBL_SNEAKERS_1706_TITLE",
+                "link": "https://www.luisaviaroma.com/en-it/shop/men/shoes/sneakers?lvrid=_gm_i4_c97&__s=OTEyMjA5NA",
+                "text": "Step light"
+            },
+            {
+                "type": "TEXT",
+                "theme": "SNEAKERS",
+                "comment": "link cat. generica sneakers con focus light summer sneakers",
+                "label": "LBL_SNEAKERS_1706_TEXT",
+                "link": "https://www.luisaviaroma.com/en-it/shop/men/shoes/sneakers?lvrid=_gm_i4_c97&__s=OTEyMjA5NA",
+                "text": "Sneakers for sunny days"
+            },
+            {
+                "type": "TITLE",
+                "theme": "BAGS",
+                "comment": "",
+                "label": "LBL_INTHEBAG_2304_TITLE",
+                "link": "https://www.luisaviaroma.com/en-it/shop/men/bags?lvrid=_gm_i22",
+                "text": "Bag essentials"
+            },
+            {
+                "type": "TEXT",
+                "theme": "BAGS",
+                "comment": "",
+                "label": "LBL_BAGSMEN_1106_TEXT",
+                "link": "https://www.luisaviaroma.com/en-it/shop/men/bags?lvrid=_gm_i22",
+                "text": "Carry your world"
+            },
+            {
+                "type": "TITLE",
+                "theme": "CELEBRATION / WEDDING GUEST",
+                "comment": "link to shop by party",
+                "label": "LBL_CELEBRATION_MEN_1106_TITLE",
+                "link": "https://www.luisaviaroma.com/en-it/shop/women/party-evening?lvrid=_gw_tspecialocc",
+                "text": "Celebrate in style"
+            },
+            {
+                "type": "TEXT",
+                "theme": "CELEBRATION / WEDDING GUEST",
+                "comment": "link to shop by party",
+                "label": "LBL_CELEBRATION_MEN_1106_TEXT",
+                "link": "https://www.luisaviaroma.com/en-it/shop/women/party-evening?lvrid=_gw_tspecialocc",
+                "text": "Dress for the occasion"
+            }
+        ]
+    },
+    "llm_name": "openai:gpt-4o",
+    "llm_config": {
+        "temperature": 0.5,
+        "timeout": 180.0,
+        "max_retries": 3
+    },
+    "language": {
+        "id": -1,
+        "name": "English(UK)",
+        "lang_alpha2": "en",
+        "country_alpha2": "GB",
+        "complete_name": "English(UK)(en-GB)"
+    },
+    "s3files": [],
+    "images": [],
+    "documents": [],
+    "custom_prompt": ""
+}
