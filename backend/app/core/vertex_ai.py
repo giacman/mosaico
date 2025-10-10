@@ -3,7 +3,7 @@ Vertex AI Client Setup
 Modern approach - NO LangChain, direct Vertex AI SDK
 """
 import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig
+from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
 from app.core.config import settings
 import logging
 import os
@@ -81,6 +81,45 @@ class VertexAIClient:
         
         except Exception as e:
             logger.error(f"Error generating content with {model_name}: {str(e)}")
+            raise
+
+    async def generate_from_image_and_text(
+        self,
+        prompt: str,
+        image_data: bytes,
+        image_mime_type: str = "image/jpeg",
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        response_mime_type: str = "application/json"
+    ) -> str:
+        """
+        Generate content from a multimodal input (image and text).
+        """
+        model_name = model or settings.vertex_ai_model
+        
+        try:
+            generative_model = GenerativeModel(model_name)
+            
+            # Prepare the multimodal content
+            image_part = Part.from_data(data=image_data, mime_type=image_mime_type)
+            prompt_part = Part.from_text(prompt)
+            
+            generation_config = GenerationConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                response_mime_type=response_mime_type
+            )
+            
+            response = generative_model.generate_content(
+                [image_part, prompt_part],
+                generation_config=generation_config
+            )
+            
+            return response.text
+            
+        except Exception as e:
+            logger.error(f"Error generating content from image with {model_name}: {str(e)}")
             raise
     
     async def generate_with_fixing(

@@ -74,6 +74,41 @@ function getSelectedText() {
 }
 
 /**
+ * Extracts an image URL from the selected cell, either from an =IMAGE() formula or raw text.
+ * @return {Object} The extracted URL or an error.
+ */
+function getImageUrlFromSelectedCell() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSheet();
+    var cell = sheet.getActiveCell();
+    var formula = cell.getFormula();
+    var url = '';
+
+    if (formula && formula.toUpperCase().indexOf('=IMAGE(') !== -1) {
+      // Extract URL from =IMAGE("url") formula
+      var matches = formula.match(/=IMAGE\("([^"]+)"/i);
+      if (matches && matches.length > 1) {
+        url = matches[1];
+      }
+    }
+    
+    // If no URL found in formula, fall back to the cell value
+    if (!url) {
+      url = cell.getValue().toString();
+    }
+    
+    return {
+      url: url.trim(),
+      isEmpty: url.trim() === ''
+    };
+  } catch (e) {
+    return {
+      error: e.message
+    };
+  }
+}
+
+/**
  * Writes text to the active cell
  * @param {string} text - Text to write
  */
@@ -229,6 +264,37 @@ function refineText(text, operation) {
       data: response
     };
   } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Generates text from an image URL and a prompt.
+ * Called from sidebar UI
+ */
+function generateFromImage(imageUrl, text, count, tone) {
+  Logger.log('generateFromImage function called. Image URL: ' + imageUrl);
+  var payload = {
+    image_url: imageUrl,
+    text: text,
+    count: count,
+    tone: tone,
+    content_type: 'newsletter' // Or make this dynamic if needed
+  };
+
+  try {
+    // We can reuse the /generate-from-image endpoint which returns a similar structure
+    var response = callMosaicoAPI('/api/v1/generate-from-image', payload);
+    Logger.log('generateFromImage successful.');
+    return {
+      success: true,
+      data: response
+    };
+  } catch (error) {
+    Logger.log('ERROR in generateFromImage: ' + error.message);
     return {
       success: false,
       error: error.message

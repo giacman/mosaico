@@ -105,6 +105,15 @@ class RefineResponse(BaseModel):
     operation: str = Field(..., description="Operation performed")
 
 
+class GenerateFromImageRequest(BaseModel):
+    image_url: str = Field(..., description="URL of the image to process")
+    text: str = Field(..., description="The instructional text or prompt to run against the image")
+    count: int = Field(default=3, description="Number of variations to generate")
+    tone: ToneType = Field(default=ToneType.PROFESSIONAL, description="Tone of voice for the generated text")
+    content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Type of content to generate")
+    context: str | None = Field(default=None, description="Optional additional context")
+
+
 # ============================================================================
 # IMAGE TO TEXT (Future - Multimodal)
 # ============================================================================

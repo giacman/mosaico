@@ -249,14 +249,19 @@
   <!-- GENERATE TAB -->
   <div id="generate-tab" class="tab-content active">
     <div class="form-group">
-      <label>Original Text</label>
-      <textarea id="generate-text" placeholder="Enter text to generate variations..."></textarea>
+      <label>Image URL (Optional)</label>
+      <input type="text" id="image-url" placeholder="Paste an image URL to add context...">
+    </div>
+    <div class="form-group">
+      <label>Instruction / Text</label>
+      <textarea id="generate-text" placeholder="e.g., 'Create three subject lines for a newsletter about our new handbag collection.'"></textarea>
     </div>
     
     <div class="form-group">
       <label>Number of Variations</label>
       <select id="generate-count">
-        <option value="3">3 variations</option>
+        <option value="1">1 variation</option>
+        <option value="3" selected>3 variations</option>
         <option value="5">5 variations</option>
         <option value="7">7 variations</option>
       </select>
@@ -273,14 +278,14 @@
       </select>
     </div>
     
-    <button class="button button-primary" onclick="generateVariations()">
-      ✨ Generate Variations
+    <button class="button button-primary" onclick="submitGeneration()">
+      ✨ Generate
     </button>
     
     <div id="generate-status" class="status"></div>
     <div id="generate-results" class="results-container"></div>
   </div>
-  
+
   <!-- TRANSLATE TAB -->
   <div id="translate-tab" class="tab-content">
     <div class="form-group">
@@ -361,74 +366,86 @@
         .getSelectedText();
     }
     
-    // Generate variations
-    function generateVariations() {
+    // Main unified generation function
+    function submitGeneration() {
+      var imageUrl = document.getElementById('image-url').value.trim();
       var text = document.getElementById('generate-text').value.trim();
       var count = parseInt(document.getElementById('generate-count').value);
       var tone = document.getElementById('generate-tone').value;
-      
+
       if (!text) {
-        showStatus('generate', 'error', 'Please enter text to generate variations.');
+        showStatus('generate', 'error', 'Please provide an instruction or text.');
         return;
       }
-      
-      // Clear previous results immediately
-      document.getElementById('generate-results').innerHTML = '';
-      showStatus('generate', 'loading', 'Generating variations...');
-      
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (response.success) {
-            var variations = response.data.variations;
-            showStatus('generate', 'success', '✓ Generated ' + variations.length + ' variations below.');
-            
-            // Display variations in the sidebar
-            var resultsContainer = document.getElementById('generate-results');
-            resultsContainer.innerHTML = ''; // Clear again just in case
 
-            for (var i = 0; i < variations.length; i++) {
-              var variationText = variations[i];
-              
-              var resultItem = document.createElement('div');
-              resultItem.className = 'result-item';
-              
-              var textElement = document.createElement('p');
-              textElement.className = 'result-text';
-              textElement.textContent = variationText;
-              
-              var copyButton = document.createElement('button');
-              copyButton.className = 'copy-button';
-              copyButton.textContent = 'Copy';
-              copyButton.onclick = (function(text) {
-                return function() {
-                  copyText(text);
-                  this.textContent = 'Copied!';
-                  setTimeout(function() { this.textContent = 'Copy'; }.bind(this), 2000);
-                };
-              })(variationText);
-              
-              var insertButton = document.createElement('button');
-              insertButton.className = 'insert-button';
-              insertButton.textContent = 'Insert';
-              insertButton.onclick = (function(text) {
-                return function() {
-                  google.script.run.writeToActiveCell(text);
-                };
-              })(variationText);
-              
-              resultItem.appendChild(textElement);
-              resultItem.appendChild(copyButton);
-              resultItem.appendChild(insertButton);
-              resultsContainer.appendChild(resultItem);
-            }
-          } else {
-            showStatus('generate', 'error', 'Error: ' + response.error);
+      document.getElementById('generate-results').innerHTML = '';
+      showStatus('generate', 'loading', 'Generating...');
+
+      var successCallback = function(response) {
+        if (response.success) {
+          var variations = response.data.variations;
+          showStatus('generate', 'success', '✓ Generated ' + variations.length + ' variations below.');
+          
+          var resultsContainer = document.getElementById('generate-results');
+          resultsContainer.innerHTML = '';
+
+          for (var i = 0; i < variations.length; i++) {
+            var variationText = variations[i];
+            
+            var resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+            
+            var textElement = document.createElement('p');
+            textElement.className = 'result-text';
+            textElement.textContent = variationText;
+            
+            var copyButton = document.createElement('button');
+            copyButton.className = 'copy-button';
+            copyButton.textContent = 'Copy';
+            copyButton.onclick = (function(text) {
+              return function() {
+                copyText(text);
+                this.textContent = 'Copied!';
+                setTimeout(function() { this.textContent = 'Copy'; }.bind(this), 2000);
+              };
+            })(variationText);
+
+            var insertButton = document.createElement('button');
+            insertButton.className = 'insert-button';
+            insertButton.textContent = 'Insert';
+            insertButton.onclick = (function(text) {
+              return function() {
+                google.script.run.writeToActiveCell(text);
+              };
+            })(variationText);
+            
+            resultItem.appendChild(textElement);
+            resultItem.appendChild(copyButton);
+            resultItem.appendChild(insertButton);
+            resultsContainer.appendChild(resultItem);
           }
-        })
-        .withFailureHandler(function(error) {
-          showStatus('generate', 'error', 'Failed: ' + error.message);
-        })
-        .generateVariations(text, count, tone);
+        } else {
+          showStatus('generate', 'error', 'Error: ' + response.error);
+        }
+      };
+
+      var failureCallback = function(error) {
+        showStatus('generate', 'error', 'Failed: ' + error.message);
+      };
+
+      if (imageUrl) {
+        // Call the image generation function
+        google.script.run
+          .withSuccessHandler(successCallback)
+          .withFailureHandler(failureCallback)
+          .generateFromImage(imageUrl, text, count, tone);
+      } else {
+        // Call the standard text generation function
+        google.script.run
+          .withSuccessHandler(successCallback)
+          .withFailureHandler(failureCallback)
+          .generateVariations(text, count, tone);
+      }
     }
     
     // Translate
