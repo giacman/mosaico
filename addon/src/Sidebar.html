@@ -182,6 +182,43 @@
       color: #5f6368;
       margin-top: 4px;
     }
+    
+    .results-container {
+      margin-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 16px;
+    }
+    
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      background: #f8f9fa;
+    }
+    
+    .result-text {
+      flex-grow: 1;
+      margin-right: 8px;
+      font-size: 13px;
+      white-space: pre-wrap; /* Preserve newlines */
+    }
+    
+    .copy-button {
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #e8f0fe;
+      color: #1967d2;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .copy-button:hover {
+      background: #d2e3fc;
+    }
   </style>
 </head>
 <body>
@@ -201,7 +238,6 @@
     <div class="form-group">
       <label>Original Text</label>
       <textarea id="generate-text" placeholder="Enter text to generate variations..."></textarea>
-      <button class="button-secondary" onclick="loadSelectedText('generate')">📝 Load from Selected Cell</button>
     </div>
     
     <div class="form-group">
@@ -229,6 +265,7 @@
     </button>
     
     <div id="generate-status" class="status"></div>
+    <div id="generate-results" class="results-container"></div>
   </div>
   
   <!-- TRANSLATE TAB -->
@@ -322,17 +359,45 @@
         return;
       }
       
+      // Clear previous results immediately
+      document.getElementById('generate-results').innerHTML = '';
       showStatus('generate', 'loading', 'Generating variations...');
       
       google.script.run
         .withSuccessHandler(function(response) {
           if (response.success) {
             var variations = response.data.variations;
-            google.script.run
-              .withSuccessHandler(function() {
-                showStatus('generate', 'success', `✓ Generated ${variations.length} variations and wrote to sheet!`);
-              })
-              .writeVariationsToSheet(variations);
+            showStatus('generate', 'success', '✓ Generated ' + variations.length + ' variations below.');
+            
+            // Display variations in the sidebar
+            var resultsContainer = document.getElementById('generate-results');
+            resultsContainer.innerHTML = ''; // Clear again just in case
+
+            for (var i = 0; i < variations.length; i++) {
+              var variationText = variations[i];
+              
+              var resultItem = document.createElement('div');
+              resultItem.className = 'result-item';
+              
+              var textElement = document.createElement('p');
+              textElement.className = 'result-text';
+              textElement.textContent = variationText;
+              
+              var copyButton = document.createElement('button');
+              copyButton.className = 'copy-button';
+              copyButton.textContent = 'Copy';
+              copyButton.onclick = (function(text) {
+                return function() {
+                  copyText(text);
+                  this.textContent = 'Copied!';
+                  setTimeout(function() { this.textContent = 'Copy'; }.bind(this), 2000);
+                };
+              })(variationText);
+              
+              resultItem.appendChild(textElement);
+              resultItem.appendChild(copyButton);
+              resultsContainer.appendChild(resultItem);
+            }
           } else {
             showStatus('generate', 'error', 'Error: ' + response.error);
           }
@@ -400,6 +465,31 @@
           showStatus('refine', 'error', 'Failed: ' + error.message);
         })
         .refineText(text, operation);
+    }
+
+    // Helper function to copy text to clipboard
+    function copyText(text) {
+      var textArea = document.createElement("textarea");
+      textArea.style.position = 'fixed';
+      textArea.style.top = 0;
+      textArea.style.left = 0;
+      textArea.style.width = '2em';
+      textArea.style.height = '2em';
+      textArea.style.padding = 0;
+      textArea.style.border = 'none';
+      textArea.style.outline = 'none';
+      textArea.style.boxShadow = 'none';
+      textArea.style.background = 'transparent';
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        showStatus('generate', 'error', 'Failed to copy text.');
+      }
+      document.body.removeChild(textArea);
     }
     
     // Show status message
