@@ -1,8 +1,6 @@
 # Mosaico
 ### Your AI Content Creation Co-Pilot
 
-> *Assembling diverse pieces of intelligence to create rich, coherent content*
-
 **Versione:** 1.0  
 **Status:** Fase 1 - Kick-off
 

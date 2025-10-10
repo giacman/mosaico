@@ -6,9 +6,10 @@
  * to provide AI-powered content generation directly in Sheets
  */
 
-// Backend API Configuration
-// TODO: Replace with your Cloud Run URL
-const BACKEND_URL = 'https://mosaico-backend-YOUR-PROJECT.run.app';
+// --- CONFIGURATION ---
+// The backend URL is now managed via Script Properties.
+// Use the "Mosaico > Set Backend URL" menu to change it.
+var DEFAULT_BACKEND_URL = 'https://beckham-odontographic-siu.ngrok-free.dev';
 
 /**
  * Runs when the add-on is installed
@@ -22,9 +23,12 @@ function onInstall(e) {
  * Adds Mosaico menu to the UI
  */
 function onOpen(e) {
-  const ui = SpreadsheetApp.getUi();
+  var ui = SpreadsheetApp.getUi();
   ui.createAddonMenu()
     .addItem('Open Mosaico', 'showSidebar')
+    .addSeparator()
+    .addItem('Set Backend URL', 'setBackendUrl')
+    .addItem('View Current Backend', 'showBackendUrl')
     .addSeparator()
     .addItem('About', 'showAbout')
     .addToUi();
@@ -34,7 +38,7 @@ function onOpen(e) {
  * Shows the Mosaico sidebar
  */
 function showSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('Sidebar')
+  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setTitle('Mosaico AI')
     .setWidth(350);
   SpreadsheetApp.getUi().showSidebar(html);
@@ -44,7 +48,7 @@ function showSidebar() {
  * Shows about dialog
  */
 function showAbout() {
-  const ui = SpreadsheetApp.getUi();
+  var ui = SpreadsheetApp.getUi();
   ui.alert(
     'Mosaico - AI Content Creation Co-Pilot',
     'Version 1.0.0\\n\\nYour AI assistant for content creation in Google Sheets.',
@@ -57,10 +61,10 @@ function showAbout() {
  * @return {Object} Selected text and cell address
  */
 function getSelectedText() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const cell = sheet.getActiveCell();
-  const text = cell.getValue().toString();
-  const address = cell.getA1Notation();
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var cell = sheet.getActiveCell();
+  var text = cell.getValue().toString();
+  var address = cell.getA1Notation();
   
   return {
     text: text,
@@ -74,8 +78,8 @@ function getSelectedText() {
  * @param {string} text - Text to write
  */
 function writeToActiveCell(text) {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const cell = sheet.getActiveCell();
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var cell = sheet.getActiveCell();
   cell.setValue(text);
 }
 
@@ -84,13 +88,13 @@ function writeToActiveCell(text) {
  * @param {Array<string>} variations - Array of text variations
  */
 function writeVariationsToSheet(variations) {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const startCell = sheet.getActiveCell();
-  const startRow = startCell.getRow();
-  const col = startCell.getColumn();
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var startCell = sheet.getActiveCell();
+  var startRow = startCell.getRow();
+  var col = startCell.getColumn();
   
   // Write each variation to a new row
-  for (let i = 0; i < variations.length; i++) {
+  for (var i = 0; i < variations.length; i++) {
     sheet.getRange(startRow + i, col).setValue(variations[i]);
   }
   
@@ -105,9 +109,14 @@ function writeVariationsToSheet(variations) {
  * @return {Object} API response
  */
 function callMosaicoAPI(endpoint, payload) {
-  const url = BACKEND_URL + endpoint;
+  var properties = PropertiesService.getScriptProperties();
+  var backendUrl = properties.getProperty('BACKEND_URL') || DEFAULT_BACKEND_URL;
+  var url = backendUrl + endpoint;
+
+  Logger.log('Attempting to call API. URL: ' + url);
+  Logger.log('Payload: ' + JSON.stringify(payload));
   
-  const options = {
+  var options = {
     'method': 'post',
     'contentType': 'application/json',
     'payload': JSON.stringify(payload),
@@ -115,16 +124,21 @@ function callMosaicoAPI(endpoint, payload) {
   };
   
   try {
-    const response = UrlFetchApp.fetch(url, options);
-    const responseCode = response.getResponseCode();
-    const responseText = response.getContentText();
+    var response = UrlFetchApp.fetch(url, options);
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
+
+    Logger.log('API Response Code: ' + responseCode);
     
     if (responseCode !== 200) {
+      Logger.log('API Error Response Text: ' + responseText);
       throw new Error('API Error: ' + responseText);
     }
     
+    Logger.log('API Success. Response received.');
     return JSON.parse(responseText);
   } catch (error) {
+    Logger.log('ERROR in callMosaicoAPI: ' + error.message);
     throw new Error('Failed to call Mosaico API: ' + error.message);
   }
 }
@@ -139,7 +153,7 @@ function callMosaicoAPI(endpoint, payload) {
  * @return {Object} API response with variations
  */
 function generateVariations(text, count, tone) {
-  const payload = {
+  var payload = {
     text: text,
     count: count,
     tone: tone || 'professional',
@@ -147,7 +161,7 @@ function generateVariations(text, count, tone) {
   };
   
   try {
-    const response = callMosaicoAPI('/api/v1/generate', payload);
+    var response = callMosaicoAPI('/api/v1/generate', payload);
     return {
       success: true,
       data: response
@@ -169,7 +183,8 @@ function generateVariations(text, count, tone) {
  * @return {Object} API response with translation
  */
 function translateText(text, targetLanguage) {
-  const payload = {
+  Logger.log('translateText function called. Text: "' + text + '", Target Language: ' + targetLanguage);
+  var payload = {
     text: text,
     target_language: targetLanguage,
     maintain_tone: true,
@@ -177,12 +192,14 @@ function translateText(text, targetLanguage) {
   };
   
   try {
-    const response = callMosaicoAPI('/api/v1/translate', payload);
+    var response = callMosaicoAPI('/api/v1/translate', payload);
+    Logger.log('translateText successful.');
     return {
       success: true,
       data: response
     };
   } catch (error) {
+    Logger.log('ERROR in translateText: ' + error.message);
     return {
       success: false,
       error: error.message
@@ -199,14 +216,14 @@ function translateText(text, targetLanguage) {
  * @return {Object} API response with refined text
  */
 function refineText(text, operation) {
-  const payload = {
+  var payload = {
     text: text,
     operation: operation,
     content_type: 'newsletter'
   };
   
   try {
-    const response = callMosaicoAPI('/api/v1/refine', payload);
+    var response = callMosaicoAPI('/api/v1/refine', payload);
     return {
       success: true,
       data: response
@@ -217,4 +234,39 @@ function refineText(text, operation) {
       error: error.message
     };
   }
+}
+
+// --- CONFIGURATION FUNCTIONS ---
+
+/**
+ * Sets the backend URL in Script Properties.
+ */
+function setBackendUrl() {
+  var ui = SpreadsheetApp.getUi();
+  var result = ui.prompt(
+    'Set Backend URL',
+    'Enter the full URL for the Mosaico backend (e.g., https://your-ngrok-url.app or https://your-cloud-run-url.run.app):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() == ui.Button.OK) {
+    var newUrl = result.getResponseText().trim();
+    if (newUrl.startsWith('http')) {
+      var properties = PropertiesService.getScriptProperties();
+      properties.setProperty('BACKEND_URL', newUrl);
+      ui.alert('Success', 'Backend URL has been updated to: ' + newUrl, ui.ButtonSet.OK);
+    } else {
+      ui.alert('Error', 'Invalid URL. Please enter a valid URL starting with http or https.', ui.ButtonSet.OK);
+    }
+  }
+}
+
+/**
+ * Displays the current backend URL.
+ */
+function showBackendUrl() {
+  var properties = PropertiesService.getScriptProperties();
+  var backendUrl = properties.getProperty('BACKEND_URL') || DEFAULT_BACKEND_URL;
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('Current Backend URL', 'The add-on is currently configured to use: ' + backendUrl, ui.ButtonSet.OK);
 }

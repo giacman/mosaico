@@ -29,8 +29,18 @@ FastAPI backend for Mosaico AI Content Creation Co-Pilot.
 ### Installation
 
 ```bash
-# Install dependencies
 cd backend
+
+# Create virtual environment
+python3 -m venv .venv-mosaico
+
+# Activate virtual environment
+# On macOS/Linux:
+source .venv-mosaico/bin/activate
+# On Windows:
+# .venv-mosaico\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
 # Copy environment configuration
@@ -46,7 +56,7 @@ Edit `.env`:
 
 ```bash
 GCP_PROJECT_ID=your-project-id
-GCP_LOCATION=us-central1
+GCP_LOCATION=europe-west1  # EU region (Belgium recommended)
 VERTEX_AI_MODEL=gemini-2.5-pro
 ```
 
@@ -139,7 +149,7 @@ pytest --cov=app tests/
 # Build and deploy
 gcloud run deploy mosaico-backend \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --set-env-vars GCP_PROJECT_ID=your-project
 

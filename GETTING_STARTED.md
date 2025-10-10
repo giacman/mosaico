@@ -20,49 +20,143 @@ This guide will help you set up and run Mosaico from scratch.
 - Basic knowledge of Python and Google Apps Script
 
 ### GCP Setup
-1. Create GCP Project: https://console.cloud.google.com/
-2. Enable APIs:
-   - Vertex AI API
-   - Cloud Run API
-   - Cloud Storage API
-3. Set up authentication:
-   ```bash
-   gcloud auth login
-   gcloud config set project YOUR_PROJECT_ID
-   gcloud auth application-default login
-   ```
+
+#### 1. Create GCP Project
+- Visita: https://console.cloud.google.com/
+- Click "Select a project" → "New Project"
+- Nome: "Mosaico" (o quello che preferisci)
+- Organization: Seleziona la tua org LuisaViaRoma
+- **Annota il Project ID** (es. `mosaico-prod-12345`)
+
+#### 2. Enable Required APIs
+
+```bash
+# Set il progetto
+gcloud config set project YOUR_PROJECT_ID
+
+# Abilita le API necessarie
+gcloud services enable aiplatform.googleapis.com
+gcloud services enable run.googleapis.com
+gcloud services enable storage.googleapis.com
+```
+
+#### 3. Setup Authentication (Local Development)
+
+**Usiamo un Service Account dedicato per Mosaico** per isolare le credenziali da altri progetti.
+
+```bash
+# A. Login base (per gcloud CLI)
+gcloud auth login
+
+# B. Crea Service Account per sviluppo locale
+gcloud iam service-accounts create mosaico-dev \
+  --display-name="Mosaico Local Development"
+
+# C. Dai permessi Vertex AI al Service Account
+gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
+  --member="serviceAccount:mosaico-dev@$(gcloud config get-value project).iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+# D. Crea chiave JSON e salvala nella home
+gcloud iam service-accounts keys create ~/mosaico-dev-key.json \
+  --iam-account=mosaico-dev@$(gcloud config get-value project).iam.gserviceaccount.com
+
+# E. Aggiungi path della chiave al file .env (dopo averlo creato)
+echo "" >> backend/.env
+echo "# Local Development Credentials" >> backend/.env
+echo "GOOGLE_APPLICATION_CREDENTIALS=/Users/gvannucchi/mosaico-dev-key.json" >> backend/.env
+
+echo "✅ Service Account configurato!"
+```
+
+**Nota:** La chiave JSON (`~/mosaico-dev-key.json`) è già nel `.gitignore` quindi non verrà committata per sbaglio.
 
 ## 🚀 Step-by-Step Setup
 
 ### Part 1: Backend Setup (15 minutes)
 
-#### 1. Install Dependencies
+#### 1. Setup Virtual Environment & Install Dependencies
 
 ```bash
 cd backend
+
+# Create virtual environment
+python3 -m venv .venv-mosaico
+
+# Activate virtual environment
+# On macOS/Linux:
+source .venv-mosaico/bin/activate
+# On Windows:
+# .venv-mosaico\Scripts\activate
+
+# Upgrade pip
+pip install --upgrade pip
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
 #### 2. Configure Environment
 
 ```bash
-# Copy environment template
+# Copy environment template (crea file .env dalla copia)
 cp env.example .env
 
-# Edit .env file
+# Apri il file .env per modificarlo
 nano .env
+# O usa il tuo editor preferito:
+# code .env    (VS Code)
+# vim .env     (Vim)
+# open .env    (TextEdit su Mac)
 ```
 
-Set these variables:
+**IMPORTANTE: Ora devi EDITARE il file `.env` che hai appena creato**
+
+Il file `.env` è una copia di `env.example` - ora devi personalizzarlo con i TUOI valori.
+
+**Step-by-step:**
+
+1. **Trova il tuo Project ID:**
+```bash
+gcloud config get-value project
+```
+Output esempio: `mosaico-prod-12345` ← Questo è il tuo Project ID
+
+2. **Apri il file `.env` in un editor:**
+```bash
+# Con nano (editor terminale)
+nano .env
+
+# O con VS Code
+code .env
+
+# O con qualsiasi editor di testo
+```
+
+3. **Modifica SOLO questa riga:**
+
+PRIMA (nel file):
 ```bash
 GCP_PROJECT_ID=your-project-id
-GCP_LOCATION=us-central1
-VERTEX_AI_MODEL=gemini-2.5-pro
 ```
+
+DOPO (con il tuo vero ID):
+```bash
+GCP_PROJECT_ID=mosaico-prod-12345
+```
+
+
+**Note on Region:**
+- `europe-west1` (Belgium) - Raccomandato, supporto completo
+- `europe-west8` (Milan) - Più vicino, verifica supporto Vertex AI
+- `europe-west4` (Netherlands) - Alternativa valida
 
 #### 3. Test Locally
 
 ```bash
+# Make sure virtual environment is activated!
+# You should see (.venv-mosaico) in your terminal prompt
+
 # Run backend
 python -m app.main
 
@@ -107,7 +201,7 @@ cd backend
 
 gcloud run deploy mosaico-backend \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --set-env-vars GCP_PROJECT_ID=your-project-id
 ```
@@ -126,7 +220,7 @@ docker push gcr.io/YOUR_PROJECT/mosaico-backend
 # Deploy
 gcloud run deploy mosaico-backend \
   --image gcr.io/YOUR_PROJECT/mosaico-backend \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated
 ```
 
@@ -134,6 +228,8 @@ gcloud run deploy mosaico-backend \
 Example: `https://mosaico-backend-abcd123-uc.a.run.app`
 
 ### Part 3: Google Sheets Add-on Setup (20 minutes)
+
+This section explains how to connect the Add-on to your **deployed Cloud Run backend**. If you want to test the Add-on with your **local backend**, please see the next section (Part 3a).
 
 #### 1. Create Apps Script Project
 
@@ -160,7 +256,42 @@ const BACKEND_URL = 'https://mosaico-backend-YOUR-URL.run.app';
 - In Apps Script: View → Show manifest file
 - Replace content with `addon/appsscript.json`
 
-#### 3. Test the Add-on
+### Part 3a: Local Add-on Testing with ngrok (10 minutes)
+
+To test the Google Sheets Add-on with your backend running on your local machine, you need to expose your local server to the public internet. Google's servers can't connect to `localhost:8080`. We'll use a tool called `ngrok` to create a secure tunnel.
+
+**1. Install and run ngrok**
+
+If you don't have ngrok, download it from [https://ngrok.com/download](https://ngrok.com/download).
+
+Open a **new terminal window** (while your backend server is still running in another) and start ngrok. The project is configured to run on port `8080`.
+
+```bash
+# This will create a public URL for your local server on port 8080
+ngrok http 8080
+```
+
+**2. Get your public URL**
+
+After running the command, ngrok will display a public URL. Copy the `https` address. It will look something like this:
+
+```
+Forwarding                    https://1a2b-3c4d-5e6f.ngrok-free.app -> http://localhost:8080
+```
+
+**3. Configure the Add-on**
+
+Follow the steps in "Part 3" to create the Apps Script project. When you get to the step to edit `Code.gs`, use your public `ngrok` URL.
+
+```javascript
+// In addon/src/Code.gs
+// Use your public ngrok URL for local testing
+const BACKEND_URL = 'https://1a2b-3c4d-5e6f.ngrok-free.app';
+```
+
+Now, your Google Sheet Add-on will send requests to your local backend server through the secure tunnel. Remember to keep ngrok running while you test.
+
+#### 4. Test the Add-on
 
 1. Save all files (Ctrl+S / Cmd+S)
 2. Refresh your Google Sheet

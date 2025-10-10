@@ -277,7 +277,7 @@ When Phase 1 is validated (>80% adoption):
 cd backend
 gcloud run deploy mosaico-backend \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --set-env-vars GCP_PROJECT_ID=your-project
 

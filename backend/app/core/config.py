@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     
+    # Authentication (optional - for local dev with service account)
+    google_application_credentials: str | None = None
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

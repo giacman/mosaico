@@ -9,9 +9,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
+from contextlib import asynccontextmanager
 
 from app.core.config import settings
-from app.api import generate, translate, refine
+from app.api import generate
+from app.api import translate
+from app.api import refine
 
 # Configure logging
 logging.basicConfig(
@@ -23,11 +26,26 @@ logger = logging.getLogger(__name__)
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("=" * 50)
+    logger.info("MOSAICO BACKEND STARTING")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"GCP Project: {settings.gcp_project_id}")
+    logger.info(f"Vertex AI Model: {settings.vertex_ai_model}")
+    logger.info("=" * 50)
+    yield
+    # Shutdown
+    logger.info("Mosaico backend shutting down")
+
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.api_title,
     version=settings.api_version,
-    description="AI Content Creation Co-Pilot for Google Sheets"
+    description="AI Content Creation Co-Pilot for Google Sheets",
+    lifespan=lifespan
 )
 
 # Add rate limiting
@@ -44,21 +62,6 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    logger.info("=" * 50)
-    logger.info("MOSAICO BACKEND STARTING")
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"GCP Project: {settings.gcp_project_id}")
-    logger.info(f"Vertex AI Model: {settings.vertex_ai_model}")
-    logger.info("=" * 50)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("Mosaico backend shutting down")
 
 
 @app.get("/")

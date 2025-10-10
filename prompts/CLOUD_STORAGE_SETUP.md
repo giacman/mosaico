@@ -39,8 +39,8 @@ gs://mosaico-examples/
 ### 1. Create GCS Bucket
 
 ```bash
-# Create bucket
-gsutil mb -l us-central1 gs://mosaico-examples
+# Create bucket (EU region)
+gsutil mb -l europe-west1 gs://mosaico-examples
 
 # Make it private (default)
 gsutil iam ch allUsers:objectViewer gs://mosaico-examples  # DON'T DO THIS
@@ -82,7 +82,7 @@ gsutil -m cp -r examples/* gs://mosaico-examples/
 ```bash
 # Get Cloud Run service account
 gcloud run services describe mosaico-backend \
-  --region us-central1 \
+  --region europe-west1 \
   --format='value(spec.template.spec.serviceAccountName)'
 
 # Grant Storage Object Viewer role

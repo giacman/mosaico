@@ -251,7 +251,7 @@
       </select>
     </div>
     
-    <button class="button button-primary" onclick="translate()">
+    <button class="button button-primary" onclick="processTranslation()">
       🌐 Translate
     </button>
     
@@ -313,9 +313,9 @@
     
     // Generate variations
     function generateVariations() {
-      const text = document.getElementById('generate-text').value.trim();
-      const count = parseInt(document.getElementById('generate-count').value);
-      const tone = document.getElementById('generate-tone').value;
+      var text = document.getElementById('generate-text').value.trim();
+      var count = parseInt(document.getElementById('generate-count').value);
+      var tone = document.getElementById('generate-tone').value;
       
       if (!text) {
         showStatus('generate', 'error', 'Please enter text to generate variations.');
@@ -327,7 +327,7 @@
       google.script.run
         .withSuccessHandler(function(response) {
           if (response.success) {
-            const variations = response.data.variations;
+            var variations = response.data.variations;
             google.script.run
               .withSuccessHandler(function() {
                 showStatus('generate', 'success', `✓ Generated ${variations.length} variations and wrote to sheet!`);
@@ -344,9 +344,9 @@
     }
     
     // Translate
-    function translate() {
-      const text = document.getElementById('translate-text').value.trim();
-      const language = document.getElementById('translate-language').value;
+    function processTranslation() {
+      var text = document.getElementById('translate-text').value.trim();
+      var language = document.getElementById('translate-language').value;
       
       if (!text) {
         showStatus('translate', 'error', 'Please enter text to translate.');
@@ -375,7 +375,7 @@
     
     // Refine
     function refine(operation) {
-      const text = document.getElementById('refine-text').value.trim();
+      var text = document.getElementById('refine-text').value.trim();
       
       if (!text) {
         showStatus('refine', 'error', 'Please enter text to refine.');
@@ -404,7 +404,7 @@
     
     // Show status message
     function showStatus(tab, type, message) {
-      const statusEl = document.getElementById(tab + '-status');
+      var statusEl = document.getElementById(tab + '-status');
       statusEl.className = 'status ' + type;
       statusEl.textContent = message;
       statusEl.style.display = 'block';

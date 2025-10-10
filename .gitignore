@@ -25,6 +25,7 @@ venv/
 ENV/
 env/
 .venv
+.venv-mosaico/
 
 # Environment variables
 .env
@@ -55,6 +56,9 @@ htmlcov/
 .gcloud/
 gcloud-credentials.json
 service-account-key.json
+mosaico-dev-key.json
+*-key.json
+*.json.key
 
 # Temporary files
 tmp/
