@@ -219,6 +219,19 @@
     .copy-button:hover {
       background: #d2e3fc;
     }
+    .insert-button {
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #e6f4ea;
+      color: #137333;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .insert-button:hover {
+      background: #cce8d4;
+    }
   </style>
 </head>
 <body>
@@ -394,8 +407,18 @@
                 };
               })(variationText);
               
+              var insertButton = document.createElement('button');
+              insertButton.className = 'insert-button';
+              insertButton.textContent = 'Insert';
+              insertButton.onclick = (function(text) {
+                return function() {
+                  google.script.run.writeToActiveCell(text);
+                };
+              })(variationText);
+              
               resultItem.appendChild(textElement);
               resultItem.appendChild(copyButton);
+              resultItem.appendChild(insertButton);
               resultsContainer.appendChild(resultItem);
             }
           } else {
