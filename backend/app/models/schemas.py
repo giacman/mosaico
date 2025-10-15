@@ -28,17 +28,33 @@ class ContentType(str, Enum):
     EDITORIAL = "editorial"
 
 
+class ComponentType(str, Enum):
+    FULL_EMAIL = "full_email" # Kept for potential fallback, but structure is preferred
+    SUBJECT = "subject"
+    PRE_HEADER = "pre_header"
+    TITLE = "title"
+    BODY = "body"
+    CTA = "cta"
+
+
+class StructureComponent(BaseModel):
+    component: ComponentType
+    count: int = Field(default=1, ge=1, le=10)
+
+
 # ============================================================================
 # REQUESTS
 # ============================================================================
 
 class GenerateVariationsRequest(BaseModel):
     """Request to generate text variations"""
-    text: str = Field(..., description="Original text to generate variations from", min_length=1, max_length=1000)
-    count: int = Field(default=3, description="Number of variations to generate", ge=1, le=10)
-    tone: ToneType = Field(default=ToneType.PROFESSIONAL, description="Desired tone for variations")
-    content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Type of content")
-    context: str | None = Field(default=None, description="Additional context for generation", max_length=500)
+    text: str = Field(..., description="The instructional text or prompt")
+    count: int = Field(default=3, description="Number of variations to generate")
+    tone: ToneType = Field(default=ToneType.PROFESSIONAL, description="Tone of voice")
+    content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Content type")
+    structure: list[StructureComponent] = Field(..., description="A list of components and their counts to generate in the desired order")
+    context: str | None = Field(default=None, description="Optional additional context")
+    image_url: str | None = None
 
 
 class TranslateRequest(BaseModel):
@@ -71,18 +87,19 @@ class VariationItem(BaseModel):
 
 
 class GenerateVariationsResponse(BaseModel):
-    """Response with generated variations"""
-    variations: List[str] = Field(..., description="List of text variations", min_length=1, max_length=10)
-    original_text: str = Field(..., description="Original input text")
-    tone: str = Field(..., description="Tone used for generation")
+    variations: list[dict[str, str]]
+    original_text: str
+    tone: str
     
     class Config:
         json_schema_extra = {
             "example": {
                 "variations": [
-                    "Scopri la nuova collezione primavera/estate",
-                    "La collezione PE2025 ti aspetta",
-                    "Novità stagionali: esplora ora"
+                    {
+                        "title": "Scopri la nuova collezione primavera/estate",
+                        "body": "La collezione PE2025 ti aspetta",
+                        "cta": "Novità stagionali: esplora ora"
+                    }
                 ],
                 "original_text": "Nuova collezione primavera",
                 "tone": "professional"
@@ -111,6 +128,7 @@ class GenerateFromImageRequest(BaseModel):
     count: int = Field(default=3, description="Number of variations to generate")
     tone: ToneType = Field(default=ToneType.PROFESSIONAL, description="Tone of voice for the generated text")
     content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Type of content to generate")
+    structure: list[StructureComponent] = Field(..., description="A list of components and their counts to generate in the desired order")
     context: str | None = Field(default=None, description="Optional additional context")
 
 

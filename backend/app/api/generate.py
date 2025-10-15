@@ -3,7 +3,7 @@ Generate Variations Endpoint
 Core feature: Generate text variations with tone-of-voice consistency
 Pattern from InventioHub but NO LangChain - Direct Vertex AI SDK
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import logging
@@ -11,21 +11,21 @@ import json
 
 from app.models.schemas import (
     GenerateVariationsRequest,
-    GenerateVariationsResponse
+    GenerateVariationsResponse,
+    ContentType,
+    ToneType,
+    ComponentType,
+    StructureComponent
 )
-from app.core.vertex_ai import vertex_client
+from app.core.vertex_ai import VertexAIClient, get_client
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
 
-
-# ==============================================================================
-# FEW-SHOT EXAMPLES (Tone of Voice)
-# In production, load from Cloud Storage
-# ==============================================================================
-
+# --- Few-Shot Examples (Hardcoded for Simplicity) ---
+# In production, this would load from a database or GCS
 FEW_SHOT_EXAMPLES = {
     "newsletter": {
         "professional": [
@@ -55,33 +55,38 @@ FEW_SHOT_EXAMPLES = {
                     "Finalmente qui: la tua nuova ossessione fashion"
                 ]
             }
+        ],
+        "cta": [
+            {"input": "New user discount", "output": ["Shop Now & Save 15%", "Claim Your Discount", "Explore the Collection"]},
         ]
     }
 }
 
+COMPONENT_INSTRUCTIONS = {
+    ComponentType.FULL_EMAIL: "a full newsletter email structure, including a subject, pre-header, two body sections, and two calls to action (CTAs)",
+    ComponentType.SUBJECT: "a compelling subject line",
+    ComponentType.PRE_HEADER: "a concise and engaging pre-header",
+    ComponentType.BODY: "a detailed body section for a newsletter",
+    ComponentType.CTA: "a clear and persuasive call to action (CTA)"
+}
 
-def load_few_shot_examples(content_type: str, tone: str) -> str:
+def load_few_shot_examples(content_type: ContentType, tone: ToneType, component: ComponentType) -> str:
     """
-    Load few-shot examples for prompt
-    Pattern from InventioHub few-shot learning
-    
-    TODO: Load from Cloud Storage in production
+    Loads few-shot examples based on content type, tone, and component.
+    For now, it's a simplified placeholder.
     """
-    examples = FEW_SHOT_EXAMPLES.get(content_type, {}).get(tone, [])
+    # Simplified logic: Use component-specific examples if they exist, otherwise fallback
+    component_key = component.value if component != ComponentType.FULL_EMAIL else "subject" # Use subject as a proxy for email
     
+    examples = FEW_SHOT_EXAMPLES.get(component_key.lower(), {}).get(tone.value.lower(), [])
     if not examples:
-        # Fallback to professional if tone not found
-        examples = FEW_SHOT_EXAMPLES.get(content_type, {}).get("professional", [])
+        return ""
     
-    formatted_examples = []
-    for i, ex in enumerate(examples, 1):
-        formatted_examples.append(
-            f"Example {i}:\n"
-            f"Input: \"{ex['input']}\"\n"
-            f"Output: {json.dumps(ex['output'], ensure_ascii=False)}"
-        )
-    
-    return "\n\n".join(formatted_examples)
+    formatted_examples = "\n".join([
+        f"- Input: {ex['input']}\n  Output: {json.dumps(ex['output'])}"
+        for ex in examples
+    ])
+    return f"Here are some examples of the desired output format and style:\n{formatted_examples}\n"
 
 
 def build_generation_prompt(
@@ -89,109 +94,97 @@ def build_generation_prompt(
     count: int,
     tone: str,
     content_type: str,
+    structure: list[StructureComponent],
     context: str | None = None
 ) -> str:
-    """
-    Build prompt for variation generation
-    Structure inspired by InventioHub prompt engineering
-    """
+    """Builds the dynamic prompt for the generative model based on a requested structure."""
     
-    # Load few-shot examples
-    examples = load_few_shot_examples(content_type, tone)
+    structure_details = []
+    json_example_structure = []
     
-    # Context section (if provided)
-    context_section = ""
-    if context:
-        context_section = f"""
-CONTEXT:
-{context}
-"""
+    for item in structure:
+        plural = "s" if item.count > 1 else ""
+        structure_details.append(f"{item.count} {item.component.value.replace('_', ' ')}{plural}")
+        
+        if item.count > 1:
+            for i in range(1, item.count + 1):
+                json_example_structure.append(f'    "{item.component.value}_{i}": "..."')
+        else:
+            json_example_structure.append(f'    "{item.component.value}": "..."')
+            
+    structure_list_str = ", ".join(structure_details)
+    json_example_str = ",\n".join(json_example_structure)
     
-    # Main prompt (inspired by InventioHub structure)
-    prompt = f"""You are a senior copywriter specialized in creating {content_type} content.
+    context_block = f"\nADDITIONAL CONTEXT:\n{context}\n" if context else ""
 
-Your task is to generate {count} variations of the provided text, maintaining a {tone} tone and brand voice consistency.
+    prompt = f"""You are a senior copywriter and expert in content architecture, specialized in creating {content_type}.
+Your task is to generate {count} variations of a structured content block based on the user's instruction.
+Each variation must contain exactly the following components: {structure_list_str}.
+Maintain a {tone} tone and brand voice consistency.
+{context_block}
+INSTRUCTION:
+"{text}"
 
 GUIDELINES:
-- Maintain the core message and intent
-- Adapt length appropriately (variations can be shorter or slightly longer)
-- Ensure each variation is distinct and creative
-- Use clear, scannable language
-- Maintain brand voice consistency with examples
-- Output ONLY as valid JSON array
+- Generate creative and relevant text that aligns with the instruction for each component.
+- For any component with a count greater than one (e.g., 2 CTAs), you MUST generate unique keys for each instance (e.g., "cta_1", "cta_2").
+- The value for every key in the JSON object MUST be a single string.
+- Output ONLY as a valid JSON object containing a single key "variations".
+- The "variations" key must be a list of "flat" JSON objects, where each object is one complete content variation.
 
-{examples}
-{context_section}
-
-NOW GENERATE {count} VARIATIONS:
-Input: "{text}"
-
-Output as JSON matching this exact structure:
+EXAMPLE OF THE EXACT JSON OUTPUT STRUCTURE REQUIRED:
 {{
-  "variations": ["variation 1", "variation 2", "variation 3"]
+  "variations": [
+    {{
+{json_example_str}
+    }},
+    // ... more variations if count > 1 ...
+  ]
 }}
-
-Return ONLY the JSON object, no explanations, no markdown formatting."""
-    
+"""
     return prompt
 
-
-@router.post("/generate", response_model=GenerateVariationsResponse)
+@router.post("/generate", response_model=GenerateVariationsResponse, status_code=200)
 @limiter.limit(f"{settings.rate_limit_per_second}/second")
 async def generate_variations(
-    request: Request,
-    req: GenerateVariationsRequest
+    request: GenerateVariationsRequest, client: VertexAIClient = Depends(get_client)
 ) -> GenerateVariationsResponse:
     """
-    Generate text variations with tone-of-voice consistency
-    
-    This endpoint generates multiple creative variations of input text,
-    maintaining brand voice through few-shot learning (RAG pattern from InventioHub)
+    Generate variations of a text based on a prompt.
     """
+    logger.info(
+        f"Generating {request.count} variations | Tone: {request.tone.value} | "
+        f"Type: {request.content_type.value} | Structure: {request.structure}"
+    )
+
+    prompt = build_generation_prompt(
+        text=request.text,
+        count=request.count,
+        tone=request.tone.value,
+        content_type=request.content_type.value,
+        structure=request.structure,
+        context=request.context,
+    )
+
+    raw_variations = await client.generate_with_fixing(
+        prompt,
+        request.count,
+        temperature=0.7,
+        max_tokens=2048,
+        image_url=request.image_url,
+    )
+
     try:
-        logger.info(f"Generating {req.count} variations | Tone: {req.tone} | Type: {req.content_type}")
+        variations_list = json.loads(raw_variations)
         
-        # Build prompt with few-shot examples
-        prompt = build_generation_prompt(
-            text=req.text,
-            count=req.count,
-            tone=req.tone.value,
-            content_type=req.content_type.value,
-            context=req.context
-        )
-        
-        # Generate with Vertex AI (with self-healing)
-        response_text = await vertex_client.generate_with_fixing(
-            prompt=prompt,
-            schema={"variations": ["string"]},
-            temperature=0.8  # More creative for variations
-        )
-        
-        # Parse response
-        try:
-            response_data = json.loads(response_text)
-            variations = response_data.get("variations", [])
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {response_text}")
-            raise HTTPException(status_code=500, detail="Invalid AI response format")
-        
-        # Validate we got the right number
-        if len(variations) != req.count:
-            logger.warning(f"Expected {req.count} variations, got {len(variations)}")
-            # Pad or truncate if needed
-            if len(variations) < req.count:
-                variations.extend([req.text] * (req.count - len(variations)))
-            else:
-                variations = variations[:req.count]
-        
-        logger.info(f"Successfully generated {len(variations)} variations")
+        logger.info(f"Successfully generated {len(variations_list)} variations")
         
         return GenerateVariationsResponse(
-            variations=variations,
-            original_text=req.text,
-            tone=req.tone.value
+            variations=variations_list,
+            original_text=request.text,
+            tone=request.tone.value
         )
-    
+        
     except Exception as e:
         logger.error(f"Error in generate_variations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

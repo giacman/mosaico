@@ -232,6 +232,82 @@
     .insert-button:hover {
       background: #cce8d4;
     }
+    
+    .structure-checklist {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .checklist-item input {
+      width: auto;
+      margin: 0;
+    }
+    .checklist-item label {
+      margin-bottom: 0;
+      font-size: 13px;
+      font-weight: 400;
+      color: #3c4043;
+      cursor: pointer;
+    }
+    .checklist-item.countable {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 45%; /* Allow two per row */
+    }
+    .checklist-item.countable label {
+      flex-grow: 1;
+    }
+    .checklist-item.countable input[type="number"] {
+      width: 50px;
+      padding: 4px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .checklist-item.countable input[type="number"]:disabled {
+      background-color: #f1f3f4;
+      border-color: #e0e0e0;
+      cursor: not-allowed;
+    }
+    .variation-container {
+      border: 1px solid #1a73e8;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    .variation-container h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a73e8;
+      margin-bottom: 8px;
+    }
+    .variation-container .result-item {
+      display: block; /* Change layout for component display */
+      background: #fff;
+      padding: 10px;
+    }
+    .variation-container .result-text {
+      display: inline;
+    }
+    .component-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .component-header strong {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #5f6368;
+    }
   </style>
 </head>
 <body>
@@ -260,8 +336,8 @@
     <div class="form-group">
       <label>Number of Variations</label>
       <select id="generate-count">
-        <option value="1">1 variation</option>
-        <option value="3" selected>3 variations</option>
+        <option value="1" selected>1 variation</option>
+        <option value="3">3 variations</option>
         <option value="5">5 variations</option>
         <option value="7">7 variations</option>
       </select>
@@ -276,6 +352,23 @@
         <option value="elegant">Elegant</option>
         <option value="direct">Direct</option>
       </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Email Structure</label>
+      <div id="generate-structure" class="structure-checklist">
+        <div class="checklist-item"><input type="checkbox" id="comp-subject" value="subject" checked><label for="comp-subject">Subject</label></div>
+        <div class="checklist-item"><input type="checkbox" id="comp-pre_header" value="pre_header" checked><label for="comp-pre_header">Pre-header</label></div>
+        <div class="checklist-item"><input type="checkbox" id="comp-title" value="title"><label for="comp-title">Title</label></div>
+        <div class="checklist-item countable">
+          <input type="checkbox" id="comp-body" value="body"><label for="comp-body">Body</label>
+          <input type="number" id="comp-body-count" value="1" min="1" max="5" disabled>
+        </div>
+        <div class="checklist-item countable">
+          <input type="checkbox" id="comp-cta" value="cta"><label for="comp-cta">CTA</label>
+          <input type="number" id="comp-cta-count" value="1" min="1" max="10" disabled>
+        </div>
+      </div>
     </div>
     
     <button class="button button-primary" onclick="submitGeneration()">
@@ -372,9 +465,31 @@
       var text = document.getElementById('generate-text').value.trim();
       var count = parseInt(document.getElementById('generate-count').value);
       var tone = document.getElementById('generate-tone').value;
+      
+      var structure = [];
+      var structureItems = document.querySelectorAll('#generate-structure .checklist-item');
+      structureItems.forEach(function(item) {
+        var checkbox = item.querySelector('input[type="checkbox"]');
+        if (checkbox.checked) {
+          var componentName = checkbox.value;
+          var componentCount = 1;
+          
+          if (item.classList.contains('countable')) {
+            var countInput = item.querySelector('input[type="number"]');
+            componentCount = parseInt(countInput.value, 10);
+          }
+          
+          structure.push({ component: componentName, count: componentCount });
+        }
+      });
 
       if (!text) {
         showStatus('generate', 'error', 'Please provide an instruction or text.');
+        return;
+      }
+      
+      if (structure.length === 0) {
+        showStatus('generate', 'error', 'Please select at least one component for the email structure.');
         return;
       }
 
@@ -383,46 +498,69 @@
 
       var successCallback = function(response) {
         if (response.success) {
-          var variations = response.data.variations;
+          var variations = response.data.variations; // This is now an array of objects
           showStatus('generate', 'success', '✓ Generated ' + variations.length + ' variations below.');
           
           var resultsContainer = document.getElementById('generate-results');
           resultsContainer.innerHTML = '';
 
           for (var i = 0; i < variations.length; i++) {
-            var variationText = variations[i];
+            var variationData = variations[i];
             
-            var resultItem = document.createElement('div');
-            resultItem.className = 'result-item';
+            var variationContainer = document.createElement('div');
+            variationContainer.className = 'variation-container';
+            variationContainer.innerHTML = '<h3>Variation ' + (i + 1) + '</h3>';
             
-            var textElement = document.createElement('p');
-            textElement.className = 'result-text';
-            textElement.textContent = variationText;
-            
-            var copyButton = document.createElement('button');
-            copyButton.className = 'copy-button';
-            copyButton.textContent = 'Copy';
-            copyButton.onclick = (function(text) {
-              return function() {
-                copyText(text);
-                this.textContent = 'Copied!';
-                setTimeout(function() { this.textContent = 'Copy'; }.bind(this), 2000);
-              };
-            })(variationText);
+            for (var componentKey in variationData) {
+              if (variationData.hasOwnProperty(componentKey)) {
+                var componentText = variationData[componentKey];
+                
+                var resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
 
-            var insertButton = document.createElement('button');
-            insertButton.className = 'insert-button';
-            insertButton.textContent = 'Insert';
-            insertButton.onclick = (function(text) {
-              return function() {
-                google.script.run.writeToActiveCell(text);
-              };
-            })(variationText);
-            
-            resultItem.appendChild(textElement);
-            resultItem.appendChild(copyButton);
-            resultItem.appendChild(insertButton);
-            resultsContainer.appendChild(resultItem);
+                var componentHeader = document.createElement('div');
+                componentHeader.className = 'component-header';
+
+                var componentLabel = document.createElement('strong');
+                componentLabel.textContent = componentKey.replace(/_/g, ' ').toUpperCase();
+                
+                var buttonsWrapper = document.createElement('div');
+                
+                var copyButton = document.createElement('button');
+                copyButton.className = 'copy-button';
+                copyButton.textContent = 'Copy';
+                copyButton.onclick = (function(text) {
+                  return function() {
+                    copyText(text);
+                    this.textContent = 'Copied!';
+                    setTimeout(function() { this.textContent = 'Copy'; }.bind(this), 2000);
+                  };
+                })(componentText);
+
+                var insertButton = document.createElement('button');
+                insertButton.className = 'insert-button';
+                insertButton.textContent = 'Insert';
+                insertButton.onclick = (function(text) {
+                  return function() {
+                    google.script.run.writeToActiveCell(text);
+                  };
+                })(componentText);
+
+                buttonsWrapper.appendChild(copyButton);
+                buttonsWrapper.appendChild(insertButton);
+                componentHeader.appendChild(componentLabel);
+                componentHeader.appendChild(buttonsWrapper);
+                
+                var textElement = document.createElement('p');
+                textElement.className = 'result-text';
+                textElement.textContent = componentText;
+
+                resultItem.appendChild(componentHeader);
+                resultItem.appendChild(textElement);
+                variationContainer.appendChild(resultItem);
+              }
+            }
+            resultsContainer.appendChild(variationContainer);
           }
         } else {
           showStatus('generate', 'error', 'Error: ' + response.error);
@@ -434,19 +572,27 @@
       };
 
       if (imageUrl) {
-        // Call the image generation function
         google.script.run
           .withSuccessHandler(successCallback)
           .withFailureHandler(failureCallback)
-          .generateFromImage(imageUrl, text, count, tone);
+          .generateFromImage(imageUrl, text, count, tone, structure);
       } else {
-        // Call the standard text generation function
         google.script.run
           .withSuccessHandler(successCallback)
           .withFailureHandler(failureCallback)
-          .generateVariations(text, count, tone);
+          .generateVariations(text, count, tone, structure, imageUrl);
       }
     }
+    
+    // Add event listeners for countable checkboxes
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('comp-body').addEventListener('change', function(e) {
+        document.getElementById('comp-body-count').disabled = !e.target.checked;
+      });
+      document.getElementById('comp-cta').addEventListener('change', function(e) {
+        document.getElementById('comp-cta-count').disabled = !e.target.checked;
+      });
+    });
     
     // Translate
     function processTranslation() {

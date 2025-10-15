@@ -22,15 +22,13 @@ function onInstall(e) {
  * Runs when the spreadsheet is opened
  * Adds Mosaico menu to the UI
  */
-function onOpen(e) {
-  var ui = SpreadsheetApp.getUi();
-  ui.createAddonMenu()
-    .addItem('Open Mosaico', 'showSidebar')
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Mosaico AI')
+    .addItem('Generate', 'showSidebar')
     .addSeparator()
     .addItem('Set Backend URL', 'setBackendUrl')
-    .addItem('View Current Backend', 'showBackendUrl')
-    .addSeparator()
-    .addItem('About', 'showAbout')
+    .addItem('View Current Backend', 'viewBackendUrl')
     .addToUi();
 }
 
@@ -187,25 +185,30 @@ function callMosaicoAPI(endpoint, payload) {
  * @param {string} tone - Tone type (professional, casual, etc.)
  * @return {Object} API response with variations
  */
-function generateVariations(text, count, tone) {
+function generateVariations(prompt, count, contentType, tone, structure, imageUrl) {
+  var backendUrl = getBackendUrl();
+  if (!backendUrl) {
+    return 'Backend URL not set. Please set it via the Mosaico AI > Settings menu.';
+  }
+
+  var url = backendUrl + '/api/v1/generate';
   var payload = {
-    text: text,
-    count: count,
-    tone: tone || 'professional',
-    content_type: 'newsletter'
+    text: prompt,
+    count: parseInt(count, 10),
+    content_type: contentType,
+    tone: tone,
+    structure: structure,
+    image_url: imageUrl,
   };
-  
+
   try {
     var response = callMosaicoAPI('/api/v1/generate', payload);
     return {
       success: true,
       data: response
     };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
+  } catch (e) {
+    return 'Error calling Mosaico API: ' + e.message;
   }
 }
 
@@ -251,23 +254,26 @@ function translateText(text, targetLanguage) {
  * @return {Object} API response with refined text
  */
 function refineText(text, operation) {
+  var backendUrl = getBackendUrl();
+  if (!backendUrl) {
+    return 'Backend URL not set. Please set it via the Mosaico AI > Settings menu.';
+  }
+
+  var url = backendUrl + '/api/v1/refine';
   var payload = {
     text: text,
     operation: operation,
     content_type: 'newsletter'
   };
-  
+
   try {
     var response = callMosaicoAPI('/api/v1/refine', payload);
     return {
       success: true,
       data: response
     };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
+  } catch (e) {
+    return 'Error calling Mosaico API: ' + e.message;
   }
 }
 
@@ -275,13 +281,14 @@ function refineText(text, operation) {
  * Generates text from an image URL and a prompt.
  * Called from sidebar UI
  */
-function generateFromImage(imageUrl, text, count, tone) {
+function generateFromImage(imageUrl, text, count, tone, structure) {
   Logger.log('generateFromImage function called. Image URL: ' + imageUrl);
   var payload = {
     image_url: imageUrl,
     text: text,
     count: count,
     tone: tone,
+    structure: structure, // This is now an array of objects
     content_type: 'newsletter' // Or make this dynamic if needed
   };
 
@@ -305,34 +312,91 @@ function generateFromImage(imageUrl, text, count, tone) {
 // --- CONFIGURATION FUNCTIONS ---
 
 /**
- * Sets the backend URL in Script Properties.
+ * Prompts the user to set the backend URL and stores it in script properties.
  */
 function setBackendUrl() {
   var ui = SpreadsheetApp.getUi();
   var result = ui.prompt(
     'Set Backend URL',
-    'Enter the full URL for the Mosaico backend (e.g., https://your-ngrok-url.app or https://your-cloud-run-url.run.app):',
+    'Please enter the full URL of your Mosaico backend (e.g., https://your-url.run.app):',
     ui.ButtonSet.OK_CANCEL
   );
 
   if (result.getSelectedButton() == ui.Button.OK) {
-    var newUrl = result.getResponseText().trim();
-    if (newUrl.startsWith('http')) {
-      var properties = PropertiesService.getScriptProperties();
-      properties.setProperty('BACKEND_URL', newUrl);
-      ui.alert('Success', 'Backend URL has been updated to: ' + newUrl, ui.ButtonSet.OK);
+    var backendUrl = result.getResponseText().trim();
+    if (backendUrl) {
+      PropertiesService.getScriptProperties().setProperty('BACKEND_URL', backendUrl);
+      ui.alert('Backend URL has been set successfully.');
     } else {
-      ui.alert('Error', 'Invalid URL. Please enter a valid URL starting with http or https.', ui.ButtonSet.OK);
+      ui.alert('No URL entered. The backend URL has not been changed.');
     }
   }
 }
 
 /**
- * Displays the current backend URL.
+ * Displays the currently configured backend URL to the user.
  */
-function showBackendUrl() {
-  var properties = PropertiesService.getScriptProperties();
-  var backendUrl = properties.getProperty('BACKEND_URL') || DEFAULT_BACKEND_URL;
+function viewBackendUrl() {
+  var backendUrl = PropertiesService.getScriptProperties().getProperty('BACKEND_URL');
   var ui = SpreadsheetApp.getUi();
-  ui.alert('Current Backend URL', 'The add-on is currently configured to use: ' + backendUrl, ui.ButtonSet.OK);
+  if (backendUrl) {
+    ui.alert('Current Backend URL', 'The current backend URL is: ' + backendUrl, ui.ButtonSet.OK);
+  } else {
+    ui.alert(
+      'Backend URL Not Set',
+      'The backend URL has not been set yet. Please set it via the Mosaico AI > Settings menu.',
+      ui.ButtonSet.OK
+    );
+  }
+}
+
+/**
+ * Retrieves the backend URL from script properties.
+ * @returns {string|null} The stored backend URL or null if not set.
+ */
+function getBackendUrl() {
+  return PropertiesService.getScriptProperties().getProperty('BACKEND_URL');
+}
+
+/**
+ * Logs the details of an API request for debugging purposes.
+ * @param {string} url The URL being called.
+ * @param {Object} payload The JSON payload sent in the request.
+ * @param {Object} options The options used for the UrlFetchApp call.
+ */
+function logApiRequest(url, payload, options) {
+  Logger.log(
+    JSON.stringify(
+      {
+        message: 'Mosaico API Request',
+        url: url,
+        payload: payload,
+        options: options,
+      },
+      null,
+      2
+    )
+  );
+}
+
+/**
+ * Logs the details of an API response for debugging purposes.
+ * @param {number} responseCode The HTTP status code of the response.
+ * @param {string} responseBody The body of the response.
+ */
+function logApiResponse(responseCode, responseBody) {
+  var logEntry = {
+    message: 'Mosaico API Response',
+    responseCode: responseCode,
+  };
+
+  try {
+    // Try to parse the body as JSON for prettier logging
+    logEntry.responseBody = JSON.parse(responseBody);
+  } catch (e) {
+    // If it's not JSON, log it as raw text
+    logEntry.responseBody = responseBody;
+  }
+
+  Logger.log(JSON.stringify(logEntry, null, 2));
 }

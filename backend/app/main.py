@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.api import generate
 from app.api import translate
 from app.api import refine
-from app.api import generate_from_image
+# from app.api import generate_from_image
 
 # Configure logging
 logging.basicConfig(
@@ -65,7 +65,7 @@ app.add_middleware(
 
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root():
     """Health check endpoint"""
     return {
@@ -89,7 +89,7 @@ async def health_check():
 app.include_router(generate.router, prefix="/api/v1", tags=["Generate"])
 app.include_router(translate.router, prefix="/api/v1", tags=["Translate"])
 app.include_router(refine.router, prefix="/api/v1", tags=["Refine"])
-app.include_router(generate_from_image.router, prefix="/api/v1", tags=["Generate"])
+# app.include_router(generate_from_image.router, prefix="/api/v1", tags=["Generate"])
 
 
 if __name__ == "__main__":
