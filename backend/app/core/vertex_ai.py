@@ -77,8 +77,8 @@ class VertexAIClient:
                 response_mime_type=response_mime_type
             )
             
-            # Generate content
-            response = generative_model.generate_content(
+            # Generate content asynchronously
+            response = await generative_model.generate_content_async(
                 prompt,
                 generation_config=generation_config
             )

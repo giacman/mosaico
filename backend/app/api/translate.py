@@ -7,6 +7,9 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 import logging
 import json
+import asyncio
+from pydantic import BaseModel
+from typing import List, Dict
 
 from app.models.schemas import TranslateRequest, TranslateResponse
 from app.core.vertex_ai import vertex_client
@@ -38,10 +41,12 @@ async def translate_text_content(
         content_type="newsletter"
     )
     
-    response_text = await ai_client.generate_with_fixing(
+    # Use generate_content instead of generate_with_fixing for translation
+    # (no need for variation count validation)
+    response_text = await ai_client.generate_content(
         prompt=prompt,
-        schema={"translated_text": "string"},
-        temperature=0.3
+        temperature=0.3,
+        response_mime_type="application/json"
     )
     
     response_data = json.loads(response_text)
@@ -123,10 +128,12 @@ async def translate_text(
             content_type=req.content_type.value
         )
         
-        response_text = await vertex_client.generate_with_fixing(
+        # Use generate_content instead of generate_with_fixing for translation
+        # (no need for variation count validation)
+        response_text = await vertex_client.generate_content(
             prompt=prompt,
-            schema={"translated_text": "string", "detected_source_language": "string"},
-            temperature=0.3  # Lower for more accurate translation
+            temperature=0.3,  # Lower for more accurate translation
+            response_mime_type="application/json"
         )
         
         response_data = json.loads(response_text)
@@ -140,4 +147,108 @@ async def translate_text(
     
     except Exception as e:
         logger.error(f"Error in translate_text: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Batch translation models
+class TextToTranslate(BaseModel):
+    key: str
+    content: str
+
+
+class BatchTranslateRequest(BaseModel):
+    texts: List[TextToTranslate]
+    target_languages: List[str]
+
+
+class BatchTranslateResponse(BaseModel):
+    translations: Dict[str, Dict[str, str]]  # {component_key: {lang: translated_text}}
+
+
+async def translate_single_with_retry(
+    text: str,
+    target_language: str,
+    max_retries: int = 3
+) -> str:
+    """
+    Translate a single text with retry logic for malformed JSON
+    """
+    for attempt in range(max_retries):
+        try:
+            prompt = build_translation_prompt(
+                text=text,
+                target_language=target_language.lower(),
+                source_language="auto",
+                maintain_tone=True,
+                content_type="newsletter"
+            )
+            
+            response_text = await vertex_client.generate_content(
+                prompt=prompt,
+                temperature=0.3,
+                response_mime_type="application/json"
+            )
+            
+            response_data = json.loads(response_text)
+            return response_data.get("translated_text", text)
+        
+        except json.JSONDecodeError as e:
+            logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {target_language}: {str(e)}")
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to translate to {target_language} after {max_retries} attempts")
+                return f"[Translation failed: {text[:50]}...]"
+            await asyncio.sleep(0.5)  # Brief delay before retry
+        
+        except Exception as e:
+            logger.error(f"Error translating to {target_language}: {str(e)}")
+            return f"[Translation error: {text[:50]}...]"
+
+
+@router.post("/translate/batch", response_model=BatchTranslateResponse)
+@limiter.limit(f"{settings.rate_limit_per_second}/second")
+async def batch_translate(
+    request: Request,
+    req: BatchTranslateRequest
+) -> BatchTranslateResponse:
+    """
+    Batch translate multiple texts to multiple languages in parallel
+    Much faster than individual requests
+    """
+    try:
+        logger.info(
+            f"Batch translating {len(req.texts)} texts to {len(req.target_languages)} languages "
+            f"({len(req.texts) * len(req.target_languages)} total translations)"
+        )
+        
+        translations: Dict[str, Dict[str, str]] = {}
+        
+        # Create all translation tasks
+        tasks = []
+        task_metadata = []
+        
+        for text_item in req.texts:
+            translations[text_item.key] = {}
+            
+            for lang in req.target_languages:
+                task = translate_single_with_retry(text_item.content, lang)
+                tasks.append(task)
+                task_metadata.append((text_item.key, lang))
+        
+        # Execute all translations in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Map results back to structure
+        for (key, lang), result in zip(task_metadata, results):
+            if isinstance(result, Exception):
+                logger.error(f"Exception translating {key} to {lang}: {str(result)}")
+                translations[key][lang] = f"[Error: {str(result)[:50]}]"
+            else:
+                translations[key][lang] = result
+        
+        logger.info(f"Batch translation completed successfully")
+        
+        return BatchTranslateResponse(translations=translations)
+    
+    except Exception as e:
+        logger.error(f"Error in batch_translate: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

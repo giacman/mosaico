@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     # Rate Limiting
-    rate_limit_per_second: int = 5
-    rate_limit_burst: int = 10
+    rate_limit_per_second: int = 30  # Higher for local dev, will use batch endpoint in production
+    rate_limit_burst: int = 50
     
     # CORS
     allowed_origins: str = "*"

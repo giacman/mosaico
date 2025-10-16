@@ -77,6 +77,7 @@ export async function translateContent(
 
 /**
  * Batch translate multiple texts to multiple languages
+ * Uses the new /translate/batch endpoint for parallel processing
  */
 export async function batchTranslate(
   texts: { key: string; content: string }[],
@@ -87,30 +88,34 @@ export async function batchTranslate(
   error?: string
 }> {
   try {
-    const translations: Record<string, Record<string, string>> = {}
+    const token = await getAuthToken()
 
-    // Translate each text to each language
-    for (const { key, content } of texts) {
-      translations[key] = {}
+    const response = await fetch(`${BACKEND_URL}/api/v1/translate/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify({
+        texts: texts,
+        target_languages: targetLanguages
+      })
+    })
 
-      for (const lang of targetLanguages) {
-        const result = await translateContent({
-          text: content,
-          target_language: lang
-        })
-
-        if (result.success && result.data) {
-          translations[key][lang] = result.data.translated_text
-        } else {
-          // If one translation fails, we still continue with others
-          translations[key][lang] = `[Translation failed: ${result.error}]`
-        }
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Batch translate error:", errorText)
+      return {
+        success: false,
+        error: `Failed to batch translate: ${response.status}`
       }
     }
 
+    const data = await response.json()
+
     return {
       success: true,
-      data: translations
+      data: data.translations
     }
   } catch (error) {
     console.error("Error in batch translation:", error)
