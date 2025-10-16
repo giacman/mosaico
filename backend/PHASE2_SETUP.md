@@ -2,6 +2,8 @@
 
 This guide covers the setup for the Phase 2 Mosaico platform with database and authentication.
 
+**⚠️ COLLABORATION MODEL:** This backend supports **team collaboration**. All authenticated users can see and edit all projects. Activity logging tracks who did what. See `../COLLABORATION_MODEL.md` for details.
+
 ## Prerequisites
 
 - PostgreSQL database (local or Cloud SQL)
@@ -216,7 +218,161 @@ alembic upgrade head
 - Ensure `CLERK_SECRET_KEY` is set correctly
 - For local dev, set `ENVIRONMENT=development` to bypass auth
 
-## Production Deployment
+## Production Deployment (Cloud Run + Cloud SQL)
 
-See deployment guide for Cloud Run + Cloud SQL setup.
+### Overview
+
+For production, we'll use **Google Cloud SQL** (managed PostgreSQL) connected to Cloud Run via private networking.
+
+**Architecture:**
+```
+Cloud Run (Backend) ──Private Socket──> Cloud SQL (PostgreSQL)
+                                        ↓
+                                   Auto Backups
+                                   High Availability
+```
+
+**Cost:** ~$10-35/month depending on instance size
+
+---
+
+### 1. Create Cloud SQL Instance
+
+```bash
+# Set your project ID
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION=europe-west1
+
+# Create PostgreSQL instance
+# Tier options:
+#   db-f1-micro   = Shared CPU, 614 MB RAM  (~$10/month)  - For testing/small workloads
+#   db-g1-small   = 1 vCPU, 1.7 GB RAM      (~$35/month)  - Production recommended
+gcloud sql instances create mosaico-db \
+  --database-version=POSTGRES_15 \
+  --tier=db-f1-micro \
+  --region=$REGION \
+  --root-password=$(openssl rand -base64 32) \
+  --backup-start-time=03:00 \
+  --storage-auto-increase \
+  --storage-size=10GB
+
+# Note: Save the root password if you need it for admin tasks
+```
+
+### 2. Create Database and User
+
+```bash
+# Create application database
+gcloud sql databases create mosaico --instance=mosaico-db
+
+# Generate secure password
+export DB_PASSWORD=$(openssl rand -base64 32)
+echo "Save this password: $DB_PASSWORD"
+
+# Create application user
+gcloud sql users create mosaico-user \
+  --instance=mosaico-db \
+  --password=$DB_PASSWORD
+
+# Grant privileges (via Cloud SQL proxy)
+gcloud sql connect mosaico-db --user=postgres
+# Then in psql:
+postgres=# GRANT ALL PRIVILEGES ON DATABASE mosaico TO "mosaico-user";
+postgres=# \c mosaico
+mosaico=# GRANT ALL ON SCHEMA public TO "mosaico-user";
+postgres=# \q
+```
+
+### 3. Run Migrations to Production Database
+
+**Via Cloud SQL Proxy (Recommended):**
+
+```bash
+# Install Cloud SQL Proxy (macOS)
+brew install cloud-sql-proxy
+
+# Or download directly:
+curl -o cloud-sql-proxy https://dl.google.com/cloudsql/cloud_sql_proxy.darwin.arm64
+chmod +x cloud-sql-proxy
+
+# Get connection name
+export DB_CONNECTION_NAME=$(gcloud sql instances describe mosaico-db --format="value(connectionName)")
+
+# Start proxy in background
+cloud-sql-proxy $DB_CONNECTION_NAME &
+
+# Run migrations through proxy
+cd backend
+export DATABASE_URL="postgresql://mosaico-user:${DB_PASSWORD}@localhost:5432/mosaico"
+alembic upgrade head
+
+# Stop proxy when done
+killall cloud-sql-proxy
+```
+
+### 4. Deploy Backend to Cloud Run
+
+```bash
+cd backend
+
+# Build DATABASE_URL for Cloud Run (uses Unix socket)
+export DB_CONNECTION_NAME=$(gcloud sql instances describe mosaico-db --format="value(connectionName)")
+export DATABASE_URL="postgresql://mosaico-user:${DB_PASSWORD}@/mosaico?host=/cloudsql/${DB_CONNECTION_NAME}"
+
+# Deploy with Cloud SQL connection
+gcloud run deploy mosaico-backend \
+  --source . \
+  --region=$REGION \
+  --allow-unauthenticated \
+  --add-cloudsql-instances=$DB_CONNECTION_NAME \
+  --set-env-vars="DATABASE_URL=${DATABASE_URL},CLERK_SECRET_KEY=${CLERK_SECRET_KEY},GCP_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=production"
+
+# Note the service URL from the output
+```
+
+### 5. Verify Deployment
+
+```bash
+# Get Cloud Run service URL
+export SERVICE_URL=$(gcloud run services describe mosaico-backend --region=$REGION --format="value(status.url)")
+
+# Test health endpoint
+curl $SERVICE_URL/health
+
+# Test projects endpoint (requires auth)
+curl $SERVICE_URL/api/v1/projects \
+  -H "Authorization: Bearer YOUR_CLERK_TOKEN"
+```
+
+---
+
+### Production Database Management
+
+**View Logs:**
+```bash
+gcloud sql operations list --instance=mosaico-db --limit=10
+```
+
+**Create Backup:**
+```bash
+gcloud sql backups create --instance=mosaico-db
+```
+
+**List Backups:**
+```bash
+gcloud sql backups list --instance=mosaico-db
+```
+
+**Scale Instance:**
+```bash
+# Upgrade to production tier
+gcloud sql instances patch mosaico-db --tier=db-g1-small
+```
+
+**Estimated Monthly Costs:**
+- db-f1-micro: ~$10/month (testing/small workloads)
+- db-g1-small: ~$35/month (production recommended)
+- Storage (10GB): ~$2/month
+- Backups (auto): ~$1/month
+- **Total: $13-38/month**
 

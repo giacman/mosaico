@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
-from app.db.models import Project, Component, Translation, Image
+from app.db.models import Project, Component, Translation, Image, ActivityLog
 from app.models.project_schemas import (
     ProjectCreate,
     ProjectUpdate,
@@ -18,49 +18,89 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectService:
-    """Service for managing projects"""
+    """Service for managing projects with collaboration support"""
     
     @staticmethod
-    def create_project(db: Session, user_id: str, project_data: ProjectCreate) -> Project:
+    def _log_activity(
+        db: Session,
+        project_id: int,
+        user_id: str,
+        user_name: Optional[str],
+        action: str,
+        field_changed: Optional[str] = None,
+        old_value: Optional[str] = None,
+        new_value: Optional[str] = None
+    ):
+        """Log an activity for audit trail"""
+        log_entry = ActivityLog(
+            project_id=project_id,
+            user_id=user_id,
+            user_name=user_name,
+            action=action,
+            field_changed=field_changed,
+            old_value=old_value,
+            new_value=new_value
+        )
+        db.add(log_entry)
+        # Don't commit here - let the main operation commit both together
+    
+    @staticmethod
+    def create_project(
+        db: Session,
+        user_id: str,
+        user_name: Optional[str],
+        project_data: ProjectCreate
+    ) -> Project:
         """Create a new project"""
         # Convert structure to dict format for JSON storage
         structure_dict = [item.model_dump() for item in project_data.structure]
         
         project = Project(
-            user_id=user_id,
             name=project_data.name,
             brief_text=project_data.brief_text,
             structure=structure_dict,
             tone=project_data.tone,
-            target_languages=project_data.target_languages or []
+            target_languages=project_data.target_languages or [],
+            created_by_user_id=user_id,
+            created_by_user_name=user_name
         )
         
         db.add(project)
+        db.flush()  # Get ID before logging
+        
+        # Log creation
+        ProjectService._log_activity(
+            db, project.id, user_id, user_name, "created_project"
+        )
+        
         db.commit()
         db.refresh(project)
         
-        logger.info(f"Created project {project.id} for user {user_id}")
+        logger.info(f"Created project {project.id} by user {user_id}")
         return project
     
     @staticmethod
-    def get_project(db: Session, project_id: int, user_id: str) -> Optional[Project]:
-        """Get a project by ID (with authorization check)"""
+    def get_project(db: Session, project_id: int) -> Optional[Project]:
+        """
+        Get a project by ID
+        NOTE: No user_id filtering - all users can see all projects
+        """
         project = db.query(Project).filter(
-            Project.id == project_id,
-            Project.user_id == user_id
+            Project.id == project_id
         ).options(
             joinedload(Project.components).joinedload(Component.translations),
-            joinedload(Project.images)
+            joinedload(Project.images),
+            joinedload(Project.activity_logs)
         ).first()
         
         return project
     
     @staticmethod
-    def list_projects(db: Session, user_id: str, skip: int = 0, limit: int = 100) -> List[Project]:
-        """List all projects for a user"""
-        projects = db.query(Project).filter(
-            Project.user_id == user_id
-        ).order_by(
+    def list_projects(db: Session, skip: int = 0, limit: int = 100) -> List[Project]:
+        """
+        List all projects (shared across all users)
+        """
+        projects = db.query(Project).order_by(
             Project.updated_at.desc()
         ).offset(skip).limit(limit).all()
         
@@ -71,41 +111,65 @@ class ProjectService:
         db: Session,
         project_id: int,
         user_id: str,
+        user_name: Optional[str],
         project_data: ProjectUpdate
     ) -> Optional[Project]:
         """Update a project"""
-        project = ProjectService.get_project(db, project_id, user_id)
+        project = ProjectService.get_project(db, project_id)
         
         if not project:
             return None
         
         update_data = project_data.model_dump(exclude_unset=True)
         
+        # Track changes for activity log
+        changes = []
+        
         # Handle structure conversion
         if "structure" in update_data and update_data["structure"]:
             update_data["structure"] = [item.model_dump() for item in project_data.structure]
         
         for field, value in update_data.items():
-            setattr(project, field, value)
+            if hasattr(project, field):
+                old_value = getattr(project, field)
+                if old_value != value:
+                    changes.append((field, str(old_value), str(value)))
+                setattr(project, field, value)
+        
+        # Update audit fields
+        project.updated_by_user_id = user_id
+        project.updated_by_user_name = user_name
+        
+        # Log each changed field
+        for field, old_val, new_val in changes:
+            ProjectService._log_activity(
+                db, project_id, user_id, user_name,
+                f"updated_{field}", field, old_val, new_val
+            )
         
         db.commit()
         db.refresh(project)
         
-        logger.info(f"Updated project {project_id}")
+        logger.info(f"Updated project {project_id} by user {user_id}")
         return project
     
     @staticmethod
-    def delete_project(db: Session, project_id: int, user_id: str) -> bool:
+    def delete_project(db: Session, project_id: int, user_id: str, user_name: Optional[str]) -> bool:
         """Delete a project"""
-        project = ProjectService.get_project(db, project_id, user_id)
+        project = ProjectService.get_project(db, project_id)
         
         if not project:
             return False
         
+        # Log deletion before deleting
+        ProjectService._log_activity(
+            db, project_id, user_id, user_name, "deleted_project"
+        )
+        
         db.delete(project)
         db.commit()
         
-        logger.info(f"Deleted project {project_id}")
+        logger.info(f"Deleted project {project_id} by user {user_id}")
         return True
     
     @staticmethod
@@ -113,11 +177,12 @@ class ProjectService:
         db: Session,
         project_id: int,
         user_id: str,
+        user_name: Optional[str],
         component_data: ComponentCreate
     ) -> Optional[Component]:
         """Create a component for a project"""
-        # Verify project ownership
-        project = ProjectService.get_project(db, project_id, user_id)
+        # Verify project exists
+        project = ProjectService.get_project(db, project_id)
         if not project:
             return None
         
@@ -131,6 +196,15 @@ class ProjectService:
         )
         
         db.add(component)
+        db.flush()
+        
+        # Log component creation
+        component_name = f"{component_data.component_type}_{component_data.component_index or 1}"
+        ProjectService._log_activity(
+            db, project_id, user_id, user_name,
+            "created_component", component_name
+        )
+        
         db.commit()
         db.refresh(component)
         
@@ -141,19 +215,30 @@ class ProjectService:
         db: Session,
         component_id: int,
         user_id: str,
+        user_name: Optional[str],
         component_data: ComponentUpdate
     ) -> Optional[Component]:
         """Update a component"""
-        component = db.query(Component).join(Project).filter(
-            Component.id == component_id,
-            Project.user_id == user_id
+        component = db.query(Component).filter(
+            Component.id == component_id
         ).first()
         
         if not component:
             return None
         
         update_data = component_data.model_dump(exclude_unset=True)
+        
+        # Track changes
+        component_name = f"{component.component_type}_{component.component_index or 1}"
+        
         for field, value in update_data.items():
+            old_value = getattr(component, field, None)
+            if old_value != value:
+                ProjectService._log_activity(
+                    db, component.project_id, user_id, user_name,
+                    f"updated_component", component_name,
+                    str(old_value), str(value)
+                )
             setattr(component, field, value)
         
         db.commit()
@@ -166,14 +251,13 @@ class ProjectService:
         db: Session,
         component_id: int,
         user_id: str,
+        user_name: Optional[str],
         language_code: str,
         translated_content: str
     ) -> Optional[Translation]:
         """Add a translation for a component"""
-        # Verify ownership through component -> project
-        component = db.query(Component).join(Project).filter(
-            Component.id == component_id,
-            Project.user_id == user_id
+        component = db.query(Component).filter(
+            Component.id == component_id
         ).first()
         
         if not component:
@@ -187,7 +271,16 @@ class ProjectService:
         
         if existing:
             # Update existing translation
+            old_content = existing.translated_content
             existing.translated_content = translated_content
+            
+            # Log update
+            component_name = f"{component.component_type}_{component.component_index or 1}"
+            ProjectService._log_activity(
+                db, component.project_id, user_id, user_name,
+                f"updated_translation_{language_code}", component_name
+            )
+            
             db.commit()
             db.refresh(existing)
             return existing
@@ -200,8 +293,26 @@ class ProjectService:
         )
         
         db.add(translation)
+        
+        # Log creation
+        component_name = f"{component.component_type}_{component.component_index or 1}"
+        ProjectService._log_activity(
+            db, component.project_id, user_id, user_name,
+            f"added_translation_{language_code}", component_name
+        )
+        
         db.commit()
         db.refresh(translation)
         
         return translation
-
+    
+    @staticmethod
+    def get_activity_log(db: Session, project_id: int, limit: int = 50) -> List[ActivityLog]:
+        """Get recent activity for a project"""
+        logs = db.query(ActivityLog).filter(
+            ActivityLog.project_id == project_id
+        ).order_by(
+            ActivityLog.created_at.desc()
+        ).limit(limit).all()
+        
+        return logs

@@ -35,12 +35,18 @@ class ProjectUpdate(BaseModel):
 class ProjectResponse(BaseModel):
     """Project response"""
     id: int
-    user_id: str
     name: str
     brief_text: Optional[str]
     structure: List[dict]
     tone: Optional[str]
     target_languages: List[str]
+    
+    # Audit fields
+    created_by_user_id: Optional[str]
+    created_by_user_name: Optional[str]
+    updated_by_user_id: Optional[str]
+    updated_by_user_name: Optional[str]
+    
     created_at: datetime
     updated_at: datetime
     
@@ -149,4 +155,22 @@ class ExportToSheetsResponse(BaseModel):
     success: bool
     sheet_url: str
     message: str
+
+
+# ===== Activity Log Schemas =====
+
+class ActivityLogResponse(BaseModel):
+    """Activity log entry"""
+    id: int
+    project_id: int
+    user_id: str
+    user_name: Optional[str]
+    action: str
+    field_changed: Optional[str]
+    old_value: Optional[str]
+    new_value: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 

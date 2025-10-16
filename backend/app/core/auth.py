@@ -2,12 +2,20 @@
 Authentication middleware using Clerk
 """
 import logging
+from typing import NamedTuple
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from clerk_backend_api import Clerk
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class User(NamedTuple):
+    """User information from authentication"""
+    id: str
+    name: str | None
+
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
@@ -20,12 +28,12 @@ if settings.clerk_secret_key:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> str:
+) -> User:
     """
     Dependency to get current authenticated user from JWT token
     
     Returns:
-        str: User ID from Clerk
+        User: User object with id and name
         
     Raises:
         HTTPException: If token is invalid or user not authenticated
@@ -34,7 +42,7 @@ async def get_current_user(
         # For development/testing without Clerk
         if settings.environment == "development":
             logger.warning("Clerk not configured, using development mode")
-            return "dev-user-123"
+            return User(id="dev-user-123", name="Dev User")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication not configured"
@@ -54,7 +62,10 @@ async def get_current_user(
             )
         
         user_id = session["sub"]
-        return user_id
+        # Try to get user name from session claims
+        user_name = session.get("name") or session.get("email") or "Unknown User"
+        
+        return User(id=user_id, name=user_name)
         
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
@@ -67,10 +78,10 @@ async def get_current_user(
 
 async def get_optional_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security)
-) -> str | None:
+) -> User | None:
     """
     Optional authentication dependency
-    Returns user ID if authenticated, None otherwise
+    Returns User object if authenticated, None otherwise
     """
     if not credentials:
         return None

@@ -11,22 +11,32 @@ class Project(Base):
     """
     Represents one email campaign project
     One project = one campaign with multiple components
+    
+    NOTE: Projects are shared across all users with appropriate roles
+    No user_id ownership - everyone can access all projects
     """
     __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(255), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     brief_text = Column(Text)  # Creative prompt/instructions
     structure = Column(JSON, nullable=False)  # [{component: "body", count: 2}, ...]
     tone = Column(String(50))
     target_languages = Column(ARRAY(String))  # ['it', 'fr', 'de', ...]
+    
+    # Audit fields
+    created_by_user_id = Column(String(255))
+    created_by_user_name = Column(String(255))
+    updated_by_user_id = Column(String(255))
+    updated_by_user_name = Column(String(255))
+    
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     components = relationship("Component", back_populates="project", cascade="all, delete-orphan")
     images = relationship("Image", back_populates="project", cascade="all, delete-orphan")
+    activity_logs = relationship("ActivityLog", back_populates="project", cascade="all, delete-orphan")
 
 
 class Image(Base):
@@ -83,4 +93,25 @@ class Translation(Base):
 
     # Relationships
     component = relationship("Component", back_populates="translations")
+
+
+class ActivityLog(Base):
+    """
+    Activity log for tracking who did what on projects
+    Enables collaboration audit trail
+    """
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(255), nullable=False)
+    user_name = Column(String(255))
+    action = Column(String(100), nullable=False)  # "created_project", "updated_subject", "uploaded_image", etc.
+    field_changed = Column(String(100))  # "subject", "body_1", etc.
+    old_value = Column(Text)
+    new_value = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    project = relationship("Project", back_populates="activity_logs")
 
