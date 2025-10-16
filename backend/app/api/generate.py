@@ -147,42 +147,48 @@ EXAMPLE OF THE EXACT JSON OUTPUT STRUCTURE REQUIRED:
 @router.post("/generate", response_model=GenerateVariationsResponse, status_code=200)
 @limiter.limit(f"{settings.rate_limit_per_second}/second")
 async def generate_variations(
-    request: GenerateVariationsRequest, client: VertexAIClient = Depends(get_client)
+    request: Request,
+    req: GenerateVariationsRequest,
+    client: VertexAIClient = Depends(get_client)
 ) -> GenerateVariationsResponse:
     """
     Generate variations of a text based on a prompt.
     """
     logger.info(
-        f"Generating {request.count} variations | Tone: {request.tone.value} | "
-        f"Type: {request.content_type.value} | Structure: {request.structure}"
+        f"Generating {req.count} variations | Tone: {req.tone.value} | "
+        f"Type: {req.content_type.value} | Structure: {req.structure}"
     )
 
     prompt = build_generation_prompt(
-        text=request.text,
-        count=request.count,
-        tone=request.tone.value,
-        content_type=request.content_type.value,
-        structure=request.structure,
-        context=request.context,
+        text=req.text,
+        count=req.count,
+        tone=req.tone.value,
+        content_type=req.content_type.value,
+        structure=req.structure,
+        context=req.context,
     )
 
     raw_variations = await client.generate_with_fixing(
         prompt,
-        request.count,
+        req.count,
         temperature=0.7,
         max_tokens=2048,
-        image_url=request.image_url,
+        image_url=req.image_url,
     )
 
     try:
-        variations_list = json.loads(raw_variations)
+        # Parse the JSON response
+        response_data = json.loads(raw_variations)
+        
+        # Extract the variations array from the response
+        variations_list = response_data.get("variations", [])
         
         logger.info(f"Successfully generated {len(variations_list)} variations")
         
         return GenerateVariationsResponse(
             variations=variations_list,
-            original_text=request.text,
-            tone=request.tone.value
+            original_text=req.text,
+            tone=req.tone.value
         )
         
     except Exception as e:

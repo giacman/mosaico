@@ -81,11 +81,14 @@ export function ContentGenerator({
         setComponents(generatedComponents)
         toast.success(`Generated ${result.data.variations.length} variations!`)
       } else {
-        throw new Error(result.error || "Failed to generate content")
+        const errorMsg = result.error || "Failed to generate content"
+        console.error("Generation failed:", errorMsg)
+        toast.error(`Error: ${errorMsg}`)
       }
     } catch (error) {
       console.error("Error generating content:", error)
-      toast.error("Failed to generate content. Please try again.")
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to generate: ${errorMessage}`)
     } finally {
       setIsGenerating(false)
     }
