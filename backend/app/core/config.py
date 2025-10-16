@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     # Cloud Storage
     gcs_bucket_prompts: str = "mosaico-prompts"
     gcs_bucket_examples: str = "mosaico-examples"
+    gcs_bucket_images: str = "mosaico-images"  # For user-uploaded images
+    
+    # Database
+    database_url: str = "postgresql://localhost:5432/mosaico"
+    
+    # Authentication
+    clerk_secret_key: str | None = None
+    
+    # Google Sheets API
+    google_sheets_credentials_path: str | None = None
     
     # API
     api_title: str = "Mosaico API"

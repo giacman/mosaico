@@ -17,6 +17,37 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
 
 
+async def translate_text_content(
+    text: str,
+    target_language: str,
+    source_language: str = "EN",
+    ai_client=None
+) -> str:
+    """
+    Helper function to translate text content
+    Used by both standalone endpoint and project translation
+    """
+    if ai_client is None:
+        ai_client = vertex_client
+    
+    prompt = build_translation_prompt(
+        text=text,
+        target_language=target_language.lower(),
+        source_language=source_language.lower(),
+        maintain_tone=True,
+        content_type="newsletter"
+    )
+    
+    response_text = await ai_client.generate_with_fixing(
+        prompt=prompt,
+        schema={"translated_text": "string"},
+        temperature=0.3
+    )
+    
+    response_data = json.loads(response_text)
+    return response_data.get("translated_text", text)
+
+
 LANGUAGE_NAMES = {
     "it": "Italian",
     "en": "English",

@@ -1,0 +1,152 @@
+"""
+Pydantic schemas for Project-related API endpoints
+"""
+from datetime import datetime
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+
+# ===== Project Schemas =====
+
+class StructureComponentCreate(BaseModel):
+    """Component in email structure"""
+    component: str = Field(..., description="Component type: subject, pre_header, title, body, cta")
+    count: int = Field(1, ge=1, le=10, description="Number of instances (for body, cta)")
+
+
+class ProjectCreate(BaseModel):
+    """Request to create a new project"""
+    name: str = Field(..., min_length=1, max_length=255)
+    brief_text: Optional[str] = None
+    structure: List[StructureComponentCreate]
+    tone: Optional[str] = None
+    target_languages: List[str] = Field(default_factory=list)
+
+
+class ProjectUpdate(BaseModel):
+    """Request to update a project"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    brief_text: Optional[str] = None
+    structure: Optional[List[StructureComponentCreate]] = None
+    tone: Optional[str] = None
+    target_languages: Optional[List[str]] = None
+
+
+class ProjectResponse(BaseModel):
+    """Project response"""
+    id: int
+    user_id: str
+    name: str
+    brief_text: Optional[str]
+    structure: List[dict]
+    tone: Optional[str]
+    target_languages: List[str]
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ===== Component Schemas =====
+
+class ComponentCreate(BaseModel):
+    """Request to create a component"""
+    component_type: str
+    component_index: Optional[int] = None
+    generated_content: Optional[str] = None
+    component_url: Optional[str] = None
+    image_id: Optional[int] = None
+
+
+class ComponentUpdate(BaseModel):
+    """Request to update a component"""
+    generated_content: Optional[str] = None
+    component_url: Optional[str] = None
+    image_id: Optional[int] = None
+
+
+class TranslationResponse(BaseModel):
+    """Translation for a component"""
+    id: int
+    language_code: str
+    translated_content: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ComponentResponse(BaseModel):
+    """Component response with translations"""
+    id: int
+    project_id: int
+    component_type: str
+    component_index: Optional[int]
+    generated_content: Optional[str]
+    component_url: Optional[str]
+    image_id: Optional[int]
+    created_at: datetime
+    translations: List[TranslationResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+
+# ===== Image Schemas =====
+
+class ImageResponse(BaseModel):
+    """Image metadata response"""
+    id: int
+    project_id: int
+    filename: str
+    gcs_path: str
+    gcs_public_url: Optional[str]
+    uploaded_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ===== Generation Schemas =====
+
+class GenerateProjectContentRequest(BaseModel):
+    """Request to generate content for a project"""
+    count: int = Field(1, ge=1, le=5, description="Number of variations")
+    image_urls: Optional[List[str]] = Field(default_factory=list, description="Optional image URLs to use as context")
+
+
+class GenerateProjectContentResponse(BaseModel):
+    """Response from generating content"""
+    project_id: int
+    components: List[ComponentResponse]
+
+
+# ===== Translation Schemas =====
+
+class TranslateProjectRequest(BaseModel):
+    """Request to translate all project components"""
+    languages: Optional[List[str]] = None  # If None, use project's target_languages
+
+
+class TranslateProjectResponse(BaseModel):
+    """Response from translating project"""
+    project_id: int
+    components: List[ComponentResponse]
+
+
+# ===== Export Schemas =====
+
+class ExportToSheetsRequest(BaseModel):
+    """Request to export project to Google Sheets"""
+    sheet_url: str = Field(..., description="Google Sheets URL")
+    export_mode: str = Field("new_sheet", description="'new_sheet' or 'append'")
+    include_metadata: bool = Field(True, description="Include character counts and metadata")
+
+
+class ExportToSheetsResponse(BaseModel):
+    """Response from exporting to sheets"""
+    success: bool
+    sheet_url: str
+    message: str
+

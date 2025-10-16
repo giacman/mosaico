@@ -10,9 +10,18 @@ python-multipart==0.0.12
 pydantic==2.9.0
 pydantic-settings==2.5.0
 
+# Database
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
 # Google Cloud
 google-cloud-aiplatform==1.70.0
 google-cloud-storage==2.18.0
+google-api-python-client==2.149.0
+
+# Authentication
+clerk-backend-api==1.5.0
 
 # Rate Limiting
 slowapi==0.1.9
