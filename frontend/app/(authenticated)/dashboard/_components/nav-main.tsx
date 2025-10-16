@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
 import { ChevronRight, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 
@@ -47,24 +46,44 @@ export function NavMain({
   const isCollapsed = state === "collapsed"
   const [mounted, setMounted] = useState(false)
 
-  // Initialize with default open state - all items start as closed for SSR
+  // Initialize with default closed state
   const defaultOpenState = items.reduce(
     (acc, item) => ({
       ...acc,
-      [item.title]: false // Default to closed to match SSR
+      [item.title]: false
     }),
     {} as Record<string, boolean>
   )
 
-  const [openItems, setOpenItems] = useLocalStorage(
-    "sidebar-open-items",
-    defaultOpenState
-  )
+  const [openItems, setOpenItems] = useState<Record<string, boolean>>(defaultOpenState)
 
-  // Fix hydration by only using localStorage after mount
+  // Load from localStorage only on client side after mount
   useEffect(() => {
     setMounted(true)
+    
+    // Load saved state from localStorage (client-side only)
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("sidebar-open-items")
+        if (saved) {
+          setOpenItems(JSON.parse(saved))
+        }
+      } catch (error) {
+        console.error("Error loading sidebar state:", error)
+      }
+    }
   }, [])
+
+  // Save to localStorage whenever openItems changes (client-side only)
+  useEffect(() => {
+    if (mounted && typeof window !== "undefined") {
+      try {
+        localStorage.setItem("sidebar-open-items", JSON.stringify(openItems))
+      } catch (error) {
+        console.error("Error saving sidebar state:", error)
+      }
+    }
+  }, [openItems, mounted])
 
   // Handle open/close state changes
   const handleOpenChange = (itemTitle: string, isOpen: boolean) => {

@@ -1,6 +1,7 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
+import { revalidatePath } from "next/cache"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
@@ -144,6 +145,10 @@ export async function createProject(
     }
 
     const data = await response.json()
+    
+    // Revalidate the dashboard to show the new project
+    revalidatePath("/dashboard")
+    
     return { success: true, data }
   } catch (error) {
     console.error("Error creating project:", error)
@@ -186,6 +191,11 @@ export async function updateProject(
     }
 
     const data = await response.json()
+    
+    // Revalidate both dashboard and project page
+    revalidatePath("/dashboard")
+    revalidatePath(`/dashboard/projects/${id}`)
+    
     return { success: true, data }
   } catch (error) {
     console.error("Error updating project:", error)
@@ -222,6 +232,9 @@ export async function deleteProject(
         error: `Failed to delete project: ${response.statusText}`
       }
     }
+
+    // Revalidate the dashboard to remove the deleted project
+    revalidatePath("/dashboard")
 
     return { success: true }
   } catch (error) {

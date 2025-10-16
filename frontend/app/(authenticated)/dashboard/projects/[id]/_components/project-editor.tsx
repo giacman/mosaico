@@ -28,6 +28,7 @@ import { updateProject, type Project } from "@/actions/projects"
 import { EmailStructureBuilder } from "../../../_components/email-structure-builder"
 import { ImageUploadManager } from "../../../_components/image-upload-manager"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
+import { ContentGenerator } from "../../../_components/content-generator"
 
 interface ProjectEditorProps {
   initialProject: Project
@@ -276,33 +277,14 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
 
         {/* Right Column: Generated Content Preview */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Generated Content</CardTitle>
-              <CardDescription>
-                AI-generated content will appear here
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex min-h-[400px] items-center justify-center text-center">
-                <div className="space-y-4">
-                  <Sparkles className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <div>
-                    <p className="font-medium">No content generated yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Save your project settings and click &quot;Generate Content&quot; to
-                      create your email copy
-                    </p>
-                  </div>
-                  {hasChanges && (
-                    <Button variant="outline" size="sm" onClick={handleSave}>
-                      Save Changes First
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ContentGenerator
+            projectId={project.id}
+            brief={project.brief_text ?? ""}
+            tone={project.tone ?? "professional"}
+            structure={project.structure}
+            targetLanguages={project.target_languages}
+            imageUrls={images.map((img) => img.url)}
+          />
 
           {/* Image Upload */}
           <ImageUploadManager
