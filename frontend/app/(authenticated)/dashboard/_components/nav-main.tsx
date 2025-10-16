@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { ChevronRight, type LucideIcon } from "lucide-react"
 import Link from "next/link"
@@ -44,12 +45,13 @@ export function NavMain({
 }) {
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
+  const [mounted, setMounted] = useState(false)
 
-  // Initialize with default open state - all items start as open
+  // Initialize with default open state - all items start as closed for SSR
   const defaultOpenState = items.reduce(
     (acc, item) => ({
       ...acc,
-      [item.title]: true // Default to open to avoid visual jumps
+      [item.title]: false // Default to closed to match SSR
     }),
     {} as Record<string, boolean>
   )
@@ -59,10 +61,18 @@ export function NavMain({
     defaultOpenState
   )
 
+  // Fix hydration by only using localStorage after mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Handle open/close state changes
   const handleOpenChange = (itemTitle: string, isOpen: boolean) => {
     setOpenItems(prev => ({ ...prev, [itemTitle]: isOpen }))
   }
+
+  // Use default state (all closed) until mounted
+  const currentOpenState = mounted ? openItems : defaultOpenState
 
   return (
     <SidebarGroup>
@@ -108,7 +118,7 @@ export function NavMain({
             ) : (
               <Collapsible
                 asChild
-                open={openItems[item.title] ?? true}
+                open={currentOpenState[item.title] ?? false}
                 onOpenChange={isOpen => handleOpenChange(item.title, isOpen)}
                 className="group/collapsible"
               >

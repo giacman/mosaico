@@ -19,6 +19,7 @@ from app.api import projects
 from app.api import upload
 from app.api import project_generation
 from app.api import export
+from app.api import optimize_prompt
 # from app.api import generate_from_image
 
 # Configure logging
@@ -93,6 +94,7 @@ async def health_check():
 app.include_router(generate.router, prefix="/api/v1", tags=["Generate"])
 app.include_router(translate.router, prefix="/api/v1", tags=["Translate"])
 app.include_router(refine.router, prefix="/api/v1", tags=["Refine"])
+app.include_router(optimize_prompt.router, prefix="/api/v1", tags=["Optimize"])
 app.include_router(projects.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(upload.router, prefix="/api/v1", tags=["Upload"])
 app.include_router(project_generation.router, prefix="/api/v1", tags=["Projects"])
