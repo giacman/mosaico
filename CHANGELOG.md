@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.4] - 2025-10-17
+
+### ✨ Added
+- **Client-Side Image Compression**: Automatic image compression before upload
+  - Accepts files up to 10MB original size
+  - Compresses to max 2MB using `browser-image-compression`
+  - Max dimension 1920px for email-optimized images
+  - JPEG format with 0.8 quality balance
+  - Real-time feedback during compression process
+  - Toast notifications showing original → compressed size
+
+### 🔧 Improvements
+- Better upload performance with smaller file sizes
+- Reduced storage costs with automatic compression
+- Improved state management in image upload component
+- Fixed image preview display after upload
+- Enhanced user feedback with compression progress
+
+### 🐛 Fixed
+- Image preview not showing after upload (state tracking issue)
+- Missing drag & drop handler functions
+
+---
+
 ## [0.2.3] - 2025-10-17
 
 ### ✨ Added

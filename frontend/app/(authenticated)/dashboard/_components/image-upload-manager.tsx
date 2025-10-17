@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { uploadImage } from "@/actions/upload"
+import imageCompression from "browser-image-compression"
 
 interface UploadedImage {
   id: string
@@ -24,51 +25,51 @@ interface ImageUploadManagerProps {
 export function ImageUploadManager({ projectId, value, onChange }: ImageUploadManagerProps) {
   const [isDragging, setIsDragging] = useState(false)
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }, [])
+  const compressImage = async (file: File): Promise<File> => {
+    // Skip compression for very small files (< 100KB)
+    if (file.size < 100 * 1024) {
+      return file
+    }
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }, [])
-
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setIsDragging(false)
-
-      const files = Array.from(e.dataTransfer.files).filter((file) =>
-        file.type.startsWith("image/")
-      )
-
-      if (files.length === 0) {
-        toast.error("Please drop image files only")
-        return
+    const originalSizeMB = (file.size / 1024 / 1024).toFixed(2)
+    
+    try {
+      const options = {
+        maxSizeMB: 2, // Max file size 2MB
+        maxWidthOrHeight: 1920, // Max dimension for email images
+        useWebWorker: true, // Use web worker for better performance
+        fileType: 'image/jpeg', // Convert to JPEG for better compression
+        initialQuality: 0.8 // Good balance between quality and size
       }
 
-      await uploadFiles(files)
-    },
-    [projectId, value, onChange]
-  )
-
-  const handleFileInput = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || [])
-      if (files.length > 0) {
-        await uploadFiles(files)
+      const compressedFile = await imageCompression(file, options)
+      const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2)
+      
+      console.log(`Image compressed: ${originalSizeMB}MB → ${compressedSizeMB}MB`)
+      
+      // Show toast if significant compression occurred
+      if (file.size / compressedFile.size > 1.5) {
+        toast.success(`Image compressed: ${originalSizeMB}MB → ${compressedSizeMB}MB`)
       }
-      // Reset input
-      e.target.value = ""
-    },
-    [projectId, value, onChange]
-  )
+      
+      return compressedFile
+    } catch (error) {
+      console.error('Compression error:', error)
+      toast.warning(`Using original image (${originalSizeMB}MB)`)
+      return file
+    }
+  }
 
   const uploadFiles = async (files: File[]) => {
+    // Validate file sizes first
+    const MAX_ORIGINAL_SIZE = 10 * 1024 * 1024 // 10MB original size limit
+    const invalidFiles = files.filter(f => f.size > MAX_ORIGINAL_SIZE)
+    
+    if (invalidFiles.length > 0) {
+      toast.error(`Files too large (max 10MB): ${invalidFiles.map(f => f.name).join(', ')}`)
+      return
+    }
+
     // Add placeholder images while uploading
     const newImages: UploadedImage[] = files.map((file) => ({
       id: `temp-${Math.random()}`,
@@ -77,16 +78,22 @@ export function ImageUploadManager({ projectId, value, onChange }: ImageUploadMa
       uploading: true
     }))
 
-    onChange([...value, ...newImages])
+    // Keep track of current images state
+    let currentImages = [...value, ...newImages]
+    onChange(currentImages)
 
     // Upload each file
     for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+      const originalFile = files[i]
       const tempId = newImages[i].id
 
       try {
+        // Compress image before upload
+        toast.info(`Compressing ${originalFile.name}...`)
+        const compressedFile = await compressImage(originalFile)
+        
         // Upload to backend
-        const result = await uploadImage(projectId, file)
+        const result = await uploadImage(projectId, compressedFile)
 
         if (!result.success || !result.data) {
           throw new Error(result.error || "Upload failed")
@@ -99,16 +106,50 @@ export function ImageUploadManager({ projectId, value, onChange }: ImageUploadMa
           filename: result.data.filename
         }
 
-        // Replace temp image with uploaded one
-        onChange(value.map((img) => (img.id === tempId ? uploadedImage : img)))
+        // Replace temp image with uploaded one using current state
+        currentImages = currentImages.map((img) => (img.id === tempId ? uploadedImage : img))
+        onChange(currentImages)
 
-        toast.success(`Uploaded ${file.name}`)
+        toast.success(`Uploaded ${originalFile.name}`)
       } catch (error) {
         console.error("Upload error:", error)
-        toast.error(`Failed to upload ${file.name}`)
-        // Remove failed upload
-        onChange(value.filter((img) => img.id !== tempId))
+        toast.error(`Failed to upload ${originalFile.name}`)
+        // Remove failed upload using current state
+        currentImages = currentImages.filter((img) => img.id !== tempId)
+        onChange(currentImages)
       }
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files).filter((file) =>
+      file.type.startsWith("image/")
+    )
+    if (files.length > 0) {
+      uploadFiles(files)
+    }
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      uploadFiles(Array.from(files))
     }
   }
 
@@ -122,7 +163,7 @@ export function ImageUploadManager({ projectId, value, onChange }: ImageUploadMa
       <CardHeader>
         <CardTitle>Images</CardTitle>
         <CardDescription>
-          Upload images for your email campaign (max 10MB each)
+          Upload images for your email campaign (max 10MB, auto-compressed to 2MB)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
