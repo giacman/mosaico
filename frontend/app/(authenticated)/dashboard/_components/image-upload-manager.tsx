@@ -100,16 +100,14 @@ export function ImageUploadManager({ projectId, value, onChange }: ImageUploadMa
         }
 
         // Replace temp image with uploaded one
-        onChange((prev) =>
-          prev.map((img) => (img.id === tempId ? uploadedImage : img))
-        )
+        onChange(value.map((img) => (img.id === tempId ? uploadedImage : img)))
 
         toast.success(`Uploaded ${file.name}`)
       } catch (error) {
         console.error("Upload error:", error)
         toast.error(`Failed to upload ${file.name}`)
         // Remove failed upload
-        onChange((prev) => prev.filter((img) => img.id !== tempId))
+        onChange(value.filter((img) => img.id !== tempId))
       }
     }
   }

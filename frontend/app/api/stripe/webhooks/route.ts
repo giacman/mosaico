@@ -19,8 +19,8 @@ export async function POST(req: Request) {
   let event: Stripe.Event
 
   try {
-    if (!sig || !webhookSecret) {
-      throw new Error("Webhook secret or signature missing")
+    if (!sig || !webhookSecret || !stripe) {
+      throw new Error("Webhook secret, signature, or Stripe client missing")
     }
 
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
@@ -95,6 +95,10 @@ async function handleCheckoutSession(event: Stripe.Event) {
     }
 
     await updateStripeCustomer(clientReferenceId, subscriptionId, customerId)
+
+    if (!stripe) {
+      throw new Error("Stripe client not initialized")
+    }
 
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ["default_payment_method"]

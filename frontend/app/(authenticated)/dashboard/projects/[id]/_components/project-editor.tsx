@@ -268,10 +268,10 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
           {/* Email Structure */}
           <EmailStructureBuilder
             value={project.structure.map((s) => ({
-              component: s.component as any,
+              component: s.component as "subject" | "pre_header" | "body" | "cta",
               count: s.count
             }))}
-            onChange={(structure) => updateField("structure", structure as any)}
+            onChange={(structure) => updateField("structure", structure as Array<{component: string; count: number}>)}
           />
         </div>
 
