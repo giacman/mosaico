@@ -284,6 +284,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
             structure={project.structure}
             targetLanguages={project.target_languages}
             imageUrls={images.map((img) => img.url)}
+            savedComponents={project.components || []}
           />
 
           {/* Image Upload */}

@@ -14,7 +14,8 @@ from app.models.project_schemas import (
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,
-    ActivityLogResponse
+    ActivityLogResponse,
+    SaveGeneratedContentRequest
 )
 from app.services.project_service import ProjectService
 from app.utils.notifications import notify_project_created, notify_project_updated
@@ -168,3 +169,42 @@ async def get_project_activity(
     
     logs = ProjectService.get_activity_log(db, project_id, limit)
     return logs
+
+
+@router.post("/projects/{project_id}/components", response_model=ProjectResponse)
+async def save_generated_content(
+    project_id: int,
+    request_data: SaveGeneratedContentRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Save generated components and translations for a project
+    This replaces all existing components
+    """
+    try:
+        # Convert Pydantic models to dicts for service layer
+        components_data = [comp.model_dump() for comp in request_data.components]
+        
+        # Save components
+        saved_components = ProjectService.save_generated_content(
+            db, project_id, user.id, user.name, components_data
+        )
+        
+        # Return updated project with all components
+        project = ProjectService.get_project(db, project_id)
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+        
+        return project
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving generated content: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save generated content: {str(e)}"
+        )

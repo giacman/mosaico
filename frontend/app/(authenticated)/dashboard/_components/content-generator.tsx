@@ -12,7 +12,10 @@ import { toast } from "sonner"
 import { generateContent } from "@/actions/generate"
 import { batchTranslate } from "@/actions/translate"
 import { generateHandlebar } from "@/actions/export"
+import { saveGeneratedComponents } from "@/actions/components"
 import { useNotifications } from "./notifications-provider"
+import { Component as SavedComponent } from "@/actions/projects"
+import { useEffect } from "react"
 
 interface ContentGeneratorProps {
   projectId: number
@@ -21,6 +24,7 @@ interface ContentGeneratorProps {
   structure: Array<{ component: string; count: number }>
   targetLanguages: string[]
   imageUrls?: string[]
+  savedComponents?: SavedComponent[]
 }
 
 interface GeneratedComponent {
@@ -36,7 +40,8 @@ export function ContentGenerator({
   tone,
   structure,
   targetLanguages,
-  imageUrls = []
+  imageUrls = [],
+  savedComponents = []
 }: ContentGeneratorProps) {
   const { addNotification } = useNotifications()
   const [isGenerating, setIsGenerating] = useState(false)
@@ -45,6 +50,89 @@ export function ContentGenerator({
   const [translations, setTranslations] = useState<Record<string, Record<string, string>>>({})
   const [temperature, setTemperature] = useState(0.7)
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Load saved components on mount
+  useEffect(() => {
+    if (savedComponents.length > 0) {
+      // Convert saved components from backend to display format
+      const loadedComponents: GeneratedComponent[] = savedComponents.map(comp => {
+        const key = comp.component_index 
+          ? `${comp.component_type}_${comp.component_index}`
+          : comp.component_type
+        
+        return {
+          key,
+          label: formatLabel(key),
+          content: comp.generated_content || "",
+          editing: false
+        }
+      })
+      
+      setComponents(loadedComponents)
+      
+      // Load translations
+      const loadedTranslations: Record<string, Record<string, string>> = {}
+      savedComponents.forEach(comp => {
+        const key = comp.component_index 
+          ? `${comp.component_type}_${comp.component_index}`
+          : comp.component_type
+        
+        if (comp.translations.length > 0) {
+          loadedTranslations[key] = {}
+          comp.translations.forEach(trans => {
+            loadedTranslations[key][trans.language_code] = trans.translated_content
+          })
+        }
+      })
+      
+      if (Object.keys(loadedTranslations).length > 0) {
+        setTranslations(loadedTranslations)
+      }
+    }
+  }, [savedComponents])
+
+  // Helper function to save components to database with visual feedback
+  const saveComponentsToDatabase = async (componentsToSave: GeneratedComponent[], translationsToSave: Record<string, Record<string, string>>) => {
+    setIsSaving(true)
+    try {
+      // Convert to backend format
+      const savedComponents = componentsToSave.map(comp => {
+        // Extract component type and index from key (e.g., "body_1" -> type: "body", index: 1)
+        const match = comp.key.match(/^(.+?)_(\d+)$/)
+        const componentType = match ? match[1] : comp.key
+        const componentIndex = match ? parseInt(match[2]) : undefined
+
+        return {
+          component_type: componentType,
+          component_index: componentIndex,
+          generated_content: comp.content,
+          translations: translationsToSave[comp.key] || {}
+        }
+      })
+
+      const result = await saveGeneratedComponents(projectId, savedComponents)
+      
+      if (!result.success) {
+        console.error("Failed to save components:", result.error)
+        // Don't show error toast to avoid annoying the user
+        // The content is still in memory and usable
+      }
+    } catch (error) {
+      console.error("Error saving components:", error)
+    } finally {
+      // Small delay so user sees the "Saved" indicator
+      setTimeout(() => setIsSaving(false), 500)
+    }
+  }
+  
+  const formatLabel = (key: string): string => {
+    return key
+      .replace(/_/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  }
 
   const handleGenerate = async () => {
     if (!brief.trim()) {
@@ -84,6 +172,9 @@ export function ContentGenerator({
         setComponents(generatedComponents)
         toast.success("Content generated successfully!")
         
+        // Auto-save to database
+        await saveComponentsToDatabase(generatedComponents, {})
+        
         // Add persistent notification for team handoff
         addNotification({
           type: "success",
@@ -102,14 +193,6 @@ export function ContentGenerator({
     } finally {
       setIsGenerating(false)
     }
-  }
-
-  const formatLabel = (key: string): string => {
-    return key
-      .replace(/_/g, " ")
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
   }
 
   const handleRegenerateAll = async () => {
@@ -215,12 +298,14 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
     )
   }
 
-  const updateContent = (index: number, newContent: string) => {
-    setComponents((prev) =>
-      prev.map((comp, i) =>
-        i === index ? { ...comp, content: newContent } : comp
-      )
+  const updateContent = async (index: number, newContent: string) => {
+    const updatedComponents = components.map((comp, i) =>
+      i === index ? { ...comp, content: newContent } : comp
     )
+    setComponents(updatedComponents)
+    
+    // Auto-save to database when content is edited
+    await saveComponentsToDatabase(updatedComponents, translations)
   }
 
   const copyToClipboard = (text: string) => {
@@ -252,6 +337,9 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
         setTranslations(result.data)
         toast.success(`Translated to ${targetLanguages.length} languages!`)
         
+        // Auto-save to database with translations
+        await saveComponentsToDatabase(components, result.data)
+        
         // Add persistent notification for team handoff
         addNotification({
           type: "success",
@@ -272,10 +360,20 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI Content Generation</CardTitle>
-        <CardDescription>
-          Generate email content based on your brief and structure
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>AI Content Generation</CardTitle>
+            <CardDescription>
+              Generate email content based on your brief and structure
+            </CardDescription>
+          </div>
+          {isSaving && (
+            <Badge variant="secondary" className="ml-auto">
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              Saving...
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Temperature Control */}

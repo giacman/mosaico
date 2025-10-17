@@ -307,6 +307,71 @@ class ProjectService:
         return translation
     
     @staticmethod
+    def save_generated_content(
+        db: Session,
+        project_id: int,
+        user_id: str,
+        user_name: Optional[str],
+        components_data: List[dict]
+    ) -> List[Component]:
+        """
+        Save or update generated components in batch
+        This replaces all existing components for the project
+        """
+        # Verify project exists
+        project = ProjectService.get_project(db, project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Delete existing components (cascade will delete translations)
+        db.query(Component).filter(Component.project_id == project_id).delete()
+        db.flush()
+        
+        saved_components = []
+        
+        for comp_data in components_data:
+            # Create component
+            component = Component(
+                project_id=project_id,
+                component_type=comp_data["component_type"],
+                component_index=comp_data.get("component_index"),
+                generated_content=comp_data["generated_content"],
+                component_url=comp_data.get("component_url"),
+                image_id=comp_data.get("image_id")
+            )
+            
+            db.add(component)
+            db.flush()  # Get component ID
+            
+            # Add translations if provided
+            translations_dict = comp_data.get("translations", {})
+            for lang_code, translated_text in translations_dict.items():
+                translation = Translation(
+                    component_id=component.id,
+                    language_code=lang_code,
+                    translated_content=translated_text
+                )
+                db.add(translation)
+            
+            saved_components.append(component)
+        
+        # Log activity
+        ProjectService._log_activity(
+            db, project_id, user_id, user_name,
+            "saved_generated_content",
+            None, None, f"{len(saved_components)} components"
+        )
+        
+        db.commit()
+        
+        # Refresh all components to get relationships
+        for component in saved_components:
+            db.refresh(component)
+        
+        logger.info(f"Saved {len(saved_components)} components for project {project_id}")
+        return saved_components
+    
+    @staticmethod
     def get_activity_log(db: Session, project_id: int, limit: int = 50) -> List[ActivityLog]:
         """Get recent activity for a project"""
         logs = db.query(ActivityLog).filter(

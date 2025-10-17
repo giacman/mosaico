@@ -5,6 +5,34 @@ import { revalidatePath } from "next/cache"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
+export interface Translation {
+  id: number
+  language_code: string
+  translated_content: string
+  created_at: string
+}
+
+export interface Component {
+  id: number
+  project_id: number
+  component_type: string
+  component_index: number | null
+  generated_content: string | null
+  component_url: string | null
+  image_id: number | null
+  created_at: string
+  translations: Translation[]
+}
+
+export interface ProjectImage {
+  id: number
+  project_id: number
+  filename: string
+  gcs_path: string
+  gcs_public_url: string | null
+  uploaded_at: string
+}
+
 export interface Project {
   id: number
   name: string
@@ -18,6 +46,8 @@ export interface Project {
   updated_by_user_name: string | null
   created_at: string
   updated_at: string
+  components: Component[]
+  images: ProjectImage[]
 }
 
 export interface CreateProjectInput {

@@ -50,6 +50,10 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
+    # Generated content (eagerly loaded)
+    components: List["ComponentResponse"] = []
+    images: List["ImageResponse"] = []
+    
     class Config:
         from_attributes = True
 
@@ -155,6 +159,30 @@ class ExportToSheetsResponse(BaseModel):
     success: bool
     sheet_url: str
     message: str
+
+
+# ===== Save Generated Content Schemas =====
+
+class SavedComponentCreate(BaseModel):
+    """Component data to save"""
+    component_type: str
+    component_index: Optional[int] = None
+    generated_content: str
+    component_url: Optional[str] = None
+    image_id: Optional[int] = None
+    translations: dict = Field(default_factory=dict, description="Dict of language_code -> translated_content")
+
+
+class SaveGeneratedContentRequest(BaseModel):
+    """Request to save generated components"""
+    components: List[SavedComponentCreate]
+
+
+class SaveGeneratedContentResponse(BaseModel):
+    """Response from saving components"""
+    project_id: int
+    saved_count: int
+    components: List[ComponentResponse]
 
 
 # ===== Activity Log Schemas =====
