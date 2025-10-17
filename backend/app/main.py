@@ -1,7 +1,6 @@
 """
 Mosaico FastAPI Application
-Modern backend for Google Sheets Add-on
-NO LangChain - Direct Vertex AI SDK
+AI-Powered Email Campaign Content Generator
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 import logging
 from contextlib import asynccontextmanager
 
+from app import __version__
 from app.core.config import settings
 from app.api import generate
 from app.api import translate
@@ -36,21 +36,21 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("=" * 50)
-    logger.info("MOSAICO BACKEND STARTING")
+    logger.info(f"MOSAICO BACKEND v{__version__} STARTING")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"GCP Project: {settings.gcp_project_id}")
     logger.info(f"Vertex AI Model: {settings.vertex_ai_model}")
     logger.info("=" * 50)
     yield
     # Shutdown
-    logger.info("Mosaico backend shutting down")
+    logger.info(f"Mosaico backend v{__version__} shutting down")
 
 
 # Create FastAPI app
 app = FastAPI(
     title=settings.api_title,
-    version=settings.api_version,
-    description="AI Content Creation Co-Pilot for Google Sheets",
+    version=__version__,
+    description="AI-Powered Email Campaign Content Generator",
     lifespan=lifespan
 )
 
@@ -75,7 +75,7 @@ async def root():
     """Health check endpoint"""
     return {
         "service": "Mosaico API",
-        "version": settings.api_version,
+        "version": __version__,
         "status": "healthy"
     }
 
@@ -85,6 +85,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
+        "version": __version__,
         "environment": settings.environment,
         "vertex_ai_model": settings.vertex_ai_model
     }

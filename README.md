@@ -1,9 +1,10 @@
 # 🎨 Mosaico
 ### AI-Powered Email Campaign Content Generator
 
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Next.js](https://img.shields.io/badge/next.js-15.1-black.svg)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com/)
 
 ---
@@ -131,6 +132,7 @@ Frontend will be available at: `http://localhost:3000`
 
 ### Core Documentation
 
+- **[CHANGELOG.md](CHANGELOG.md)**: Version history and release notes
 - **[CURRENT_STATUS.md](CURRENT_STATUS.md)**: Current project status and recent changes
 - **[QUICK_START.md](QUICK_START.md)**: Step-by-step setup guide
 - **[TEAM_WORKFLOW_NOTIFICATIONS.md](TEAM_WORKFLOW_NOTIFICATIONS.md)**: Team collaboration workflow and notification system
