@@ -127,6 +127,31 @@ async def update_project(
     return project
 
 
+@router.post("/projects/{project_id}/duplicate", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+async def duplicate_project(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Duplicate a project with all its components, translations, and images
+    All authenticated users can duplicate any project
+    """
+    try:
+        duplicated_project = ProjectService.duplicate_project(
+            db, project_id, user.id, user.name
+        )
+        return duplicated_project
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error duplicating project {project_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to duplicate project: {str(e)}"
+        )
+
+
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: int,

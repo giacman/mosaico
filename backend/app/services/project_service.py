@@ -80,6 +80,87 @@ class ProjectService:
         return project
     
     @staticmethod
+    def duplicate_project(
+        db: Session,
+        project_id: int,
+        user_id: str,
+        user_name: Optional[str]
+    ) -> Project:
+        """Duplicate an existing project with all its components, translations, and images"""
+        # Get original project with all relationships
+        original = db.query(Project).options(
+            joinedload(Project.components).joinedload(Component.translations),
+            joinedload(Project.images)
+        ).filter(Project.id == project_id).first()
+        
+        if not original:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project {project_id} not found"
+            )
+        
+        # Create new project with "(Copy)" suffix
+        new_project = Project(
+            name=f"{original.name} (Copy)",
+            brief_text=original.brief_text,
+            structure=original.structure,
+            tone=original.tone,
+            target_languages=original.target_languages,
+            created_by_user_id=user_id,
+            created_by_user_name=user_name
+        )
+        
+        db.add(new_project)
+        db.flush()  # Get new project ID
+        
+        # Duplicate components and their translations
+        for orig_component in original.components:
+            new_component = Component(
+                project_id=new_project.id,
+                component_type=orig_component.component_type,
+                component_index=orig_component.component_index,
+                generated_content=orig_component.generated_content,
+                component_url=orig_component.component_url,
+                image_id=orig_component.image_id
+            )
+            db.add(new_component)
+            db.flush()  # Get new component ID
+            
+            # Duplicate translations
+            for orig_translation in orig_component.translations:
+                new_translation = Translation(
+                    component_id=new_component.id,
+                    language_code=orig_translation.language_code,
+                    translated_content=orig_translation.translated_content
+                )
+                db.add(new_translation)
+        
+        # Duplicate images (they reference the same GCS files)
+        for orig_image in original.images:
+            new_image = Image(
+                project_id=new_project.id,
+                user_id=user_id,  # Use current user as uploader of duplicated images
+                filename=orig_image.filename,
+                gcs_path=orig_image.gcs_path,
+                gcs_public_url=orig_image.gcs_public_url
+            )
+            db.add(new_image)
+        
+        # Log duplication
+        ProjectService._log_activity(
+            db, new_project.id, user_id, user_name, 
+            "duplicated_project", 
+            field_changed="source_project_id",
+            new_value=str(project_id)
+        )
+        
+        db.commit()
+        db.refresh(new_project)
+        
+        logger.info(f"Duplicated project {project_id} to new project {new_project.id} by user {user_id}")
+        return new_project
+    
+    @staticmethod
     def get_project(db: Session, project_id: int) -> Optional[Project]:
         """
         Get a project by ID

@@ -237,6 +237,49 @@ export async function updateProject(
 }
 
 /**
+ * Duplicate a project
+ */
+export async function duplicateProject(
+  id: number
+): Promise<{ success: boolean; data?: Project; error?: string }> {
+  try {
+    const token = await getAuthToken()
+
+    if (!token) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/projects/${id}/duplicate`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return {
+        success: false,
+        error: errorData.detail || `Failed to duplicate project: ${response.statusText}`
+      }
+    }
+
+    const data = await response.json()
+    
+    // Revalidate the dashboard to show the duplicated project
+    revalidatePath("/dashboard")
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error duplicating project:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to duplicate project"
+    }
+  }
+}
+
+/**
  * Delete a project
  */
 export async function deleteProject(

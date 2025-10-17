@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.5] - 2025-10-17
+
+### ✨ Added
+- **Project Duplication**: Complete project cloning functionality
+  - New "Duplicate" option in project card dropdown menu
+  - Duplicates all project settings (brief, structure, tone, languages)
+  - Copies all generated components with their content
+  - Copies all translations for all languages
+  - References same images in GCS (no file duplication)
+  - Adds "(Copy)" suffix to duplicated project name
+  - Activity log tracks duplication for audit trail
+  - New backend endpoint `POST /api/v1/projects/{id}/duplicate`
+
+### 🔧 Improvements
+- Enhanced project card dropdown menu with separator
+- Better workflow for creating campaign variations
+- Instant project cloning without regenerating content
+
+### 🐛 Fixed
+- Fixed `user_id` NOT NULL constraint error when duplicating images
+- Proper user attribution for duplicated project resources
+
+---
+
 ## [0.2.4] - 2025-10-17
 
 ### ✨ Added

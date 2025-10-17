@@ -1,6 +1,6 @@
 "use client"
 
-import { deleteProject, type Project } from "@/actions/projects"
+import { deleteProject, duplicateProject, type Project } from "@/actions/projects"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { formatDistanceToNow } from "date-fns"
-import { MoreVertical, Trash2 } from "lucide-react"
+import { Copy, MoreVertical, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -37,6 +37,23 @@ export function ProjectCard({ project }: { project: Project }) {
   const router = useRouter()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+
+  const handleDuplicate = async () => {
+    setIsDuplicating(true)
+    const result = await duplicateProject(project.id)
+
+    if (result.success && result.data) {
+      toast.success(`Project duplicated: ${result.data.name}`)
+      router.refresh()
+      setTimeout(() => {
+        window.location.href = "/dashboard"
+      }, 500)
+    } else {
+      toast.error(result.error || "Failed to duplicate project")
+      setIsDuplicating(false)
+    }
+  }
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -101,6 +118,17 @@ export function ProjectCard({ project }: { project: Project }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDuplicate()
+                  }}
+                  disabled={isDuplicating}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  {isDuplicating ? "Duplicating..." : "Duplicate"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={(e) => {
