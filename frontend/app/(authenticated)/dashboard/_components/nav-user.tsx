@@ -1,7 +1,6 @@
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +19,6 @@ import {
 import { useClerk } from "@clerk/nextjs"
 import {
   ChevronsUpDown,
-  CreditCard,
   HelpCircle,
   LogOut,
   Moon,
@@ -69,12 +67,7 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <Badge
-                  variant={user.membership === "pro" ? "default" : "secondary"}
-                  className="mt-0.5 w-fit px-2 py-0 text-xs"
-                >
-                  {user.membership === "pro" ? "Pro" : "Free"}
-                </Badge>
+                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -105,12 +98,6 @@ export function NavUser({
                 <Link href="/dashboard/account">
                   <User />
                   Account
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/billing">
-                  <CreditCard />
-                  Billing
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

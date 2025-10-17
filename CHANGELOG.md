@@ -18,6 +18,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.7] - 2025-10-17
+
+### 🎨 UI/UX Improvements
+- **New branding**: Changed logo and favicon to 🎨 emoji
+- **Cleaner sidebar**: Removed SidebarRail component (resize handle)
+- **Simplified team switcher**: Removed unnecessary dropdown menu for single workspace
+- **Cleaner user menu**: 
+  - Removed "Free" membership badge
+  - Removed "Billing" menu item
+  - Shows email directly under username
+
+### 🧹 Code Cleanup
+- Removed unused imports and components
+- Simplified TeamSwitcher to support both emoji and icon logos
+- Cleaner navigation structure
+
+---
+
 ## [0.2.6] - 2025-10-17
 
 ### ✨ Added

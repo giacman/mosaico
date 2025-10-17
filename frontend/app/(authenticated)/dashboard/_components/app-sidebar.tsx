@@ -7,8 +7,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
-  SidebarRail
+  SidebarHeader
 } from "@/components/ui/sidebar"
 import { NavMain } from "../_components/nav-main"
 import { NavUser } from "../_components/nav-user"
@@ -30,7 +29,7 @@ export function AppSidebar({
     teams: [
       {
         name: "Mosaico",
-        logo: User,
+        logo: "🎨",
         plan: "Workspace"
       }
     ],
@@ -69,7 +68,6 @@ export function AppSidebar({
       <SidebarFooter>
         <NavUser user={data.user} />
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   )
 }
