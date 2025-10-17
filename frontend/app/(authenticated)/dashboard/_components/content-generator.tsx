@@ -25,6 +25,7 @@ interface ContentGeneratorProps {
   targetLanguages: string[]
   imageUrls?: string[]
   savedComponents?: SavedComponent[]
+  userName?: string
 }
 
 interface GeneratedComponent {
@@ -41,7 +42,8 @@ export function ContentGenerator({
   structure,
   targetLanguages,
   imageUrls = [],
-  savedComponents = []
+  savedComponents = [],
+  userName = "Unknown user"
 }: ContentGeneratorProps) {
   const { addNotification } = useNotifications()
   const [isGenerating, setIsGenerating] = useState(false)
@@ -179,7 +181,7 @@ export function ContentGenerator({
         addNotification({
           type: "success",
           title: "Content Generated",
-          message: `AI has generated ${generatedComponents.length} components. Content team can now review for quality.`
+          message: `AI has generated ${generatedComponents.length} components by ${userName}. Content team can now review for quality.`
         })
       } else {
         const errorMsg = result.error || "Failed to generate content"
@@ -281,12 +283,39 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
     })
 
     if (result.success && result.data) {
-      navigator.clipboard.writeText(result.data.handlebar_template)
-      const langCount = Object.keys(componentTranslations).length
-      if (langCount === 0) {
-        toast.success("Handlebar template copied (English only)")
-      } else {
-        toast.success(`Handlebar template copied (${langCount + 1} languages)`)
+      try {
+        await navigator.clipboard.writeText(result.data.handlebar_template)
+        const langCount = Object.keys(componentTranslations).length
+        if (langCount === 0) {
+          toast.success("Handlebar template copied (English only)")
+        } else {
+          toast.success(`Handlebar template copied (${langCount + 1} languages)`)
+        }
+      } catch (clipboardError) {
+        // Fallback for when clipboard API fails (document not focused, permissions, etc.)
+        console.error("Clipboard error:", clipboardError)
+        
+        // Try legacy execCommand as fallback
+        try {
+          const textArea = document.createElement("textarea")
+          textArea.value = result.data.handlebar_template
+          textArea.style.position = "fixed"
+          textArea.style.left = "-999999px"
+          document.body.appendChild(textArea)
+          textArea.select()
+          document.execCommand("copy")
+          document.body.removeChild(textArea)
+          
+          const langCount = Object.keys(componentTranslations).length
+          if (langCount === 0) {
+            toast.success("Handlebar template copied (English only)")
+          } else {
+            toast.success(`Handlebar template copied (${langCount + 1} languages)`)
+          }
+        } catch (fallbackError) {
+          console.error("Fallback copy failed:", fallbackError)
+          toast.error("Failed to copy to clipboard. Please try again.")
+        }
       }
     } else {
       toast.error("Failed to generate handlebar")
@@ -347,7 +376,7 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
         addNotification({
           type: "success",
           title: "Translation Completed",
-          message: `Content translated to ${targetLanguages.length} language(s). Translation team can now review. Ready for Airship export.`
+          message: `Content translated to ${targetLanguages.length} language(s) by ${userName}. Translation team can now review. Ready for Airship export.`
         })
       } else {
         throw new Error(result.error || "Failed to translate")

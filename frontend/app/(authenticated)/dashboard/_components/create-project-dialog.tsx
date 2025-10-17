@@ -56,10 +56,11 @@ export function CreateProjectDialog() {
       toast.success("Project created successfully")
       
       // Add persistent notification for team handoff
+      const createdBy = result.data.created_by_user_name || "Unknown user"
       addNotification({
         type: "success",
         title: "Project Created",
-        message: `Campaign "${result.data.name}" has been created. CRM team can now add structure and brief.`
+        message: `Campaign "${result.data.name}" has been created by ${createdBy}. CRM team can now add structure and brief.`
       })
       
       setOpen(false)

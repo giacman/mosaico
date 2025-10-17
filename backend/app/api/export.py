@@ -234,8 +234,9 @@ def generate_handlebar(component_key: str, translations: Dict[str, str], english
     Returns:
         Formatted handlebar template string
     """
+    # If no translations, generate English-only handlebar formula
     if not translations:
-        return english_fallback
+        return f'{{{{#eq selected_language "EN"}}}}{english_fallback}{{{{else}}}}{english_fallback}{{{{/eq}}}}'
     
     # Build the handlebar template
     parts = []

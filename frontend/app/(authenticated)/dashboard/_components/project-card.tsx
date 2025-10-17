@@ -28,8 +28,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { formatDistanceToNow } from "date-fns"
-import { MoreVertical, Pencil, Trash2 } from "lucide-react"
-import Link from "next/link"
+import { MoreVertical, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -66,9 +65,16 @@ export function ProjectCard({ project }: { project: Project }) {
 
   const languageCount = project.target_languages.length
 
+  const handleCardClick = () => {
+    router.push(`/dashboard/projects/${project.id}`)
+  }
+
   return (
     <>
-      <Card className="group hover:border-primary transition-colors">
+      <Card 
+        className="group hover:border-primary transition-colors cursor-pointer"
+        onClick={handleCardClick}
+      >
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -89,21 +95,18 @@ export function ProjectCard({ project }: { project: Project }) {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/projects/${project.id}`}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onClick={() => setShowDeleteDialog(true)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowDeleteDialog(true)
+                  }}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete

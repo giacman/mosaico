@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
 import { ArrowLeft, Save, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -60,6 +61,7 @@ const LANGUAGES = [
 
 export function ProjectEditor({ initialProject }: ProjectEditorProps) {
   const router = useRouter()
+  const { user } = useUser()
   const [mounted, setMounted] = useState(false)
   const [project, setProject] = useState(initialProject)
   const [images, setImages] = useState<UploadedImage[]>([])
@@ -285,6 +287,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
             targetLanguages={project.target_languages}
             imageUrls={images.map((img) => img.url)}
             savedComponents={project.components || []}
+            userName={user?.fullName || user?.firstName || "Unknown user"}
           />
 
           {/* Image Upload */}
