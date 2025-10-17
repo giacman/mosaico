@@ -42,12 +42,12 @@ async def translate_text_content(
         content_type="newsletter"
     )
     
-    # Use generate_content instead of generate_with_fixing for translation
-    # (no need for variation count validation)
+    # Use gemini-2.5-flash for faster translations with higher rate limits
     response_text = await ai_client.generate_content(
         prompt=prompt,
         temperature=0.3,
-        response_mime_type="application/json"
+        response_mime_type="application/json",
+        use_flash=True  # Use Flash model for translations
     )
     
     response_data = json.loads(response_text)
@@ -129,12 +129,12 @@ async def translate_text(
             content_type=req.content_type.value
         )
         
-        # Use generate_content instead of generate_with_fixing for translation
-        # (no need for variation count validation)
+        # Use gemini-2.5-flash for faster translations with higher rate limits
         response_text = await vertex_client.generate_content(
             prompt=prompt,
             temperature=0.3,  # Lower for more accurate translation
-            response_mime_type="application/json"
+            response_mime_type="application/json",
+            use_flash=True  # Use Flash model for translations
         )
         
         response_data = json.loads(response_text)
@@ -187,7 +187,8 @@ async def translate_single_with_retry(
             response_text = await vertex_client.generate_content(
                 prompt=prompt,
                 temperature=0.3,
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                use_flash=True  # Use Flash model for translations
             )
             
             response_data = json.loads(response_text)

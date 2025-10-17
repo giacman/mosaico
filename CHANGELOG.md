@@ -18,6 +18,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.6] - 2025-10-17
+
+### ✨ Added
+- **UI Improvement**: Unified Generate/Regenerate button for cleaner interface
+  - Shows "Generate Email Content" before first generation
+  - Changes to "Regenerate All Content" after content exists
+  - Single full-width button instead of two separate buttons
+  - Reduces UI clutter and improves user experience
+
+### 🔧 Improvements
+- **Translation Performance**: Switched to `gemini-2.5-flash` for translations
+  - ⚡ **6-7x faster** translations (~9 seconds vs 60+ seconds for 10 translations)
+  - 🚀 **Higher rate limits** (60 req/min vs 5 req/min)
+  - 💰 **Lower cost** (90% cheaper than gemini-2.5-pro)
+  - ✅ **Better reliability** - no more 429 rate limit errors
+  - ✅ **Fewer JSON parsing errors** - more stable output format
+- Added `use_flash` parameter to `VertexAIClient.generate_content()` for flexible model selection
+- Translation quality remains excellent with Flash model
+
+### 🐛 Fixed
+- Translation failures with "429 Resource exhausted" errors
+- "Unterminated string" JSON parsing errors in batch translations
+- Rate limiting issues when translating to multiple languages
+
+### 📊 Performance Metrics
+**Before (gemini-2.5-pro):**
+- 6 components × 2 languages = ~60-90 seconds
+- Frequent rate limit errors (429)
+- JSON parsing failures requiring retries
+
+**After (gemini-2.5-flash):**
+- 6 components × 2 languages = ~8-12 seconds ⚡
+- No rate limit errors
+- Clean JSON responses
+
+---
+
 ## [0.2.5] - 2025-10-17
 
 ### ✨ Added

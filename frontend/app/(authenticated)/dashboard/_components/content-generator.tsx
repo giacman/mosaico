@@ -428,39 +428,34 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
           </p>
         </div>
 
-        {/* Generate Buttons */}
-        <div className="flex gap-2">
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating || !brief.trim()}
-            className="flex-1"
-            size="lg"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate Email Content
-              </>
-            )}
-          </Button>
-          
-          {components.length > 0 && (
-            <Button
-              onClick={handleRegenerateAll}
-              disabled={isGenerating}
-              variant="outline"
-              size="lg"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Regenerate All
-            </Button>
+        {/* Generate/Regenerate Button */}
+        <Button
+          onClick={components.length > 0 ? handleRegenerateAll : handleGenerate}
+          disabled={isGenerating || !brief.trim()}
+          className="w-full"
+          size="lg"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              {components.length > 0 ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Regenerate All Content
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate Email Content
+                </>
+              )}
+            </>
           )}
-        </div>
+        </Button>
 
         {/* Translate Button */}
         {components.length > 0 && targetLanguages.length > 0 && (

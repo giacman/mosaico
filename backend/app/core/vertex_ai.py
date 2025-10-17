@@ -49,7 +49,8 @@ class VertexAIClient:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        response_mime_type: str = "application/json"
+        response_mime_type: str = "application/json",
+        use_flash: bool = False
     ) -> str:
         """
         Generate content using Vertex AI
@@ -60,11 +61,16 @@ class VertexAIClient:
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum output tokens
             response_mime_type: Output format (application/json or text/plain)
+            use_flash: If True, use gemini-2.5-flash instead of gemini-2.5-pro
         
         Returns:
             Generated text content
         """
-        model_name = model or settings.vertex_ai_model
+        # Use Flash model if requested, otherwise use provided model or default
+        if use_flash:
+            model_name = settings.vertex_ai_model_flash
+        else:
+            model_name = model or settings.vertex_ai_model
         
         try:
             # Create model instance
