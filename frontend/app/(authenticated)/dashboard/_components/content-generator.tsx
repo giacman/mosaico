@@ -271,20 +271,23 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
   }
 
   const copyHandlebar = async (component: GeneratedComponent) => {
-    if (!translations[component.key] || Object.keys(translations[component.key]).length === 0) {
-      toast.error("Please translate this component first")
-      return
-    }
+    // If no translations, generate handlebar with only English
+    const componentTranslations = translations[component.key] || {}
 
     const result = await generateHandlebar({
       component_key: component.key,
-      translations: translations[component.key],
+      translations: componentTranslations,
       english_fallback: component.content
     })
 
     if (result.success && result.data) {
       navigator.clipboard.writeText(result.data.handlebar_template)
-      toast.success("Handlebar template copied!")
+      const langCount = Object.keys(componentTranslations).length
+      if (langCount === 0) {
+        toast.success("Handlebar template copied (English only)")
+      } else {
+        toast.success(`Handlebar template copied (${langCount + 1} languages)`)
+      }
     } else {
       toast.error("Failed to generate handlebar")
     }
@@ -503,16 +506,14 @@ OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    {translations[component.key] && Object.keys(translations[component.key]).length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyHandlebar(component)}
-                        title="Copy handlebar template"
-                      >
-                        <FileCode className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyHandlebar(component)}
+                      title="Copy handlebar template"
+                    >
+                      <FileCode className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
 
