@@ -144,6 +144,8 @@ class VertexAIClient:
             temperature=temperature,
             max_output_tokens=max_tokens,
             response_mime_type=response_mime_type,
+            top_p=0.95,  # Add nucleus sampling for more diversity
+            top_k=40,    # Add top-k sampling for variety
         )
 
         final_prompt = [Part.from_text(prompt)]

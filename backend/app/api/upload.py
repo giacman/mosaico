@@ -46,11 +46,8 @@ async def upload_image(
     - Returns image ID and public URL
     """
     
-    # Verify project ownership
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == user_id
-    ).first()
+    # Verify project exists (all authenticated users can upload to any project)
+    project = db.query(Project).filter(Project.id == project_id).first()
     
     if not project:
         raise HTTPException(

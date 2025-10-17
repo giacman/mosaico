@@ -18,9 +18,11 @@ import { Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { useNotifications } from "./notifications-provider"
 
 export function CreateProjectDialog() {
   const router = useRouter()
+  const { addNotification } = useNotifications()
   const [open, setOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState({
@@ -52,6 +54,14 @@ export function CreateProjectDialog() {
 
     if (result.success && result.data) {
       toast.success("Project created successfully")
+      
+      // Add persistent notification for team handoff
+      addNotification({
+        type: "success",
+        title: "Project Created",
+        message: `Campaign "${result.data.name}" has been created. CRM team can now add structure and brief.`
+      })
+      
       setOpen(false)
       setFormData({ name: "", brief_text: "" })
       // Navigate to the project editor

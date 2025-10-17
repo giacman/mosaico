@@ -1,8 +1,10 @@
 """
-Google Sheets Export API
+Google Sheets Export API and Handlebar Generation
 """
 import logging
 import re
+from typing import Dict
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from googleapiclient.discovery import build
@@ -18,6 +20,20 @@ from app.services.project_service import ProjectService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# Handlebar export models
+class HandlebarExportRequest(BaseModel):
+    """Request for generating handlebar template for a component"""
+    component_key: str
+    translations: Dict[str, str]  # {language_code: translated_text}
+    english_fallback: str
+
+
+class HandlebarExportResponse(BaseModel):
+    """Response with generated handlebar template"""
+    component_key: str
+    handlebar_template: str
 
 
 def extract_spreadsheet_id(sheet_url: str) -> str:
@@ -200,5 +216,82 @@ async def export_to_sheets(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export: {str(e)}"
+        )
+
+
+def generate_handlebar(component_key: str, translations: Dict[str, str], english_fallback: str) -> str:
+    """
+    Generate a handlebar template string from translations
+    
+    Format:
+    {{#eq selected_language "IT"}}Italian text{{else eq selected_language "FR"}}French text{{else}}English fallback{{/eq}}
+    
+    Args:
+        component_key: Component identifier (e.g., "subject", "pre_header_1")
+        translations: Dictionary of {language_code: translated_text}
+        english_fallback: English text to use as fallback
+    
+    Returns:
+        Formatted handlebar template string
+    """
+    if not translations:
+        return english_fallback
+    
+    # Build the handlebar template
+    parts = []
+    
+    # Sort languages for consistent output
+    sorted_langs = sorted(translations.items())
+    
+    # Add first language with {{#eq
+    first_lang, first_text = sorted_langs[0]
+    parts.append(f'{{{{#eq selected_language "{first_lang.upper()}"}}}}{first_text}')
+    
+    # Add remaining languages with {{else eq
+    for lang_code, text in sorted_langs[1:]:
+        parts.append(f'{{{{else eq selected_language "{lang_code.upper()}"}}}}{text}')
+    
+    # Add English fallback
+    if "EN" in [lang.upper() for lang in translations.keys()]:
+        # If EN is already in translations, just add final else
+        parts.append(f'{{{{else}}}}{english_fallback}')
+    else:
+        # Add EN explicitly then final else
+        parts.append(f'{{{{else eq selected_language "EN"}}}}{english_fallback}')
+        parts.append(f'{{{{else}}}}{english_fallback}')
+    
+    # Close the conditional
+    parts.append('{{/eq}}')
+    
+    return ''.join(parts)
+
+
+@router.post("/handlebars/generate", response_model=HandlebarExportResponse)
+async def generate_handlebar_template(
+    request: HandlebarExportRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Generate a handlebar template string for a component with its translations
+    
+    This creates the format used in Google Sheets:
+    {{#eq selected_language "IT"}}Italian{{else eq...}}
+    """
+    try:
+        handlebar_template = generate_handlebar(
+            component_key=request.component_key,
+            translations=request.translations,
+            english_fallback=request.english_fallback
+        )
+        
+        return HandlebarExportResponse(
+            component_key=request.component_key,
+            handlebar_template=handlebar_template
+        )
+    except Exception as e:
+        logger.error(f"Error generating handlebar: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate handlebar: {str(e)}"
         )
 

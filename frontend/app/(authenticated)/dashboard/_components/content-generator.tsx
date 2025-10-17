@@ -1,14 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import { Sparkles, Loader2, Copy, Check, Edit2, Languages } from "lucide-react"
+import { Sparkles, Loader2, Copy, Check, Edit2, Languages, RefreshCw, FileCode } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
+import { Slider } from "@/components/ui/slider"
+import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { generateContent } from "@/actions/generate"
 import { batchTranslate } from "@/actions/translate"
+import { generateHandlebar } from "@/actions/export"
+import { useNotifications } from "./notifications-provider"
 
 interface ContentGeneratorProps {
   projectId: number
@@ -34,12 +38,13 @@ export function ContentGenerator({
   targetLanguages,
   imageUrls = []
 }: ContentGeneratorProps) {
+  const { addNotification } = useNotifications()
   const [isGenerating, setIsGenerating] = useState(false)
   const [components, setComponents] = useState<GeneratedComponent[]>([])
-  const [selectedVariation, setSelectedVariation] = useState(0)
-  const [allVariations, setAllVariations] = useState<any[]>([])
   const [isTranslating, setIsTranslating] = useState(false)
   const [translations, setTranslations] = useState<Record<string, Record<string, string>>>({})
+  const [temperature, setTemperature] = useState(0.7)
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null)
 
   const handleGenerate = async () => {
     if (!brief.trim()) {
@@ -56,18 +61,16 @@ export function ContentGenerator({
     try {
       const result = await generateContent({
         text: brief,
-        count: 3, // Generate 3 variations
+        count: 1, // Generate 1 variation
         tone: tone,
         content_type: "newsletter",
         structure: structure,
-        image_url: imageUrls[0] // Use first image if available
+        image_url: imageUrls[0], // Use first image if available
+        temperature: temperature
       })
 
       if (result.success && result.data) {
-        setAllVariations(result.data.variations)
-        setSelectedVariation(0)
-        
-        // Convert first variation to components
+        // Convert first (and only) variation to components
         const firstVariation = result.data.variations[0]
         const generatedComponents: GeneratedComponent[] = Object.entries(firstVariation).map(
           ([key, content]) => ({
@@ -79,7 +82,14 @@ export function ContentGenerator({
         )
         
         setComponents(generatedComponents)
-        toast.success(`Generated ${result.data.variations.length} variations!`)
+        toast.success("Content generated successfully!")
+        
+        // Add persistent notification for team handoff
+        addNotification({
+          type: "success",
+          title: "Content Generated",
+          message: `AI has generated ${generatedComponents.length} components. Content team can now review for quality.`
+        })
       } else {
         const errorMsg = result.error || "Failed to generate content"
         console.error("Generation failed:", errorMsg)
@@ -102,18 +112,99 @@ export function ContentGenerator({
       .join(" ")
   }
 
-  const handleVariationChange = (index: number) => {
-    setSelectedVariation(index)
-    const variation = allVariations[index]
-    const generatedComponents: GeneratedComponent[] = Object.entries(variation).map(
-      ([key, content]) => ({
-        key,
-        label: formatLabel(key),
-        content: content as string,
-        editing: false
+  const handleRegenerateAll = async () => {
+    await handleGenerate()
+  }
+
+  const handleRegenerateSingle = async (index: number) => {
+    const component = components[index]
+    setRegeneratingIndex(index)
+    
+    try {
+      // Extract component type and count from the component key
+      const componentType = component.key.replace(/_\d+$/, '') // Remove trailing number if exists
+      
+      // Build context from ALL existing components so AI knows the full email structure
+      const existingContext = components
+        .map(c => `${c.label}: "${c.content}"`)
+        .join('\n')
+      
+      // Add context about previous version to encourage different output
+      const randomSeed = Math.random().toString(36).substring(7)
+      const timestamp = Date.now()
+      const enhancedBrief = `${brief}
+
+FULL EMAIL CONTEXT (for reference):
+${existingContext}
+
+CRITICAL INSTRUCTION - You MUST regenerate ONLY the "${component.label}" component:
+Current version (DO NOT REPEAT): "${component.content}"
+
+Requirements:
+1. Use completely different words and phrasing
+2. Try a different angle or creative approach
+3. Make it distinctly different from the current version
+4. Maintain ${tone} tone
+5. Keep similar length (~${component.content.length} characters)
+6. Ensure it's unique compared to similar components above
+7. Regeneration attempt: ${timestamp}
+
+Variation seed: ${randomSeed}
+
+OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). Make it UNIQUE and DIFFERENT from "${component.content}".`
+      
+      // Use significantly higher temperature for regeneration to increase variety
+      const regenerateTemp = Math.min(temperature + 0.3, 1.0)
+      
+      const result = await generateContent({
+        text: enhancedBrief,
+        count: 1,
+        tone: tone,
+        content_type: "newsletter",
+        structure: [{ component: componentType, count: 1 }],
+        image_url: imageUrls[0],
+        temperature: regenerateTemp
       })
-    )
-    setComponents(generatedComponents)
+
+      if (result.success && result.data) {
+        const newContent = result.data.variations[0][component.key]
+        if (newContent) {
+          setComponents((prev) =>
+            prev.map((comp, i) =>
+              i === index ? { ...comp, content: newContent } : comp
+            )
+          )
+          toast.success(`Regenerated ${component.label}`)
+        }
+      } else {
+        toast.error("Failed to regenerate component")
+      }
+    } catch (error) {
+      console.error("Error regenerating component:", error)
+      toast.error("Failed to regenerate component")
+    } finally {
+      setRegeneratingIndex(null)
+    }
+  }
+
+  const copyHandlebar = async (component: GeneratedComponent) => {
+    if (!translations[component.key] || Object.keys(translations[component.key]).length === 0) {
+      toast.error("Please translate this component first")
+      return
+    }
+
+    const result = await generateHandlebar({
+      component_key: component.key,
+      translations: translations[component.key],
+      english_fallback: component.content
+    })
+
+    if (result.success && result.data) {
+      navigator.clipboard.writeText(result.data.handlebar_template)
+      toast.success("Handlebar template copied!")
+    } else {
+      toast.error("Failed to generate handlebar")
+    }
   }
 
   const toggleEdit = (index: number) => {
@@ -160,6 +251,13 @@ export function ContentGenerator({
       if (result.success && result.data) {
         setTranslations(result.data)
         toast.success(`Translated to ${targetLanguages.length} languages!`)
+        
+        // Add persistent notification for team handoff
+        addNotification({
+          type: "success",
+          title: "Translation Completed",
+          message: `Content translated to ${targetLanguages.length} language(s). Translation team can now review. Ready for Airship export.`
+        })
       } else {
         throw new Error(result.error || "Failed to translate")
       }
@@ -179,67 +277,82 @@ export function ContentGenerator({
           Generate email content based on your brief and structure
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Generate Button */}
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating || !brief.trim()}
-          className="w-full"
-          size="lg"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating content...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Email Content
-            </>
-          )}
-        </Button>
-
-        {/* Variation Selector & Translate Button */}
-        {allVariations.length > 0 && (
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Variation:</span>
-              <div className="flex gap-2">
-                {allVariations.map((_, index) => (
-                  <Button
-                    key={index}
-                    variant={selectedVariation === index ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleVariationChange(index)}
-                  >
-                    {index + 1}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            
-            {targetLanguages.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTranslate}
-                disabled={isTranslating}
-              >
-                {isTranslating ? (
-                  <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Translating...
-                  </>
-                ) : (
-                  <>
-                    <Languages className="mr-2 h-3.5 w-3.5" />
-                    Translate ({targetLanguages.length} langs)
-                  </>
-                )}
-              </Button>
-            )}
+      <CardContent className="space-y-6">
+        {/* Temperature Control */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="temperature">Creativity Level (Temperature)</Label>
+            <span className="text-sm text-muted-foreground">{temperature.toFixed(1)}</span>
           </div>
+          <Slider
+            id="temperature"
+            min={0}
+            max={1}
+            step={0.1}
+            value={[temperature]}
+            onValueChange={(values: number[]) => setTemperature(values[0])}
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">
+            Lower = more consistent, Higher = more creative
+          </p>
+        </div>
+
+        {/* Generate Buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={handleGenerate}
+            disabled={isGenerating || !brief.trim()}
+            className="flex-1"
+            size="lg"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate Email Content
+              </>
+            )}
+          </Button>
+          
+          {components.length > 0 && (
+            <Button
+              onClick={handleRegenerateAll}
+              disabled={isGenerating}
+              variant="outline"
+              size="lg"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Regenerate All
+            </Button>
+          )}
+        </div>
+
+        {/* Translate Button */}
+        {components.length > 0 && targetLanguages.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTranslate}
+            disabled={isTranslating}
+            className="w-full"
+          >
+            {isTranslating ? (
+              <>
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                Translating...
+              </>
+            ) : (
+              <>
+                <Languages className="mr-2 h-3.5 w-3.5" />
+                Translate to {targetLanguages.length} language(s)
+              </>
+            )}
+          </Button>
         )}
 
         {/* Generated Components */}
@@ -266,7 +379,21 @@ export function ContentGenerator({
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => handleRegenerateSingle(index)}
+                      disabled={regeneratingIndex === index}
+                      title="Regenerate this component"
+                    >
+                      {regeneratingIndex === index ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleEdit(index)}
+                      title="Edit content"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
@@ -274,9 +401,20 @@ export function ContentGenerator({
                       variant="ghost"
                       size="sm"
                       onClick={() => copyToClipboard(component.content)}
+                      title="Copy to clipboard"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
+                    {translations[component.key] && Object.keys(translations[component.key]).length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyHandlebar(component)}
+                        title="Copy handlebar template"
+                      >
+                        <FileCode className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
 

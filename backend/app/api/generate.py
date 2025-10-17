@@ -8,6 +8,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 import logging
 import json
+import asyncio
 
 from app.models.schemas import (
     GenerateVariationsRequest,
@@ -19,6 +20,7 @@ from app.models.schemas import (
 )
 from app.core.vertex_ai import VertexAIClient, get_client
 from app.core.config import settings
+from app.utils.notifications import notify_generation_completed
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -168,10 +170,13 @@ async def generate_variations(
         context=req.context,
     )
 
+    # Use provided temperature or default to 0.7
+    temperature = req.temperature if req.temperature is not None else 0.7
+    
     raw_variations = await client.generate_with_fixing(
         prompt,
         req.count,
-        temperature=0.7,
+        temperature=temperature,
         max_tokens=2048,
         image_url=req.image_url,
     )
@@ -184,6 +189,16 @@ async def generate_variations(
         variations_list = response_data.get("variations", [])
         
         logger.info(f"Successfully generated {len(variations_list)} variations")
+        
+        # Send Slack notification (non-blocking)
+        component_count = sum(comp.count for comp in req.structure)
+        asyncio.create_task(
+            notify_generation_completed(
+                project_name="Unknown",  # Will be enriched when we have project context
+                component_count=component_count,
+                user_email=None
+            )
+        )
         
         return GenerateVariationsResponse(
             variations=variations_list,

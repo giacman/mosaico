@@ -12,6 +12,7 @@ interface GenerateContentInput {
   structure: Array<{ component: string; count: number }>
   context?: string
   image_url?: string
+  temperature?: number
 }
 
 interface GeneratedContent {

@@ -14,6 +14,7 @@ from typing import List, Dict
 from app.models.schemas import TranslateRequest, TranslateResponse
 from app.core.vertex_ai import vertex_client
 from app.core.config import settings
+from app.utils.notifications import notify_translation_completed
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -246,6 +247,16 @@ async def batch_translate(
                 translations[key][lang] = result
         
         logger.info(f"Batch translation completed successfully")
+        
+        # Send Slack notification (non-blocking)
+        asyncio.create_task(
+            notify_translation_completed(
+                project_name="Unknown",  # Will be enriched when we have project context
+                language_count=len(req.target_languages),
+                component_count=len(req.texts),
+                user_email=None
+            )
+        )
         
         return BatchTranslateResponse(translations=translations)
     

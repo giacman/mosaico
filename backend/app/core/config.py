@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     
+    # Notifications
+    slack_webhook_url: str | None = None
+    
     # Authentication (optional - for local dev with service account)
     google_application_credentials: str | None = None
     

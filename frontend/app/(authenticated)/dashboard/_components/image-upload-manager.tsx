@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import { uploadImage } from "@/actions/upload"
 
 interface UploadedImage {
   id: string
@@ -84,15 +85,18 @@ export function ImageUploadManager({ projectId, value, onChange }: ImageUploadMa
       const tempId = newImages[i].id
 
       try {
-        // TODO: Replace with actual upload to backend
-        // For now, simulate upload with timeout
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+        // Upload to backend
+        const result = await uploadImage(projectId, file)
 
-        // Simulate successful upload
+        if (!result.success || !result.data) {
+          throw new Error(result.error || "Upload failed")
+        }
+
+        // Use the public URL from GCS
         const uploadedImage: UploadedImage = {
-          id: `img-${Date.now()}-${i}`,
-          url: URL.createObjectURL(file), // In production, this would be the GCS URL
-          filename: file.name
+          id: result.data.id.toString(),
+          url: result.data.gcs_public_url || result.data.gcs_path, // Use public URL
+          filename: result.data.filename
         }
 
         // Replace temp image with uploaded one

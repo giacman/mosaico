@@ -49,12 +49,13 @@ class StructureComponent(BaseModel):
 class GenerateVariationsRequest(BaseModel):
     """Request to generate text variations"""
     text: str = Field(..., description="The instructional text or prompt")
-    count: int = Field(default=3, description="Number of variations to generate")
+    count: int = Field(default=1, description="Number of variations to generate")
     tone: ToneType = Field(default=ToneType.PROFESSIONAL, description="Tone of voice")
     content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Content type")
     structure: list[StructureComponent] = Field(..., description="A list of components and their counts to generate in the desired order")
     context: str | None = Field(default=None, description="Optional additional context")
     image_url: str | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=1.0, description="Temperature for generation (0.0-1.0, default 0.7)")
 
 
 class TranslateRequest(BaseModel):

@@ -3,6 +3,7 @@ Project CRUD API Endpoints
 Now with collaboration support - all users can access all projects
 """
 import logging
+import asyncio
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -16,6 +17,7 @@ from app.models.project_schemas import (
     ActivityLogResponse
 )
 from app.services.project_service import ProjectService
+from app.utils.notifications import notify_project_created, notify_project_updated
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,15 @@ async def create_project(
     """
     try:
         project = ProjectService.create_project(db, user.id, user.name, project_data)
+        
+        # Send Slack notification (non-blocking)
+        asyncio.create_task(
+            notify_project_created(
+                project_name=project.name,
+                user_email=getattr(user, 'email', None) or user.name
+            )
+        )
+        
         return project
     except Exception as e:
         logger.error(f"Error creating project: {str(e)}")
@@ -103,6 +114,14 @@ async def update_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found"
         )
+    
+    # Send Slack notification (non-blocking)
+    asyncio.create_task(
+        notify_project_updated(
+            project_name=project.name,
+            user_email=getattr(user, 'email', None) or user.name
+        )
+    )
     
     return project
 
