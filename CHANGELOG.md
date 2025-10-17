@@ -18,6 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2025-10-17
+
+### ✨ Added
+- **Persistent Component Storage**: Generated content now automatically saves to database
+  - Auto-save after AI generation
+  - Auto-save after translation
+  - Auto-save on inline edits
+  - Content persists across page refreshes and sessions
+- **Visual Feedback**: "Saving..." indicator shows when content is being saved
+- **Automatic Loading**: Saved components load automatically when opening a project
+- **Backend API**: New `/api/v1/projects/{id}/components` endpoint for batch component saving
+- **Database Integration**: Full integration with Components and Translations tables
+
+### 🔧 Improvements
+- Project settings (brief, tone, structure) still use manual "Save" button for user control
+- Generated components use Google Docs-style auto-save for zero data loss
+- Improved data flow between frontend and backend with proper TypeScript types
+
+---
+
 ## [0.2.1] - 2025-10-17
 
 ### 🐛 Fixed
