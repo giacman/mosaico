@@ -45,13 +45,18 @@ export function ProjectCard({ project }: { project: Project }) {
 
     if (result.success) {
       toast.success("Project deleted successfully")
+      setShowDeleteDialog(false)
+      // Force a hard refresh to ensure UI updates
       router.refresh()
+      // Small delay to ensure the delete completes
+      setTimeout(() => {
+        window.location.href = "/dashboard"
+      }, 500)
     } else {
       toast.error(result.error || "Failed to delete project")
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
     }
-
-    setIsDeleting(false)
-    setShowDeleteDialog(false)
   }
 
   const componentCount = project.structure.reduce(

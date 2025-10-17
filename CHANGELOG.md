@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2025-10-17
+
+### 🐛 Fixed
+- **UI Responsiveness**: Fixed dashboard becoming unresponsive after deleting projects
+  - Added hard page refresh after delete to ensure UI updates correctly
+  - Prevents buttons and links from becoming unclickable
+- **TypeScript Compilation**: Fixed type errors preventing frontend build
+  - Fixed type assertions in `project-editor.tsx`
+  - Fixed onChange callbacks in `image-upload-manager.tsx`
+  - Added null checks in Stripe webhook handler
+- **Next.js Cache**: Resolved corrupted build manifest errors in development
+
+---
+
 ## [0.2.0] - 2025-10-17
 
 ### Breaking Changes
