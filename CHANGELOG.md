@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.3] - 2025-10-17
+
+### ✨ Added
+- **Handlebar Export Without Translations**: "Copy Handlebar" button now visible immediately after content generation
+  - No need to translate first for English-only campaigns
+  - Exports English-only handlebar if no translations exist
+  - Exports multi-language handlebar when translations are present
+  - Toast message shows language count for clarity
+
+### 🔧 Improvements
+- Better UX for single-language campaigns
+- Clearer feedback with language count in success message
+
+---
+
 ## [0.2.2] - 2025-10-17
 
 ### ✨ Added
