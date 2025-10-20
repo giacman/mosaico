@@ -27,11 +27,11 @@ export function TeamSwitcher({
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton size="lg">
-          <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+          <div className="bg-gray-200 dark:bg-gray-700 flex aspect-square size-8 items-center justify-center rounded-lg">
             {typeof activeTeam.logo === 'string' ? (
               <span className="text-lg">{activeTeam.logo}</span>
             ) : (
-              <activeTeam.logo className="size-4" />
+              <activeTeam.logo className="size-4 text-gray-700 dark:text-gray-200" />
             )}
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">

@@ -45,6 +45,11 @@ async def optimize_prompt(
     from the AI by adding context, structure, and clarity to their brief.
     """
     try:
+        # Calculate max length based on whether structure includes images
+        # Images use ~1000 tokens, so we need shorter prompts when images are present
+        has_image_context = any('image' in str(s).lower() for s in req.structure)
+        max_chars = 600 if has_image_context else 1000
+        
         # Build the meta-prompt that will optimize the user's brief
         optimization_prompt = f"""You are an expert prompt engineer specializing in marketing content generation.
 
@@ -67,16 +72,23 @@ Transform this brief into an optimized prompt that will help an AI generate exce
 4. **Add Style Guidelines**: Specify tone, length, and formatting expectations
 5. **Add Key Messages**: Highlight what to emphasize and what to avoid
 
+**Critical Constraints:**
+- The optimized prompt MUST be under {max_chars} characters (current: {len(req.text)} chars)
+- Be concise but informative - every word should add value
+- Prioritize the most important details
+- If the original brief is already long, consolidate and clarify rather than expand
+
 **Important:**
 - Keep the user's core intent and key information
 - Add helpful details they might have missed
 - Make it clear and actionable for content generation
 - Don't invent product names or specific details - use placeholders if needed
 - Focus on making the AI understand WHAT to create and HOW to write it
+- STAY UNDER {max_chars} CHARACTERS - this is critical for AI stability
 
 Return your response as JSON with this structure:
 {{
-    "optimized_prompt": "The complete, detailed prompt ready for AI generation",
+    "optimized_prompt": "The complete, detailed prompt ready for AI generation (UNDER {max_chars} chars)",
     "improvements": ["Improvement 1: What you added/clarified", "Improvement 2: ...", "Improvement 3: ..."]
 }}
 
@@ -100,10 +112,26 @@ Return ONLY the JSON, no other text."""
         
         # Parse response
         response_data = json.loads(response_text)
+        optimized = response_data.get("optimized_prompt", req.text)
+        improvements = response_data.get("improvements", [])
+        
+        # Validate length and force truncate if needed (shouldn't happen, but safety check)
+        if len(optimized) > max_chars:
+            logger.warning(f"Optimized prompt exceeded {max_chars} chars ({len(optimized)}), truncating...")
+            # Truncate at sentence boundary
+            truncated = optimized[:max_chars]
+            last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+            if last_period > max_chars * 0.8:  # Only truncate at sentence if it's not too far back
+                optimized = optimized[:last_period + 1]
+            else:
+                optimized = truncated.rstrip() + "..."
+            improvements.append(f"⚠️ Truncated to {len(optimized)} chars for AI stability")
+        
+        logger.info(f"Optimized prompt: {len(req.text)} chars → {len(optimized)} chars (limit: {max_chars})")
         
         return OptimizePromptResponse(
-            optimized_prompt=response_data.get("optimized_prompt", req.text),
-            improvements=response_data.get("improvements", [])
+            optimized_prompt=optimized,
+            improvements=improvements
         )
 
     except json.JSONDecodeError as e:

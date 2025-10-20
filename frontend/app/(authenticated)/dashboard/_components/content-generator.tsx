@@ -149,26 +149,84 @@ export function ContentGenerator({
 
     setIsGenerating(true)
     try {
-      const result = await generateContent({
+      // Determine if structure contains Body (narratives need Pro quality)
+      const hasBody = structure.some(s => s.component === 'body')
+      const totalComponents = structure.reduce((sum, s) => sum + s.count, 0)
+      const hasImage = imageUrls.length > 0
+      const isComplexStructure = totalComponents >= 5 // 5+ components = complex
+      
+      // Use Flash ONLY for: image + complex structure + NO body
+      // Flash tends to use bullet points for bodies, Pro is better for narratives
+      const shouldUseFlash = hasImage && isComplexStructure && !hasBody
+      
+      if (shouldUseFlash) {
+        console.log("⚡ Using Flash model: Image + complex structure (no body)", {
+          totalComponents,
+          hasImage,
+          hasBody,
+          structure: structure.map(s => `${s.component}(${s.count})`)
+        })
+        toast.info("⚡ Using Flash model for fast generation")
+      } else if (hasImage && isComplexStructure && hasBody) {
+        console.log("🎯 Using Pro model: Complex structure with body requires narrative quality", {
+          totalComponents,
+          hasImage,
+          hasBody,
+          structure: structure.map(s => `${s.component}(${s.count})`)
+        })
+      }
+      
+      let result = await generateContent({
         text: brief,
         count: 1, // Generate 1 variation
         tone: tone,
         content_type: "newsletter",
         structure: structure,
         image_url: imageUrls[0], // Use first image if available
-        temperature: temperature
+        temperature: temperature,
+        use_flash: shouldUseFlash // Use Flash for complex generation with images
       })
+
+      // Automatic retry with Flash if Pro fails with JSON errors
+      if (!result.success && !shouldUseFlash && hasImage && isComplexStructure) {
+        const errorMsg = result.error || ""
+        const isJsonError = errorMsg.includes("500") || errorMsg.includes("Failed to generate")
+        
+        if (isJsonError) {
+          console.log("🔄 Pro failed, retrying with Flash as fallback...")
+          toast.warning("⚠️ Retrying with Flash model for better stability...")
+          
+          result = await generateContent({
+            text: brief,
+            count: 1,
+            tone: tone,
+            content_type: "newsletter",
+            structure: structure,
+            image_url: imageUrls[0],
+            temperature: temperature,
+            use_flash: true // Force Flash on retry
+          })
+          
+          if (result.success) {
+            toast.success("✅ Generation succeeded with Flash fallback!")
+          }
+        }
+      }
 
       if (result.success && result.data) {
         // Convert first (and only) variation to components
         const firstVariation = result.data.variations[0]
         const generatedComponents: GeneratedComponent[] = Object.entries(firstVariation).map(
-          ([key, content]) => ({
-            key,
-            label: formatLabel(key),
-            content: content as string,
-            editing: false
-          })
+          ([key, content]) => {
+            // Normalize CTAs to UPPERCASE for brand consistency
+            const isCTA = key.toLowerCase().includes('cta')
+            return {
+              key,
+              label: formatLabel(key),
+              content: isCTA ? (content as string).toUpperCase() : (content as string),
+              editing: false
+            }
+          }
         )
         
         setComponents(generatedComponents)
@@ -217,49 +275,139 @@ export function ContentGenerator({
       // Add context about previous version to encourage different output
       const randomSeed = Math.random().toString(36).substring(7)
       const timestamp = Date.now()
+      const iteration = Math.floor(Math.random() * 1000)
+      
+      // For short components (CTAs), use even more aggressive variation prompts
+      const isShortComponent = component.content.length < 30
+      const variationInstruction = isShortComponent 
+        ? `
+🚨 CRITICAL: This is a SHORT CTA (${component.content.length} chars). 
+You MUST use completely DIFFERENT words. Do NOT use any words from: "${component.content}"
+Try these alternative approaches:
+- Different action verb (if current is "SHOP", try "DISCOVER", "EXPLORE", "GET", "FIND")
+- Different structure (if current is "SHOP X", try "X NOW", "GET X", "FIND YOUR X")
+- Different focus (category vs. action vs. urgency)
+
+FORBIDDEN: Do not repeat "${component.content}" or use similar words.
+ITERATION #${iteration} - Generate variation #${iteration} with fresh creativity.
+`
+        : `Generate a completely different version with new wording and approach.`
+      
       const enhancedBrief = `${brief}
 
 FULL EMAIL CONTEXT (for reference):
 ${existingContext}
 
 CRITICAL INSTRUCTION - You MUST regenerate ONLY the "${component.label}" component:
-Current version (DO NOT REPEAT): "${component.content}"
+Current version (STRICTLY FORBIDDEN TO REPEAT): "${component.content}"
+
+${variationInstruction}
 
 Requirements:
-1. Use completely different words and phrasing
+1. Use completely different words and phrasing - NO OVERLAP with current version
 2. Try a different angle or creative approach
 3. Make it distinctly different from the current version
 4. Maintain ${tone} tone
 5. Keep similar length (~${component.content.length} characters)
 6. Ensure it's unique compared to similar components above
 7. Regeneration attempt: ${timestamp}
+8. Random seed: ${randomSeed}
 
-Variation seed: ${randomSeed}
-
-OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). Make it UNIQUE and DIFFERENT from "${component.content}".`
+OUTPUT: Generate ONLY the new "${component.label}" text (not the entire email). 
+Make it UNIQUE and DIFFERENT from "${component.content}".
+This is attempt #${iteration} - be creative and original!`
       
-      // Use significantly higher temperature for regeneration to increase variety
-      const regenerateTemp = Math.min(temperature + 0.3, 1.0)
+      // Use even higher temperature for short components (CTAs)
+      const tempBoost = isShortComponent ? 0.5 : 0.3
+      const regenerateTemp = Math.min(temperature + tempBoost, 1.0)
       
+      // Generate 3 candidates and pick the most different one
+      // Use Flash model for CTAs (faster, cheaper, same quality for short text)
+      // Use Few-Shot examples for brand consistency
+      // NOTE: Don't send image for regeneration - not needed and causes issues with Flash
       const result = await generateContent({
         text: enhancedBrief,
-        count: 1,
+        count: 3, // Generate 3 options to increase variety
         tone: tone,
         content_type: "newsletter",
         structure: [{ component: componentType, count: 1 }],
-        image_url: imageUrls[0],
-        temperature: regenerateTemp
+        image_url: undefined, // No image needed for single component regeneration
+        temperature: regenerateTemp,
+        use_flash: isShortComponent, // Use Flash for CTAs and other short components
+        use_few_shot: true // Use Few-Shot examples for regeneration only
+      })
+      
+      // Debug: Log the full result
+      console.log("📡 API RESPONSE:", {
+        success: result.success,
+        componentKey: component.key,
+        componentType: componentType,
+        rawData: result.data,
+        variations: result.data?.variations
       })
 
       if (result.success && result.data) {
-        const newContent = result.data.variations[0][component.key]
+        // Normalize function to compare content (remove spaces, lowercase, punctuation)
+        const normalize = (str: string) => 
+          str.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ')
+        
+        const currentNormalized = normalize(component.content)
+        
+        // FIXED: Use componentType as key (e.g., "cta"), not component.key (e.g., "cta_2")
+        // The API returns {"cta": "..."}, not {"cta_2": "..."}
+        const lookupKey = componentType
+        
+        // Get all variations and check each one
+        const allVariations = result.data.variations.map(v => ({
+          original: v[lookupKey] || '',
+          normalized: normalize(v[lookupKey] || '')
+        }))
+        
+        // Find truly different candidates (not just spacing/case differences)
+        const differentCandidates = allVariations.filter(v => 
+          v.normalized !== currentNormalized && v.original.trim() !== ''
+        )
+        
+        // Log for debugging
+        console.log("🔍 REGENERATION DEBUG:", {
+          current: component.content,
+          currentNormalized,
+          allVariations: allVariations.map(v => v.original),
+          differentCount: differentCandidates.length
+        })
+        
+        // Check if ALL variations are essentially the same (ignoring minor differences)
+        if (differentCandidates.length === 0) {
+          // FORCE ERROR: AI generated the same content (even with minor variations)
+          toast.error(`❌ CTA invariato! L'AI ha generato "${component.content}" 3 volte. Problema di caching AI. Riprova o usa "Regenerate All".`)
+          console.error("🚨 REGENERATION FAILED: All 3 variations are identical", {
+            current: component.content,
+            generated: allVariations.map(v => v.original)
+          })
+          return // Don't update the component
+        }
+        
+        // Use first truly different candidate
+        let newContent = differentCandidates[0].original
+        
+        // Normalize CTAs to UPPERCASE for brand consistency
+        const isCTA = component.key.toLowerCase().includes('cta')
+        if (isCTA) {
+          newContent = newContent.toUpperCase()
+        }
+        
         if (newContent) {
-          setComponents((prev) =>
-            prev.map((comp, i) =>
-              i === index ? { ...comp, content: newContent } : comp
-            )
+          // Update components with new content
+          const updatedComponents = components.map((comp, i) =>
+            i === index ? { ...comp, content: newContent } : comp
           )
-          toast.success(`Regenerated ${component.label}`)
+          
+          setComponents(updatedComponents)
+          
+          // Auto-save after regeneration with updated components
+          await saveComponentsToDatabase(updatedComponents, translations)
+          
+          toast.success(`✅ Rigenerato! (${differentCandidates.length}/3 varianti diverse trovate)`)
         }
       } else {
         toast.error("Failed to regenerate component")

@@ -143,15 +143,24 @@ class VertexAIClient:
         image_url: str | None = None,
         model: str | None = None,
         response_mime_type: str = "application/json",
+        use_flash: bool = False,
     ) -> str:
-        model_name = model or settings.vertex_ai_model
+        # Use Flash model if requested, otherwise use provided model or default
+        if use_flash:
+            model_name = settings.vertex_ai_model_flash
+        else:
+            model_name = model or settings.vertex_ai_model
         generative_model = GenerativeModel(model_name)
+        
+        # For high temperature (regeneration), increase top_k for more variety
+        top_k_value = 60 if temperature > 0.8 else 40
+        
         generation_config = GenerationConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
             response_mime_type=response_mime_type,
-            top_p=0.95,  # Add nucleus sampling for more diversity
-            top_k=40,    # Add top-k sampling for variety
+            top_p=0.95,  # Nucleus sampling for diversity
+            top_k=top_k_value,  # Higher top_k for regeneration
         )
 
         final_prompt = [Part.from_text(prompt)]

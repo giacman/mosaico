@@ -13,6 +13,8 @@ interface GenerateContentInput {
   context?: string
   image_url?: string
   temperature?: number
+  use_flash?: boolean
+  use_few_shot?: boolean
 }
 
 interface GeneratedContent {

@@ -21,6 +21,7 @@ from app.models.schemas import (
 from app.core.vertex_ai import VertexAIClient, get_client
 from app.core.config import settings
 from app.utils.notifications import notify_generation_completed
+from app.prompts.few_shot_loader import get_few_shot_db
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -97,16 +98,35 @@ def build_generation_prompt(
     tone: str,
     content_type: str,
     structure: list[StructureComponent],
-    context: str | None = None
+    context: str | None = None,
+    use_few_shot: bool = False
 ) -> str:
-    """Builds the dynamic prompt for the generative model based on a requested structure."""
+    """
+    Builds the dynamic prompt for the generative model based on a requested structure.
+    
+    Args:
+        text: User's instruction text
+        count: Number of variations to generate
+        tone: Tone of voice
+        content_type: Type of content (newsletter, etc.)
+        structure: List of components to generate
+        context: Optional additional context
+        use_few_shot: If True, include Few-Shot examples (recommended for regeneration only)
+    
+    Returns:
+        Formatted prompt string
+    """
     
     structure_details = []
     json_example_structure = []
     
+    # Track which component types are in the structure for Few-Shot examples
+    component_types_in_structure = set()
+    
     for item in structure:
         plural = "s" if item.count > 1 else ""
         structure_details.append(f"{item.count} {item.component.value.replace('_', ' ')}{plural}")
+        component_types_in_structure.add(item.component.value)
         
         if item.count > 1:
             for i in range(1, item.count + 1):
@@ -118,6 +138,23 @@ def build_generation_prompt(
     json_example_str = ",\n".join(json_example_structure)
     
     context_block = f"\nADDITIONAL CONTEXT:\n{context}\n" if context else ""
+    
+    # Load Few-Shot examples ONLY if requested (for regeneration)
+    # This keeps initial generation prompts lighter and more stable
+    few_shot_section = ""
+    if use_few_shot:
+        few_shot_db = get_few_shot_db()
+        few_shot_blocks = []
+        
+        for comp_type in component_types_in_structure:
+            formatted_examples = few_shot_db.format_examples_for_prompt(
+                component_type=comp_type,
+                count=8  # Include 8 examples per component type
+            )
+            if formatted_examples:
+                few_shot_blocks.append(formatted_examples)
+        
+        few_shot_section = "\n".join(few_shot_blocks) if few_shot_blocks else ""
 
     prompt = f"""You are a senior copywriter and expert in content architecture, specialized in creating {content_type}.
 Your task is to generate {count} variations of a structured content block based on the user's instruction.
@@ -127,9 +164,12 @@ Maintain a {tone} tone and brand voice consistency.
 INSTRUCTION:
 "{text}"
 
+{few_shot_section}
+
 GUIDELINES:
 - Generate creative and relevant text that aligns with the instruction for each component.
 - For any component with a count greater than one (e.g., 2 CTAs), you MUST generate unique keys for each instance (e.g., "cta_1", "cta_2").
+- Each instance MUST be completely DIFFERENT from the others - use different words, phrasing, and creative angles.
 - The value for every key in the JSON object MUST be a single string.
 - Output ONLY as a valid JSON object containing a single key "variations".
 - The "variations" key must be a list of "flat" JSON objects, where each object is one complete content variation.
@@ -161,6 +201,9 @@ async def generate_variations(
         f"Type: {req.content_type.value} | Structure: {req.structure}"
     )
 
+    # Use Few-Shot examples only if requested (for regeneration)
+    use_few_shot = req.use_few_shot if req.use_few_shot is not None else False
+    
     prompt = build_generation_prompt(
         text=req.text,
         count=req.count,
@@ -168,10 +211,14 @@ async def generate_variations(
         content_type=req.content_type.value,
         structure=req.structure,
         context=req.context,
+        use_few_shot=use_few_shot,
     )
 
     # Use provided temperature or default to 0.7
     temperature = req.temperature if req.temperature is not None else 0.7
+    
+    # Use Flash model if requested (faster/cheaper for CTAs)
+    use_flash = req.use_flash if req.use_flash is not None else False
     
     raw_variations = await client.generate_with_fixing(
         prompt,
@@ -179,6 +226,7 @@ async def generate_variations(
         temperature=temperature,
         max_tokens=2048,
         image_url=req.image_url,
+        use_flash=use_flash,
     )
 
     try:

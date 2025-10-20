@@ -1,0 +1,12 @@
+# Ignore all email files (privacy)
+sample_emails/*.eml
+sample_emails/*.html
+sample_emails/*.htm
+
+# Ignore parsed data (can be regenerated)
+parsed_examples.json
+
+# But keep the directory structure
+!sample_emails/.gitkeep
+!README.md
+

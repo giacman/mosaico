@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Mckay's App Template",
-  description: "The easiest way to start your next project."
+  title: "Mosaico - AI Email Campaign Generator",
+  description: "Create, translate, and manage multilingual email campaigns with AI-powered content generation."
 }
 
 export default function RootLayout({

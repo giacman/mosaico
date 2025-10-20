@@ -15,7 +15,6 @@ export async function getCustomerByUserId(
     return customer || null
   } catch (error) {
     // Customer table doesn't exist yet (Mosaico doesn't use billing)
-    console.warn("Customer table not available - billing features disabled")
     return null
   }
 }
@@ -46,7 +45,6 @@ export async function getBillingDataByUserId(userId: string): Promise<{
     }
   } catch (error) {
     // Customer table doesn't exist yet (Mosaico doesn't use billing)
-    console.warn("Billing data not available - billing features disabled")
     const user = await currentUser()
     return {
       customer: null,

@@ -56,6 +56,8 @@ class GenerateVariationsRequest(BaseModel):
     context: str | None = Field(default=None, description="Optional additional context")
     image_url: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=1.0, description="Temperature for generation (0.0-1.0, default 0.7)")
+    use_flash: bool | None = Field(default=False, description="Use Gemini Flash model instead of Pro for faster, cheaper generation")
+    use_few_shot: bool | None = Field(default=False, description="Include Few-Shot examples in prompt (for regeneration only, not initial generation)")
 
 
 class TranslateRequest(BaseModel):
