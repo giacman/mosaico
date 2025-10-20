@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### AI-Powered Email Campaign Content Generator
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)

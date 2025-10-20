@@ -18,6 +18,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2025-10-20
+
+**🎨 UX Improvements: Streamlined Translation Workflow**
+
+This patch focuses on improving the user experience for content generation and translation by making the workflow more intuitive and linear.
+
+### 🎨 UI/UX Improvements
+
+#### Image Upload Repositioning
+- **Moved Image Upload to Left Column**: `ImageUploadManager` now appears under Creative Brief, before Tone of Voice
+- **Clearer Context**: Images are now clearly part of the "input" (left column) rather than scattered in the output area
+- **Better Mental Model**: All context/settings on the left, all outputs on the right
+
+#### Translation Workflow Redesign
+- **Removed Language Selection from Settings**: Target languages no longer appear in the left column with project settings
+- **Contextual Language Selection**: Language badges now appear in the right column AFTER content generation
+- **Linear Workflow**: Generate → Select Languages → Translate (natural progression)
+- **Helper Text**: "Click to add or remove languages for translation" appears with language badges
+
+#### Enhanced Translation Button
+- **More Prominent**: Changed from `variant="outline"` (white) to `variant="default"` with `bg-blue-600 hover:bg-blue-700`
+- **Larger Size**: Changed from `size="sm"` to `size="default"` for better visibility
+- **Impossible to Miss**: Bright blue button stands out as the primary action after content generation
+- **Dynamic Count**: Shows "Translate to X language(s)" with real-time count
+
+#### Prompt Assistant Retained
+- **Still Available**: "Optimize Prompt" button remains next to Creative Brief
+- **User Requested**: Kept after feedback that this feature should not be removed
+
+### 📊 User Flow Comparison
+
+**Before (v0.3.0):**
+```
+Left Column: Name, Brief, Tone, Structure, Languages (confusing)
+Right Column: Image Upload (separated from brief), Generate, Translate (small button)
+```
+
+**After (v0.3.1):**
+```
+Left Column: Name → Brief → Images → Tone → Structure (all inputs together)
+Right Column: Generate → [Languages appear] → Translate (blue, prominent)
+```
+
+### 🎯 Benefits
+- **Clearer Input/Output Separation**: All context on left, all results on right
+- **Natural Progression**: Each step flows logically to the next
+- **Can't Miss Translation**: Blue button is now the obvious next action
+- **Image Context Clear**: Images are part of the brief, not floating separately
+
+### 📁 Files Modified
+- `frontend/app/(authenticated)/dashboard/projects/[id]/_components/project-editor.tsx`
+  - Moved `ImageUploadManager` from right to left column
+  - Removed `Target Languages` section from left column
+  - Re-added `PromptAssistantDialog` after user feedback
+  - Passed `onLanguagesChange` callback to `ContentGenerator`
+- `frontend/app/(authenticated)/dashboard/_components/content-generator.tsx`
+  - Added `LANGUAGES` constant
+  - Added `onLanguagesChange` prop
+  - Created new "Translation Section" that appears after generation
+  - Language selection with clickable badges
+  - Enhanced translate button styling (blue, larger)
+  - Conditional rendering: only shows after content is generated
+
+---
+
 ## [0.3.0] - 2025-10-20
 
 **🎯 Major Feature Release: Intelligent AI Model Selection & Few-Shot Learning**
