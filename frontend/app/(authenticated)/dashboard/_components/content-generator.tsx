@@ -17,12 +17,22 @@ import { useNotifications } from "./notifications-provider"
 import { Component as SavedComponent } from "@/actions/projects"
 import { useEffect } from "react"
 
+const LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "it", label: "Italian" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "es", label: "Spanish" },
+  { value: "pt", label: "Portuguese" }
+]
+
 interface ContentGeneratorProps {
   projectId: number
   brief: string
   tone: string
   structure: Array<{ component: string; count: number }>
   targetLanguages: string[]
+  onLanguagesChange?: (languages: string[]) => void
   imageUrls?: string[]
   savedComponents?: SavedComponent[]
   userName?: string
@@ -41,6 +51,7 @@ export function ContentGenerator({
   tone,
   structure,
   targetLanguages,
+  onLanguagesChange,
   imageUrls = [],
   savedComponents = [],
   userName = "Unknown user"
@@ -605,27 +616,61 @@ This is attempt #${iteration} - be creative and original!`
           )}
         </Button>
 
-        {/* Translate Button */}
-        {components.length > 0 && targetLanguages.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTranslate}
-            disabled={isTranslating}
-            className="w-full"
-          >
-            {isTranslating ? (
-              <>
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                Translating...
-              </>
-            ) : (
-              <>
-                <Languages className="mr-2 h-3.5 w-3.5" />
-                Translate to {targetLanguages.length} language(s)
-              </>
+        {/* Translation Section - Only show after content generation */}
+        {components.length > 0 && (
+          <div className="space-y-3 pt-4 border-t">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Translation Languages</Label>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((lang) => {
+                  const isSelected = targetLanguages.includes(lang.value)
+                  return (
+                    <Badge
+                      key={lang.value}
+                      variant={isSelected ? "default" : "outline"}
+                      className="cursor-pointer hover:bg-primary/80"
+                      onClick={() => {
+                        if (onLanguagesChange) {
+                          if (isSelected) {
+                            onLanguagesChange(targetLanguages.filter((l) => l !== lang.value))
+                          } else {
+                            onLanguagesChange([...targetLanguages, lang.value])
+                          }
+                        }
+                      }}
+                    >
+                      {lang.label}
+                    </Badge>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Click to add or remove languages for translation
+              </p>
+            </div>
+
+            {targetLanguages.length > 0 && (
+              <Button
+                variant="default"
+                size="default"
+                onClick={handleTranslate}
+                disabled={isTranslating}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Translating to {targetLanguages.length} language(s)...
+                  </>
+                ) : (
+                  <>
+                    <Languages className="mr-2 h-4 w-4" />
+                    Translate to {targetLanguages.length} language(s)
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         )}
 
         {/* Generated Components */}

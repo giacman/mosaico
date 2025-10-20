@@ -216,11 +216,24 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
                   id="project-brief"
                   value={project.brief_text ?? ""}
                   onChange={(e) => updateField("brief_text", e.target.value || null)}
-                  placeholder="Describe the theme, target audience, key messages..."
+                  placeholder="Describe the theme, target audience, key messages... Keep it under 600 characters for best results with images."
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                  💡 Tip: Use the Prompt Assistant to enhance your brief with AI-optimized details
+                  💡 Use the Prompt Assistant to enhance your brief, or keep under 600 chars when using images
+                </p>
+              </div>
+
+              {/* Image Upload - Part of the Brief */}
+              <div className="space-y-2">
+                <Label>Reference Images (Optional)</Label>
+                <ImageUploadManager
+                  projectId={project.id}
+                  value={images}
+                  onChange={setImages}
+                />
+                <p className="text-xs text-muted-foreground">
+                  📸 Add images to provide visual context for AI generation
                 </p>
               </div>
 
@@ -241,28 +254,6 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Target Languages</Label>
-                <div className="flex flex-wrap gap-2">
-                  {LANGUAGES.map((lang) => {
-                    const isSelected = project.target_languages.includes(lang.value)
-                    return (
-                      <Badge
-                        key={lang.value}
-                        variant={isSelected ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => toggleLanguage(lang.value)}
-                      >
-                        {lang.label}
-                      </Badge>
-                    )
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Click to add or remove languages
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -285,17 +276,12 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
             tone={project.tone ?? "professional"}
             structure={project.structure}
             targetLanguages={project.target_languages}
+            onLanguagesChange={(languages) => updateField("target_languages", languages)}
             imageUrls={images.map((img) => img.url)}
             savedComponents={project.components || []}
             userName={user?.fullName || user?.firstName || "Unknown user"}
           />
 
-          {/* Image Upload */}
-          <ImageUploadManager
-            projectId={project.id}
-            value={images}
-            onChange={setImages}
-          />
         </div>
       </div>
 
