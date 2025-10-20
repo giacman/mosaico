@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -26,8 +25,7 @@ export function CreateProjectDialog() {
   const [open, setOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState({
-    name: "",
-    brief_text: ""
+    name: ""
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,7 +41,7 @@ export function CreateProjectDialog() {
     // Create project with default structure (subject + pre_header)
     const result = await createProject({
       name: formData.name,
-      brief_text: formData.brief_text || undefined,
+      brief_text: undefined,
       structure: [
         { component: "subject", count: 1 },
         { component: "pre_header", count: 1 }
@@ -64,7 +62,7 @@ export function CreateProjectDialog() {
       })
       
       setOpen(false)
-      setFormData({ name: "", brief_text: "" })
+      setFormData({ name: "" })
       // Navigate to the project editor
       router.push(`/dashboard/projects/${result.data.id}`)
     } else {
@@ -87,7 +85,7 @@ export function CreateProjectDialog() {
           <DialogHeader>
             <DialogTitle>Create New Project</DialogTitle>
             <DialogDescription>
-              Give your email campaign project a name and brief description.
+              Give your email campaign project a name. You'll add the brief and structure in the editor.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -97,29 +95,20 @@ export function CreateProjectDialog() {
               </Label>
               <Input
                 id="name"
-                placeholder="Spring Collection 2025"
+                placeholder="e.g., Spring Collection 2025, Summer Sale Campaign..."
                 value={formData.name}
                 onChange={e =>
                   setFormData(prev => ({ ...prev, name: e.target.value }))
                 }
                 disabled={isCreating}
                 autoFocus
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="brief">Brief (Optional)</Label>
-              <Textarea
-                id="brief"
-                placeholder="Promote our new spring handbag collection targeting women 25-40..."
-                value={formData.brief_text}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, brief_text: e.target.value }))
-                }
-                disabled={isCreating}
-                rows={4}
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-form-type="other"
               />
               <p className="text-xs text-muted-foreground">
-                You can refine this later in the project editor.
+                You'll add the brief, structure, and other details in the project editor.
               </p>
             </div>
           </div>
