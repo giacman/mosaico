@@ -18,6 +18,154 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2025-10-20
+
+**🎯 Major Feature Release: Auto-Retranslation & Drag-and-Drop Email Structure**
+
+This release introduces intelligent auto-retranslation workflows and a completely redesigned drag-and-drop email structure builder, making content editing and translation management seamless and intuitive.
+
+### ✨ Added - Auto-Retranslation System
+
+#### Automatic Translation Regeneration
+- **Regenerate All with Translations**: When regenerating all content, if translations existed, they are automatically regenerated
+- **Regenerate Single with Translations**: When regenerating a single component, only that component's translations are regenerated
+- **Manual Edit with Retranslation**: New "Save & Retranslate" button appears when editing content manually
+  - Saves the edited content to database
+  - Automatically regenerates translations if they existed
+  - Visual feedback with spinner and greyed-out translations during processing
+
+#### Visual Feedback During Translation
+- **Loading Spinner**: Rotating loader icon appears next to "Translations" header
+- **Greyed Out Content**: Translation cards become semi-transparent (opacity-50) during regeneration
+- **Disabled Actions**: Copy buttons are disabled while translating
+- **Smooth Transitions**: CSS transitions for opacity changes
+- **Toast Notifications**: Clear feedback for each step ("Retranslating...", "Retranslated to X language(s)")
+
+### ✨ Added - Drag-and-Drop Email Structure Builder
+
+#### New Structure Builder (V2)
+- **Always-Present Components**: Subject and Pre-header are always included and cannot be removed
+- **Drag-and-Drop Interface**: Powered by `@dnd-kit` for smooth, accessible drag-and-drop
+- **Dynamic Components**: Add multiple instances of:
+  - **Title**: Main headline/section title
+  - **Body Section**: Content paragraphs
+  - **CTA Button**: Call-to-action buttons
+- **Visual Reordering**: Drag handle (⋮⋮) for intuitive reordering
+- **Real-time Preview**: See component order with numbered badges
+- **Remove Components**: X button on each component (except Subject/Pre-header)
+
+#### Builder Features
+- Components maintain order during generation
+- Subject and Pre-header locked at top positions
+- Smooth animations during drag operations
+- Visual feedback (opacity) when dragging
+- Total component count display
+- Clean, professional UI without emoji
+
+### 🔧 Improvements - Language Support
+
+#### Expanded Language Options (10 Languages)
+- Removed English (source language, no translation needed)
+- Added new languages:
+  - **Italian** (it)
+  - **German** (de)
+  - **French** (fr)
+  - **Spanish** (es)
+  - **Portuguese** (pt)
+  - **Russian** (ru)
+  - **Chinese** (zh)
+  - **Japanese** (ja)
+  - **Arabic** (ar)
+  - **Dutch** (nl)
+
+### 🎨 UI/UX Improvements
+
+#### Enhanced Editing Experience
+- **Cancel Button**: Added to editing mode to discard changes without saving
+- **Save & Retranslate**: Single action combines save + retranslate for edited content
+- **Loading States**: Spinner on save button during processing
+- **Better Feedback**: Clear toast messages for all actions
+
+#### Structure Builder V2 Interface
+- Cleaner design without emoji clutter
+- Grip handle for drag operations
+- Hover effects on components
+- Smooth transitions and animations
+- Numbered badge preview of final structure
+
+### 📦 Dependencies
+
+#### New Packages
+- `@dnd-kit/core@^6.1.0` - Core drag-and-drop functionality
+- `@dnd-kit/sortable@^8.0.0` - Sortable list utilities
+- `@dnd-kit/utilities@^3.2.2` - Helper utilities for transforms
+
+### 🐛 Fixed
+
+#### Translation State Management
+- Fixed translations not being detected when reopening saved projects
+- Added debugging logs to track translation state (removed in final version)
+- Translations now properly load from database and trigger auto-regeneration
+
+#### React Rendering Issues
+- Fixed "Cannot update component while rendering" error in EmailStructureBuilderV2
+- Moved state updates from render to `useEffect` for proper lifecycle management
+
+### 📁 Files Modified
+
+#### Frontend
+- `frontend/package.json` - Updated version to 0.4.0, added @dnd-kit dependencies
+- `frontend/app/(authenticated)/dashboard/_components/content-generator.tsx`
+  - Added `saveAndRetranslate` function for manual edits
+  - Enhanced translation visual feedback
+  - Auto-retranslation on regenerate all/single
+  - Save & Retranslate button in edit mode
+- `frontend/app/(authenticated)/dashboard/_components/email-structure-builder-v2.tsx` - **NEW**
+  - Drag-and-drop structure builder
+  - Always-present Subject/Pre-header
+  - Dynamic Title/Body/CTA components
+- `frontend/app/(authenticated)/dashboard/projects/[id]/_components/project-editor.tsx`
+  - Switched from `EmailStructureBuilder` to `EmailStructureBuilderV2`
+  - Updated type definitions to include "title" component
+
+#### Backend
+- `backend/app/__init__.py` - Updated version to 0.4.0
+
+### 📊 User Flow Improvements
+
+**Before (v0.3.1):**
+1. Edit content manually
+2. Click somewhere else (loses changes?)
+3. Manually click Translate again
+4. No visual feedback during translation
+
+**After (v0.4.0):**
+1. Edit content manually
+2. Click "Save & Retranslate" (or Cancel)
+3. Automatic retranslation if translations existed
+4. Clear visual feedback (spinner + greyed out + toast)
+
+**Structure Builder Before:**
+- Checkboxes to enable/disable components
+- Number inputs for counts
+- No visual ordering
+- Could remove Subject/Pre-header
+
+**Structure Builder After:**
+- Subject/Pre-header always present
+- Drag & drop to reorder Title/Body/CTA
+- Visual preview with numbered badges
+- Intuitive add/remove buttons
+
+### 🎯 Breaking Changes
+
+#### Email Structure
+- **Title component added**: Emails can now have title sections separate from body
+- Existing projects without "title" will continue to work (backward compatible)
+- New projects default to Subject + Pre-header only
+
+---
+
 ## [0.3.1] - 2025-10-20
 
 **🎨 UX Improvements: Streamlined Translation Workflow**

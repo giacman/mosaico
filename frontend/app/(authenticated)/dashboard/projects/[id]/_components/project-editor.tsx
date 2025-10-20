@@ -26,7 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
-import { EmailStructureBuilder } from "../../../_components/email-structure-builder"
+import { EmailStructureBuilderV2 } from "../../../_components/email-structure-builder-v2"
 import { ImageUploadManager } from "../../../_components/image-upload-manager"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { ContentGenerator } from "../../../_components/content-generator"
@@ -51,12 +51,16 @@ const TONES = [
 ]
 
 const LANGUAGES = [
-  { value: "en", label: "English" },
   { value: "it", label: "Italian" },
-  { value: "fr", label: "French" },
   { value: "de", label: "German" },
+  { value: "fr", label: "French" },
   { value: "es", label: "Spanish" },
-  { value: "pt", label: "Portuguese" }
+  { value: "pt", label: "Portuguese" },
+  { value: "ru", label: "Russian" },
+  { value: "zh", label: "Chinese" },
+  { value: "ja", label: "Japanese" },
+  { value: "ar", label: "Arabic" },
+  { value: "nl", label: "Dutch" }
 ]
 
 export function ProjectEditor({ initialProject }: ProjectEditorProps) {
@@ -259,9 +263,9 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
           </Card>
 
           {/* Email Structure */}
-          <EmailStructureBuilder
+          <EmailStructureBuilderV2
             value={project.structure.map((s) => ({
-              component: s.component as "subject" | "pre_header" | "body" | "cta",
+              component: s.component as "subject" | "pre_header" | "title" | "body" | "cta",
               count: s.count
             }))}
             onChange={(structure) => updateField("structure", structure as Array<{component: string; count: number}>)}

@@ -18,12 +18,16 @@ import { Component as SavedComponent } from "@/actions/projects"
 import { useEffect } from "react"
 
 const LANGUAGES = [
-  { value: "en", label: "English" },
   { value: "it", label: "Italian" },
-  { value: "fr", label: "French" },
   { value: "de", label: "German" },
+  { value: "fr", label: "French" },
   { value: "es", label: "Spanish" },
-  { value: "pt", label: "Portuguese" }
+  { value: "pt", label: "Portuguese" },
+  { value: "ru", label: "Russian" },
+  { value: "zh", label: "Chinese" },
+  { value: "ja", label: "Japanese" },
+  { value: "ar", label: "Arabic" },
+  { value: "nl", label: "Dutch" }
 ]
 
 interface ContentGeneratorProps {
@@ -267,7 +271,22 @@ export function ContentGenerator({
   }
 
   const handleRegenerateAll = async () => {
+    // Store if translations existed before regenerating
+    const hadTranslations = Object.keys(translations).length > 0
+    const previousLanguages = targetLanguages.length > 0 ? [...targetLanguages] : []
+    
+    // Regenerate content (this updates the components state)
     await handleGenerate()
+    
+    // If translations existed, automatically regenerate them
+    // We need to wait for the state to update before translating
+    if (hadTranslations && previousLanguages.length > 0) {
+      // Use a small delay to ensure React state has propagated
+      setTimeout(async () => {
+        toast.info("🔄 Rigenerando anche le traduzioni...")
+        await handleTranslate()
+      }, 500)
+    }
   }
 
   const handleRegenerateSingle = async (index: number) => {
@@ -415,10 +434,44 @@ This is attempt #${iteration} - be creative and original!`
           
           setComponents(updatedComponents)
           
-          // Auto-save after regeneration with updated components
-          await saveComponentsToDatabase(updatedComponents, translations)
-          
           toast.success(`✅ Rigenerato! (${differentCandidates.length}/3 varianti diverse trovate)`)
+          
+          // If this component had translations, automatically regenerate them
+          const hadTranslations = translations[component.key] && Object.keys(translations[component.key]).length > 0
+          
+          if (hadTranslations && targetLanguages.length > 0) {
+            toast.info("🔄 Rigenerando traduzioni per questa componente...")
+            setIsTranslating(true) // Set translating state for visual feedback
+            
+            try {
+              // Regenerate translations for this specific component
+              const result = await batchTranslate(
+                [{ key: component.key, content: newContent }],
+                targetLanguages
+              )
+              
+              if (result.success && result.data) {
+                // Update translations for this component only
+                const updatedTranslations = {
+                  ...translations,
+                  ...result.data
+                }
+                setTranslations(updatedTranslations)
+                
+                // Auto-save with updated translations
+                await saveComponentsToDatabase(updatedComponents, updatedTranslations)
+                
+                toast.success(`✅ Traduzioni rigenerate per ${targetLanguages.length} lingua/e`)
+              } else {
+                toast.error("❌ Errore rigenerando le traduzioni")
+              }
+            } finally {
+              setIsTranslating(false) // Reset translating state
+            }
+          } else {
+            // Just save without translations
+            await saveComponentsToDatabase(updatedComponents, translations)
+          }
         }
       } else {
         toast.error("Failed to regenerate component")
@@ -494,9 +547,52 @@ This is attempt #${iteration} - be creative and original!`
       i === index ? { ...comp, content: newContent } : comp
     )
     setComponents(updatedComponents)
+  }
+
+  const saveAndRetranslate = async (index: number) => {
+    const component = components[index]
     
-    // Auto-save to database when content is edited
-    await saveComponentsToDatabase(updatedComponents, translations)
+    // Close editing mode
+    setComponents((prev) =>
+      prev.map((comp, i) =>
+        i === index ? { ...comp, editing: false } : comp
+      )
+    )
+    
+    // Check if this component had translations
+    const hadTranslations = translations[component.key] && Object.keys(translations[component.key]).length > 0
+    
+    // Save to database
+    await saveComponentsToDatabase(components, translations)
+    toast.success("✅ Saved!")
+    
+    // If had translations and languages are selected, retranslate
+    if (hadTranslations && targetLanguages.length > 0) {
+      toast.info("🔄 Retranslating edited content...")
+      setIsTranslating(true)
+      
+      try {
+        const result = await batchTranslate(
+          [{ key: component.key, content: component.content }],
+          targetLanguages
+        )
+        
+        if (result.success && result.data) {
+          const updatedTranslations = {
+            ...translations,
+            ...result.data
+          }
+          setTranslations(updatedTranslations)
+          
+          await saveComponentsToDatabase(components, updatedTranslations)
+          toast.success(`✅ Retranslated to ${targetLanguages.length} language(s)`)
+        } else {
+          toast.error("❌ Error retranslating")
+        }
+      } finally {
+        setIsTranslating(false)
+      }
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -735,12 +831,41 @@ This is attempt #${iteration} - be creative and original!`
                 </div>
 
                 {component.editing ? (
-                  <Textarea
-                    value={component.content}
-                    onChange={(e) => updateContent(index, e.target.value)}
-                    rows={4}
-                    className="font-mono text-sm"
-                  />
+                  <div className="space-y-2">
+                    <Textarea
+                      value={component.content}
+                      onChange={(e) => updateContent(index, e.target.value)}
+                      rows={4}
+                      className="font-mono text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => saveAndRetranslate(index)}
+                        disabled={isTranslating}
+                        className="gap-2"
+                      >
+                        {isTranslating ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Save & Retranslate
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleEdit(index)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">
                     {component.content}
@@ -751,14 +876,21 @@ This is attempt #${iteration} - be creative and original!`
                 {translations[component.key] &&
                   Object.keys(translations[component.key]).length > 0 && (
                     <div className="mt-4 space-y-3 pt-4 border-t">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">
-                        Translations
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">
+                          Translations
+                        </p>
+                        {isTranslating && (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                       {Object.entries(translations[component.key]).map(
                         ([lang, translatedText]) => (
                           <div
                             key={lang}
-                            className="rounded-md bg-muted/50 p-3 space-y-1"
+                            className={`rounded-md bg-muted/50 p-3 space-y-1 transition-opacity ${
+                              isTranslating ? 'opacity-50' : 'opacity-100'
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <Badge variant="secondary" className="uppercase">
@@ -768,6 +900,7 @@ This is attempt #${iteration} - be creative and original!`
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => copyToClipboard(translatedText)}
+                                disabled={isTranslating}
                               >
                                 <Copy className="h-3 w-3" />
                               </Button>
