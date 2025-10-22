@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### AI-Powered Email Campaign Content Generator
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -15,14 +15,20 @@
 
 ### Key Features
 
-- ✨ **AI Content Generation**: Create email components (subjects, pre-headers, body, CTAs) with customizable tone and structure
+- ✨ **AI Content Generation**: Create email components (subjects, pre-headers, title, body, CTAs) with customizable tone and structure
 - 🌍 **Batch Translation**: Translate content to multiple languages simultaneously with context preservation
-- 🎯 **Dynamic Email Structure**: Build custom email layouts with variable component counts
+- 🎯 **Drag-and-Drop Email Structure**: Visual builder with always-on Subject & Pre-header; add/reorder Title, Body, CTAs
 - 🖼️ **Image Context**: Generate content based on uploaded product images
 - 🔄 **Regenerate & Refine**: Fine-tune individual components with temperature control (0.0-1.0)
+- 🧠 **Intelligent Model Selection**: Auto-choose Gemini Pro vs Flash with JSON-stability fallback
 - 📊 **Project Management**: Organize campaigns with team collaboration and activity tracking
+- 🏷️ **Labels**: Add pastel color labels to projects (dashboard, editor, sidebar)
+- ✅ **Status**: `in_progress` (editable) vs `approved` (read-only) with UI gating
+- 🧭 **Sidebar & Filters**: Projects nested under In Progress / Approved; dashboard tabs for filtering
 - 🔔 **Notifications**: Real-time in-app and Slack notifications for team handoffs
 - 📤 **Handlebar Export**: Export components with multi-language handlebar templates for Airship integration
+- 🔠 **CTA Consistency**: CTAs normalized to UPPERCASE across generation and regeneration
+- 🔁 **Auto-Retranslation**: Regeneration and manual edits trigger translation updates with clear UX states
 
 ---
 
@@ -141,6 +147,7 @@ Frontend will be available at: `http://localhost:3000`
 
 - **[backend/README.md](backend/README.md)**: Backend architecture and API reference
 - **[backend/PHASE2_SETUP.md](backend/PHASE2_SETUP.md)**: Production deployment guide
+- **[backend/docs/FEW_SHOT_STRATEGY.md](backend/docs/FEW_SHOT_STRATEGY.md)**: Few-shot learning design and rationale
 
 ### Frontend Documentation
 
@@ -165,14 +172,16 @@ Mosaico supports a collaborative multi-team workflow:
 
 ### 2. **Content Generation** (AI + Content Team Review)
 - AI generates email components based on brief and images
-- Content team reviews and refines outputs
+- Intelligent model selection (Pro/Flash) with automatic Flash fallback for JSON stability
+- Few-shot examples used during regeneration only, for higher variety without breaking JSON
 - Individual component regeneration with temperature control
 - Real-time editing and approval
 
 ### 3. **Translation** (AI + Translation Team Review)
-- Batch translate to multiple languages (IT, FR, DE, ES, PT)
-- Translation team reviews for cultural accuracy
-- Manual adjustments if needed
+- Batch translate to multiple languages (IT, DE, FR, ES, PT, RU, ZH, JA, AR, NL)
+- Auto-retranslation after Regenerate All / Regenerate Single if translations existed
+- "Save & Retranslate" after manual edits to keep translations in sync
+- Spinner + greyed-out states + disabled actions during translation
 
 ### 4. **Export to Airship** (CRM Team)
 - Export components as handlebar templates
@@ -292,6 +301,7 @@ alembic history
 - `POST /api/v1/generate` - Generate email content with dynamic structure
 - `POST /api/v1/optimize-prompt` - Optimize user briefs with AI assistance
 - `POST /api/v1/refine` - Refine/improve existing content
+  - Options: `use_flash`, `use_few_shot`, `temperature`, `count`
 
 ### Translation
 - `POST /api/v1/translate` - Translate single text
@@ -316,20 +326,29 @@ Full API documentation: `http://localhost:8080/docs` (when backend is running)
 ## 🎨 Features Deep Dive
 
 ### AI Content Generation
-
-- **Dynamic Structure**: Define custom email layouts with variable component counts
+- **Drag-and-Drop Structure Builder (V2)**: Subject + Pre-header always present; add/reorder Title/Body/CTA
 - **Tone Control**: Professional, casual, enthusiastic, elegant, direct
 - **Temperature Control**: 0.0 (consistent) to 1.0 (creative)
 - **Image Context**: Upload product images for AI to reference during generation
 - **Prompt Assistant**: AI-powered brief optimization for better results
 - **Regenerate**: Regenerate all components or individual ones with preserved context
+- **Few-Shot Strategy**: Only on regeneration to boost variety; kept off for initial generation to avoid JSON errors
+- **Intelligent Model Selection**: Pro for long/narrative, Flash for short or image+complex, with auto-fallback
+- **CTA Uppercase Normalization**: Enforced at prompt and post-processing
 
 ### Translation System
-
 - **Batch Processing**: Translate multiple components to multiple languages in parallel
 - **Context Preservation**: Maintains tone, formality, and brand voice across languages
-- **Retry Logic**: Automatic retry for failed translations with exponential backoff
-- **Rate Limiting**: Configurable limits to prevent API quota exhaustion
+- **Auto-Retranslation**: Regenerate All/Single re-triggers translations for changed content
+- **Save & Retranslate**: Manual edits can persist and refresh all translations for that component
+- **Visual Feedback**: Spinner, muted cards, disabled copy buttons during translation
+- **Retry Logic & Limits**: Robustness under rate limits, with Flash model for speed
+
+### Project Management & Navigation
+- **Labels**: Colored badges on cards, editor, and sidebar; quick toggle + autosave in editor
+- **Status**: `in_progress` (editable) vs `approved` (read-only UI with output-only view)
+- **Sidebar**: Projects nested under In Progress / Approved; collapsible groups; persisted state
+- **Dashboard Tabs**: Quick filter by In Progress, Approved, All
 
 ### Notification System
 

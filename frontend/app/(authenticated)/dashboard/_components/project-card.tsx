@@ -95,9 +95,20 @@ export function ProjectCard({ project }: { project: Project }) {
         onClick={handleCardClick}
       >
         <CardHeader>
-          <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="line-clamp-1">{project.name}</CardTitle>
+                {(project as any).status && (
+                  <div className="mt-1">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      (project as any).status === "in_progress"
+                        ? "bg-blue-50 text-blue-700 border border-blue-100"
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                    }`}>
+                      {(project as any).status.replace("_", " ")}
+                    </span>
+                  </div>
+                )}
               {project.labels && project.labels.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {project.labels.map((label) => {

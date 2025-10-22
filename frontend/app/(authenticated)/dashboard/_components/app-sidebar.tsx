@@ -69,27 +69,30 @@ export function AppSidebar({
         icon: FolderKanban,
         items: isLoading 
           ? [{ title: "Loading...", url: "#" }]
-          : projects.map(project => ({
-              title: project.name,
-              url: `/dashboard/projects/${project.id}`,
-              labels: project.labels || []
-            }))
+          : [
+              {
+                title: "In Progress",
+                children: projects
+                  .filter(p => (p as any).status !== "approved")
+                  .map(p => ({
+                    title: p.name,
+                    url: `/dashboard/projects/${p.id}`,
+                    labels: p.labels || []
+                  }))
+              },
+              {
+                title: "Approved",
+                children: projects
+                  .filter(p => (p as any).status === "approved")
+                  .map(p => ({
+                    title: p.name,
+                    url: `/dashboard/projects/${p.id}`,
+                    labels: p.labels || []
+                  }))
+              }
+            ]
       },
-      {
-        title: "Settings",
-        url: "#",
-        icon: Settings2,
-        items: [
-          {
-            title: "Account",
-            url: "/dashboard/account"
-          },
-          {
-            title: "Support",
-            url: "/dashboard/support"
-          }
-        ]
-      }
+      // Settings group removed (available from user menu)
     ]
   }
   return (

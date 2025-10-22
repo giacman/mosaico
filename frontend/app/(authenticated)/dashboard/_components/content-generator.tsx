@@ -40,6 +40,7 @@ interface ContentGeneratorProps {
   imageUrls?: string[]
   savedComponents?: SavedComponent[]
   userName?: string
+  readOnly?: boolean
 }
 
 interface GeneratedComponent {
@@ -58,7 +59,8 @@ export function ContentGenerator({
   onLanguagesChange,
   imageUrls = [],
   savedComponents = [],
-  userName = "Unknown user"
+  userName = "Unknown user",
+  readOnly = false
 }: ContentGeneratorProps) {
   const { addNotification } = useNotifications()
   const [isGenerating, setIsGenerating] = useState(false)
@@ -686,7 +688,7 @@ This is attempt #${iteration} - be creative and original!`
         {/* Generate/Regenerate Button */}
         <Button
           onClick={components.length > 0 ? handleRegenerateAll : handleGenerate}
-          disabled={isGenerating || !brief.trim()}
+          disabled={isGenerating || !brief.trim() || readOnly}
           className="w-full"
           size="lg"
         >
@@ -794,7 +796,7 @@ This is attempt #${iteration} - be creative and original!`
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRegenerateSingle(index)}
-                      disabled={regeneratingIndex === index}
+                      disabled={regeneratingIndex === index || readOnly}
                       title="Regenerate this component"
                     >
                       {regeneratingIndex === index ? (
@@ -807,6 +809,7 @@ This is attempt #${iteration} - be creative and original!`
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleEdit(index)}
+                      disabled={readOnly}
                       title="Edit content"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
@@ -837,12 +840,13 @@ This is attempt #${iteration} - be creative and original!`
                       onChange={(e) => updateContent(index, e.target.value)}
                       rows={4}
                       className="font-mono text-sm"
+                      disabled={readOnly}
                     />
                     <div className="flex gap-2">
                       <Button
                         size="sm"
                         onClick={() => saveAndRetranslate(index)}
-                        disabled={isTranslating}
+                        disabled={isTranslating || readOnly}
                         className="gap-2"
                       >
                         {isTranslating ? (

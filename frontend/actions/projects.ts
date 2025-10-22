@@ -41,6 +41,7 @@ export interface Project {
   tone: string | null
   target_languages: string[]
   labels: string[]
+  status: "in_progress" | "approved"
   created_by_user_id: string | null
   created_by_user_name: string | null
   updated_by_user_id: string | null
@@ -58,6 +59,7 @@ export interface CreateProjectInput {
   tone?: string
   target_languages?: string[]
   labels?: string[]
+  status?: "in_progress" | "approved"
 }
 
 export interface UpdateProjectInput {
@@ -67,6 +69,7 @@ export interface UpdateProjectInput {
   tone?: string
   target_languages?: string[]
   labels?: string[]
+  status?: "in_progress" | "approved"
 }
 
 /**

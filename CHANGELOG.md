@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2025-10-22
+
+### Sidebar hierarchy and status groups
+- Projects list now nested under two collapsible groups: `In Progress` and `Approved`.
+- `In Progress` group opens by default; open/close state persisted in localStorage.
+- Removed redundant `Settings` group from sidebar (still accessible from user avatar).
+- Minor visual tweaks to submenu labels and spacing.
+
+### Internal
+- Bumped versions: backend `__version__` to 0.4.1, frontend package.json to 0.4.1.
+
+---
+
 ## [0.4.0] - 2025-10-20
 
 **🎯 Major Feature Release: Auto-Retranslation & Drag-and-Drop Email Structure**

@@ -7,9 +7,9 @@ import {
   CardTitle
 } from "@/components/ui/card"
 import { FolderKanban, Plus } from "lucide-react"
-import Link from "next/link"
 import { CreateProjectDialog } from "./_components/create-project-dialog"
-import { ProjectCard } from "./_components/project-card"
+import { StatusTabs } from "./_components/status-tabs"
+import { ProjectsGrid } from "./_components/projects-grid"
 
 export default async function DashboardPage() {
   const result = await listProjects()
@@ -40,32 +40,10 @@ export default async function DashboardPage() {
         <CreateProjectDialog />
       </div>
 
-      {projects.length === 0 ? (
-        <Card className="flex h-[50vh] flex-col items-center justify-center border-dashed">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <FolderKanban className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>No Projects Yet</CardTitle>
-            <CardDescription className="mx-auto max-w-sm">
-              Get started by creating your first email campaign project. Define
-              your structure, add images, and let AI generate content.
-            </CardDescription>
-            <div className="mt-4">
-              <CreateProjectDialog />
-            </div>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map(project => (
-            <ProjectCard 
-              key={`${project.id}-${project.updated_at}`} 
-              project={project} 
-            />
-          ))}
-        </div>
-      )}
+      {/* Filter Tabs */}
+      <StatusTabs />
+
+      <ProjectsGrid projects={projects} />
     </div>
   )
 }

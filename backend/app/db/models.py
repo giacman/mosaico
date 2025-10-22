@@ -3,6 +3,7 @@ Database models for Mosaico Platform
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, ARRAY
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -24,6 +25,12 @@ class Project(Base):
     tone = Column(String(50))
     target_languages = Column(ARRAY(String))  # ['it', 'fr', 'de', ...]
     labels = Column(ARRAY(String), nullable=False, default=[])  # ['promo', 'october 2025', ...]
+    # Project status (simple workflow: in_progress, approved)
+    status = Column(
+        SAEnum("in_progress", "approved", name="projectstatus"),
+        nullable=False,
+        server_default="in_progress",
+    )
     
     # Audit fields
     created_by_user_id = Column(String(255))

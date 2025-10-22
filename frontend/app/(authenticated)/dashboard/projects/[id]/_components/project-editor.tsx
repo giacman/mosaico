@@ -73,6 +73,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [showPromptAssistant, setShowPromptAssistant] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
 
   // Fix hydration by only rendering after mount
   useEffect(() => {
@@ -131,6 +132,22 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
       toast.error("Failed to save project")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const onChangeStatus = async (value: "in_progress" | "approved") => {
+    setSavingStatus(true)
+    try {
+      const result = await updateProject(project.id, { status: value })
+      if (result.success && result.data) {
+        setProject(result.data)
+        toast.success(`Status updated to ${value.replace("_", " ")}`)
+        router.refresh()
+      } else {
+        toast.error(result.error || "Failed to update status")
+      }
+    } finally {
+      setSavingStatus(false)
     }
   }
 
@@ -195,6 +212,19 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Project Status */}
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select defaultValue={(project as any).status ?? "in_progress"} onValueChange={onChangeStatus} disabled={savingStatus}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="in_progress">In progress</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="outline"
             onClick={handleSave}
@@ -214,7 +244,8 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left Column: Project Settings */}
         <div className="space-y-6">
-          {/* Basic Info */}
+          {(project as any).status !== "approved" && (
+            <>
           <Card>
             <CardHeader>
               <CardTitle>Project Details</CardTitle>
@@ -348,6 +379,8 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
             }))}
             onChange={(structure) => updateField("structure", structure as Array<{component: string; count: number}>)}
           />
+            </>
+          )}
         </div>
 
         {/* Right Column: Generated Content Preview */}
@@ -362,6 +395,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
             imageUrls={images.map((img) => img.url)}
             savedComponents={project.components || []}
             userName={user?.fullName || user?.firstName || "Unknown user"}
+            readOnly={(project as any).status === "approved"}
           />
 
         </div>

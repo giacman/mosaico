@@ -55,6 +55,9 @@ class ProjectService:
         # Convert structure to dict format for JSON storage
         structure_dict = [item.model_dump() for item in project_data.structure]
         
+        # Handle status value (enum or string)
+        status_val = getattr(project_data.status, "value", None) or getattr(project_data, "status", None) or "in_progress"
+
         project = Project(
             name=project_data.name,
             brief_text=project_data.brief_text,
@@ -62,6 +65,7 @@ class ProjectService:
             tone=project_data.tone,
             target_languages=project_data.target_languages or [],
             labels=project_data.labels or [],
+            status=status_val,
             created_by_user_id=user_id,
             created_by_user_name=user_name
         )
@@ -203,6 +207,11 @@ class ProjectService:
             return None
         
         update_data = project_data.model_dump(exclude_unset=True)
+
+        # Normalize status if present (accept enum or string)
+        if "status" in update_data and update_data["status"] is not None:
+            status_val = getattr(project_data.status, "value", None) or update_data["status"]
+            update_data["status"] = status_val
         
         # Track changes for activity log
         changes = []

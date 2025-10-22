@@ -3,10 +3,15 @@ Pydantic schemas for Project-related API endpoints
 """
 from datetime import datetime
 from pydantic import BaseModel, Field
+from enum import Enum
 from typing import List, Optional
 
 
 # ===== Project Schemas =====
+
+class ProjectStatus(str, Enum):
+    in_progress = "in_progress"
+    approved = "approved"
 
 class StructureComponentCreate(BaseModel):
     """Component in email structure"""
@@ -22,6 +27,7 @@ class ProjectCreate(BaseModel):
     tone: Optional[str] = None
     target_languages: List[str] = Field(default_factory=list)
     labels: List[str] = Field(default_factory=list)
+    status: ProjectStatus = ProjectStatus.in_progress
 
 
 class ProjectUpdate(BaseModel):
@@ -32,6 +38,7 @@ class ProjectUpdate(BaseModel):
     tone: Optional[str] = None
     target_languages: Optional[List[str]] = None
     labels: Optional[List[str]] = None
+    status: Optional[ProjectStatus] = None
 
 
 class ProjectResponse(BaseModel):
@@ -43,6 +50,7 @@ class ProjectResponse(BaseModel):
     tone: Optional[str]
     target_languages: List[str]
     labels: List[str]
+    status: ProjectStatus
     
     # Audit fields
     created_by_user_id: Optional[str]
