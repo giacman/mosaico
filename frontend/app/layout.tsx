@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Mosaico - AI Email Campaign Generator",
-  description: "Create, translate, and manage multilingual email campaigns with AI-powered content generation."
+  title: "Mosaico — Multilingual Content Studio",
+  description: "Create, translate, and manage omnichannel content (email, push, banners, web) with AI."
 }
 
 export default function RootLayout({

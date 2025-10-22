@@ -1,5 +1,5 @@
 # 🎨 Mosaico
-### AI-Powered Email Campaign Content Generator
+### Multilingual Content Studio
 
 [![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
