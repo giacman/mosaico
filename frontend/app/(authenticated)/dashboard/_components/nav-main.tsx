@@ -27,6 +27,8 @@ import {
   SidebarMenuSubItem,
   useSidebar
 } from "@/components/ui/sidebar"
+import { Badge } from "@/components/ui/badge"
+import { getLabelColor } from "./create-project-dialog"
 
 export function NavMain({
   items
@@ -39,6 +41,7 @@ export function NavMain({
     items?: {
       title: string
       url: string
+      labels?: string[]
     }[]
   }[]
 }) {
@@ -125,10 +128,30 @@ export function NavMain({
                     <DropdownMenuItem key={subItem.title} asChild>
                       <Link
                         href={subItem.url}
-                        className="hover:bg-accent flex cursor-pointer items-center gap-3 rounded-sm px-3 py-2 text-sm"
+                        className="hover:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm"
                       >
-                        <div className="bg-muted-foreground/50 h-1.5 w-1.5 rounded-full" />
-                        {subItem.title}
+                        <div className="bg-muted-foreground/50 h-1.5 w-1.5 rounded-full flex-shrink-0" />
+                        <div className="flex-1 min-w-0 truncate">{subItem.title}</div>
+                        {subItem.labels && subItem.labels.length > 0 && (
+                          <div className="flex gap-1 flex-shrink-0">
+                            {subItem.labels.slice(0, 1).map((label) => {
+                              const colors = getLabelColor(label)
+                              return (
+                                <span 
+                                  key={label}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}
+                                >
+                                  {label}
+                                </span>
+                              )
+                            })}
+                            {subItem.labels.length > 1 && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                +{subItem.labels.length - 1}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </Link>
                     </DropdownMenuItem>
                   ))}
@@ -150,17 +173,41 @@ export function NavMain({
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {item.items?.map(subItem => (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </a>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
+                    <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                      <SidebarMenuSub>
+                        {item.items?.map(subItem => (
+                          <SidebarMenuSubItem key={subItem.title}>
+                            <SidebarMenuSubButton asChild>
+                              <a href={subItem.url}>
+                                <div className="flex items-center justify-between gap-2 w-full">
+                                  <span className="truncate flex-1">{subItem.title}</span>
+                                  {subItem.labels && subItem.labels.length > 0 && (
+                                    <div className="flex gap-1 flex-shrink-0">
+                                      {subItem.labels.slice(0, 1).map((label) => {
+                                        const colors = getLabelColor(label)
+                                        return (
+                                          <span 
+                                            key={label}
+                                            className={`text-[9px] px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}
+                                          >
+                                            {label}
+                                          </span>
+                                        )
+                                      })}
+                                      {subItem.labels.length > 1 && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                          +{subItem.labels.length - 1}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </a>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </div>
                   </CollapsibleContent>
                 </div>
               </Collapsible>

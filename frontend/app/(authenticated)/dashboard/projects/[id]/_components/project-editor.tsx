@@ -30,6 +30,7 @@ import { EmailStructureBuilderV2 } from "../../../_components/email-structure-bu
 import { ImageUploadManager } from "../../../_components/image-upload-manager"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { ContentGenerator } from "../../../_components/content-generator"
+import { getLabelColor } from "../../../_components/create-project-dialog"
 
 interface ProjectEditorProps {
   initialProject: Project
@@ -114,7 +115,8 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
         brief_text: project.brief_text ?? undefined,
         structure: project.structure,
         tone: project.tone ?? undefined,
-        target_languages: project.target_languages
+        target_languages: project.target_languages,
+        labels: project.labels
       })
 
       if (result.success) {
@@ -143,6 +145,36 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
       : [...project.target_languages, langCode]
 
     updateField("target_languages", newLanguages)
+  }
+
+  const toggleLabel = async (label: string) => {
+    const currentLabels = project.labels || []
+    const newLabels = currentLabels.includes(label)
+      ? currentLabels.filter(l => l !== label)
+      : [...currentLabels, label]
+    
+    // Update local state immediately for UI feedback
+    setProject((prev) => ({ ...prev, labels: newLabels }))
+    
+    // Auto-save to backend
+    try {
+      const result = await updateProject(project.id, {
+        labels: newLabels
+      })
+
+      if (result.success) {
+        toast.success(`Label ${currentLabels.includes(label) ? "removed" : "added"}`)
+        router.refresh()
+      } else {
+        // Revert on failure
+        setProject((prev) => ({ ...prev, labels: currentLabels }))
+        toast.error("Failed to update label")
+      }
+    } catch (error) {
+      // Revert on error
+      setProject((prev) => ({ ...prev, labels: currentLabels }))
+      toast.error("Failed to update label")
+    }
   }
 
   return (
@@ -199,6 +231,52 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
                   onChange={(e) => updateField("name", e.target.value)}
                   placeholder="e.g., Spring Collection Launch"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Project Labels</Label>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {["promo", "category", "design", "october 2025", "november 2025", "december 2025"].map((label) => {
+                      const isSelected = project.labels?.includes(label) || false
+                      const colors = getLabelColor(label)
+                      return (
+                        <Badge
+                          key={label}
+                          variant={isSelected ? "default" : "outline"}
+                          className={`cursor-pointer hover:opacity-80 transition-opacity ${
+                            isSelected ? `${colors.bg} ${colors.text} ${colors.border} border` : ""
+                          }`}
+                          onClick={() => toggleLabel(label)}
+                        >
+                          {label}
+                        </Badge>
+                      )
+                    })}
+                  </div>
+                  {project.labels && project.labels.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs font-medium mb-2">Selected:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {project.labels.map((label) => {
+                          const colors = getLabelColor(label)
+                          return (
+                            <Badge 
+                              key={label} 
+                              variant="secondary"
+                              className={`${colors.bg} ${colors.text} ${colors.border} border`}
+                            >
+                              {label}
+                            </Badge>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Click to add or remove labels for easier project organization.
+                </p>
               </div>
 
               <div className="space-y-2">

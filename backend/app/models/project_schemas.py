@@ -21,6 +21,7 @@ class ProjectCreate(BaseModel):
     structure: List[StructureComponentCreate]
     tone: Optional[str] = None
     target_languages: List[str] = Field(default_factory=list)
+    labels: List[str] = Field(default_factory=list)
 
 
 class ProjectUpdate(BaseModel):
@@ -30,6 +31,7 @@ class ProjectUpdate(BaseModel):
     structure: Optional[List[StructureComponentCreate]] = None
     tone: Optional[str] = None
     target_languages: Optional[List[str]] = None
+    labels: Optional[List[str]] = None
 
 
 class ProjectResponse(BaseModel):
@@ -40,6 +42,7 @@ class ProjectResponse(BaseModel):
     structure: List[dict]
     tone: Optional[str]
     target_languages: List[str]
+    labels: List[str]
     
     # Audit fields
     created_by_user_id: Optional[str]

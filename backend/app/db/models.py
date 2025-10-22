@@ -23,6 +23,7 @@ class Project(Base):
     structure = Column(JSON, nullable=False)  # [{component: "body", count: 2}, ...]
     tone = Column(String(50))
     target_languages = Column(ARRAY(String))  # ['it', 'fr', 'de', ...]
+    labels = Column(ARRAY(String), nullable=False, default=[])  # ['promo', 'october 2025', ...]
     
     # Audit fields
     created_by_user_id = Column(String(255))

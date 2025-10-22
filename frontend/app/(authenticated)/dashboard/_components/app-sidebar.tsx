@@ -1,7 +1,9 @@
 "use client"
 
-import { FolderKanban, Settings2, User } from "lucide-react"
+import { FolderKanban, Settings2 } from "lucide-react"
 import * as React from "react"
+import { useEffect, useState } from "react"
+import { listProjects, type Project } from "@/actions/projects"
 
 import {
   Sidebar,
@@ -24,6 +26,33 @@ export function AppSidebar({
     membership: string
   }
 }) {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const result = await listProjects()
+        if (result.success && result.data) {
+          // Sort by updated_at descending (show all projects)
+          const sortedProjects = result.data
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          setProjects(sortedProjects)
+        }
+      } catch (error) {
+        console.error("Error loading projects:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProjects()
+
+    // Refresh projects every 30 seconds to catch updates
+    const interval = setInterval(loadProjects, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   const data = {
     user: userData,
     teams: [
@@ -38,7 +67,13 @@ export function AppSidebar({
         title: "Projects",
         url: "/dashboard",
         icon: FolderKanban,
-        items: []
+        items: isLoading 
+          ? [{ title: "Loading...", url: "#" }]
+          : projects.map(project => ({
+              title: project.name,
+              url: `/dashboard/projects/${project.id}`,
+              labels: project.labels || []
+            }))
       },
       {
         title: "Settings",

@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ import { Copy, MoreVertical, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { getLabelColor } from "./create-project-dialog"
 
 export function ProjectCard({ project }: { project: Project }) {
   const router = useRouter()
@@ -96,7 +98,23 @@ export function ProjectCard({ project }: { project: Project }) {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="line-clamp-1">{project.name}</CardTitle>
-              <CardDescription className="mt-1">
+              {project.labels && project.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {project.labels.map((label) => {
+                    const colors = getLabelColor(label)
+                    return (
+                      <Badge 
+                        key={label} 
+                        variant="secondary" 
+                        className={`text-xs ${colors.bg} ${colors.text} ${colors.border} border`}
+                      >
+                        {label}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+              <CardDescription className="mt-2">
                 {project.brief_text ? (
                   <span className="line-clamp-2">{project.brief_text}</span>
                 ) : (

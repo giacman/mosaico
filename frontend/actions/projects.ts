@@ -40,6 +40,7 @@ export interface Project {
   structure: Array<{ component: string; count: number }>
   tone: string | null
   target_languages: string[]
+  labels: string[]
   created_by_user_id: string | null
   created_by_user_name: string | null
   updated_by_user_id: string | null
@@ -56,6 +57,7 @@ export interface CreateProjectInput {
   structure: Array<{ component: string; count: number }>
   tone?: string
   target_languages?: string[]
+  labels?: string[]
 }
 
 export interface UpdateProjectInput {
@@ -64,6 +66,7 @@ export interface UpdateProjectInput {
   structure?: Array<{ component: string; count: number }>
   tone?: string
   target_languages?: string[]
+  labels?: string[]
 }
 
 /**

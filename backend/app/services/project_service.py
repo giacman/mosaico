@@ -61,6 +61,7 @@ class ProjectService:
             structure=structure_dict,
             tone=project_data.tone,
             target_languages=project_data.target_languages or [],
+            labels=project_data.labels or [],
             created_by_user_id=user_id,
             created_by_user_name=user_name
         )
