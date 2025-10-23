@@ -1,4 +1,3 @@
-import { CheckoutRedirect } from "@/components/payments/checkout-redirect"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ClerkProvider } from "@clerk/nextjs"
 import type { Metadata } from "next"
@@ -36,7 +35,6 @@ export default function RootLayout({
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
             <TooltipProvider>
               {children}
-              <CheckoutRedirect />
               <Toaster />
             </TooltipProvider>
           </ThemeProvider>

@@ -1,6 +1,5 @@
 "use client"
 
-import { PricingButton } from "@/components/payments/pricing-button"
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { Check, CreditCard, Zap } from "lucide-react"
@@ -169,31 +168,17 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              {tier.paymentLink ? (
-                <PricingButton
-                  paymentLink={tier.paymentLink}
-                  className={`mt-8 w-full ${
-                    tier.highlight
-                      ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                      : ""
-                  }`}
-                  variant={tier.highlight ? "default" : "outline"}
-                >
-                  Get started
-                </PricingButton>
-              ) : (
-                <Button
-                  className={`mt-8 w-full ${
-                    tier.highlight
-                      ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                      : ""
-                  }`}
-                  variant={tier.highlight ? "default" : "outline"}
-                  disabled
-                >
-                  Configure payment link
-                </Button>
-              )}
+              <Button
+                className={`mt-8 w-full ${
+                  tier.highlight
+                    ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                    : ""
+                }`}
+                variant={tier.highlight ? "default" : "outline"}
+                disabled
+              >
+                Coming Soon
+              </Button>
             </motion.div>
           ))}
         </div>
