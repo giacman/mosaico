@@ -1,9 +1,9 @@
 "use client"
 
 import { useSearchParams } from "next/navigation"
-import { Project } from "@/actions/projects"
+import { Project } from "../../../../actions/projects"
 import { ProjectCard } from "./project-card"
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardDescription } from "../../../../components/ui/card"
 import { FolderKanban } from "lucide-react"
 
 export function ProjectsGrid({ projects }: { projects: Project[] }) {

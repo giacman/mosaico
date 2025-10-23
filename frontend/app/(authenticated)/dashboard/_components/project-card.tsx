@@ -1,6 +1,6 @@
 "use client"
 
-import { deleteProject, duplicateProject, type Project } from "@/actions/projects"
+import { deleteProject, duplicateProject, type Project } from "../../../../actions/projects"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,8 +10,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+} from "../../../../components/ui/alert-dialog"
+import { Button } from "../../../../components/ui/button"
 import {
   Card,
   CardContent,
@@ -19,15 +19,15 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+} from "../../../../components/ui/card"
+import { Badge } from "../../../../components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
+} from "../../../../components/ui/dropdown-menu"
 import { formatDistanceToNow } from "date-fns"
 import { Copy, MoreVertical, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
