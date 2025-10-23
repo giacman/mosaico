@@ -3,14 +3,14 @@
 import { FolderKanban, Settings2 } from "lucide-react"
 import * as React from "react"
 import { useEffect, useState } from "react"
-import { listProjects, type Project } from "../../../../actions/projects"
+import { listProjects, type Project } from "@/actions/projects"
 
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader
-} from "../../../../components/ui/sidebar"
+} from "@/components/ui/sidebar"
 import { NavMain } from "../_components/nav-main"
 import { NavUser } from "../_components/nav-user"
 import { TeamSwitcher } from "../_components/team-switcher"
