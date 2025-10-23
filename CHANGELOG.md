@@ -18,6 +18,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Backend deployment to Google Cloud Run
 - Production database setup
 
+
+## [0.6.0] - 2025-10-23
+
+### 🚀 Backend deployed to Google Cloud Run
+- Built and deployed FastAPI backend to Cloud Run (region `europe-west1`).
+- Connected to Cloud SQL (PostgreSQL 16) via Unix socket with `cloudsql.instances` attachment.
+- Configured service account with minimal roles: Run Invoker, Storage Object Admin, Vertex AI User, Logging Writer, Cloud SQL Client.
+- Health endpoint reachable: `/health`.
+
+### 🗄️ Database
+- Provisioned Cloud SQL instance: `db-custom-1-3840` (1 vCPU, 3.75 GB), zonal, SSD 20 GB with auto-grow, backups + PITR.
+- Created DB `mosaico` and user `mosaicoapp`.
+- Tuned SQLAlchemy pool: `pool_size=5`, `max_overflow=5` for serverless autoscaling.
+- Auto-create tables on startup for MVP (`Base.metadata.create_all`).
+
+### 🗂️ Storage & AI
+- Created GCS buckets: `mosaico-prompts-474415`, `mosaico-examples-474415`, confirmed `mosaico-images-474415`.
+- Vertex AI initialized with `gemini-2.5-pro` and `gemini-2.5-flash`.
+
+### 🔧 Build & Infra
+- Resolved dependency conflicts:
+  - Aligned `httpx==0.28.1` with `clerk-backend-api==1.5.0`.
+  - Bumped `pydantic` to `2.10.3` per upstream constraints.
+- Added `backend/.dockerignore` to slim Cloud Build context.
+
+### 🔁 Frontend Integration
+- Frontend calls backend via `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_BACKEND_URL`.
+- Action required on Vercel: set `NEXT_PUBLIC_API_URL` to Cloud Run URL.
+
+### 📄 Versioning
+- Bumped backend `__version__` to `0.6.0` and updated README badge.
+
+### Notes
+- Current service URL: set in deploy logs; configure frontend env to use it.
+
 ---
 
 ## [0.5.0] - 2025-10-23

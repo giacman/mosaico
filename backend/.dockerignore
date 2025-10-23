@@ -1,0 +1,53 @@
+# VCS
+.git
+.gitignore
+
+# Python caches
+**/__pycache__/**
+**/*.pyc
+**/*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Logs & artifacts
+*.log
+.coverage
+htmlcov/
+.dist/
+build/
+
+# Tests and docs not needed at runtime
+/tests/
+**/tests/**
+/docs/
+*.md
+
+# Local configs not needed in container
+*.env
+*.example.env
+*.local
+
+# Docker / compose files not used by Cloud Build
+Dockerfile.dev
+**/docker-compose.yml
+compose*.yml
+*dev.yml
+
+# Nginx or other infra files
+nginx*.conf
+
+# Unrelated backend tree (Django)
+/backend/
+
+# Node artifacts (safety)
+node_modules/
+
+# IDE
+.vscode/
+.idea/

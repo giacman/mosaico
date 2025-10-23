@@ -9,6 +9,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
 from contextlib import asynccontextmanager
+from app.db.base import Base
+from app.db.session import engine
 
 from app import __version__
 from app.core.config import settings
@@ -41,6 +43,12 @@ async def lifespan(app: FastAPI):
     logger.info(f"GCP Project: {settings.gcp_project_id}")
     logger.info(f"Vertex AI Model: {settings.vertex_ai_model}")
     logger.info("=" * 50)
+    # Auto-create DB tables if not present (simple bootstrap for MVP)
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables ensured (create_all).")
+    except Exception as e:
+        logger.error(f"DB bootstrap failed: {e}")
     yield
     # Shutdown
     logger.info(f"Mosaico backend v{__version__} shutting down")
