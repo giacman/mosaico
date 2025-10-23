@@ -15,6 +15,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User roles & permissions
 - Approval workflow
 - Activity audit log
+- Backend deployment to Google Cloud Run
+- Production database setup
+
+---
+
+## [0.5.0] - 2025-10-23
+
+**🚀 Production Deployment Release**
+
+This release marks the first successful deployment of Mosaico to Vercel, with complete removal of unused billing infrastructure and fixes for production environment compatibility.
+
+### ✨ Added - Deployment Infrastructure
+- **Vercel Deployment**: Frontend successfully deployed and live on Vercel
+- **GitHub Auto-Deploy**: Configured webhooks for automatic deployments on push
+- **Edge Runtime Compatibility**: Simplified Clerk middleware for Vercel Edge Runtime
+- **Build Configuration**: Added `jsconfig.json` for robust path alias resolution
+- **JavaScript Config**: Converted `next.config.ts` to `next.config.js` with explicit webpack aliases
+
+### 🗑️ Removed - Billing & Payment Infrastructure
+- **Stripe Integration**: Completely removed all Stripe-related code
+  - Deleted `app/api/stripe/webhooks/route.ts` (webhook endpoint)
+  - Deleted `actions/stripe.ts` (server actions)
+  - Deleted `lib/stripe.ts` (Stripe client)
+  - Deleted `components/payments/checkout-redirect.tsx`
+  - Deleted `components/payments/pricing-button.tsx`
+- **Payment UI**: Replaced payment buttons with "Coming Soon" placeholders in pricing section
+- **Checkout Flow**: Removed checkout redirect component from root layout
+
+### 🐛 Fixed - Critical Deployment Issues
+- **Module Resolution**: Fixed `Module not found: Can't resolve '@/lib/utils'` error
+  - Root cause: `.gitignore` was ignoring `frontend/lib/` directory
+  - Solution: Modified `.gitignore` to only ignore `backend/lib/` and `backend/lib64/`
+  - Force-added `lib/utils.ts` and `lib/stripe.ts` to Git (latter removed in same release)
+- **Build Errors**: Resolved `DATABASE_URL is not set` error during static generation
+  - Removed Stripe webhook that required database connection at build time
+- **Middleware Invocation**: Fixed `MIDDLEWARE_INVOCATION_FAILED` on Vercel
+  - Simplified Clerk middleware from manual auth checks to `auth.protect()`
+  - Improved Edge Runtime compatibility
+
+### 🔧 Configuration Changes
+- **Git Ignore**: Updated `.gitignore` to be more specific about Python lib folders
+- **Path Aliases**: Added `jsconfig.json` for dual TypeScript/JavaScript path resolution
+- **Webpack Aliases**: Explicit `@` alias configuration in `next.config.js`
+- **Environment Variables**: Documented required Vercel environment variables
+  - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+  - `CLERK_SECRET_KEY` (critical for middleware)
+  - `NEXT_PUBLIC_API_URL`
+  - `NEXT_PUBLIC_BACKEND_URL`
+
+### 📊 Deployment Metrics
+- **Build Time**: ~40 seconds on Vercel
+- **Bundle Size**: 246 kB for largest route (`/dashboard/projects/[id]`)
+- **Static Pages**: 12 routes successfully generated
+- **Dynamic Pages**: 6 server-rendered routes (dashboard, projects)
+
+### 🎯 Breaking Changes
+- **No Billing**: All payment and subscription features removed
+- **Pricing Page**: Now shows "Coming Soon" instead of functional payment buttons
+- **Middleware**: Changed from custom auth logic to `auth.protect()` (cleaner, more reliable)
+
+### 📝 Documentation
+- Updated README with deployment status and Vercel webhook test
+- Documented all environment variables required for production
+- Added troubleshooting notes for common deployment issues
+
+### 🔗 Infrastructure
+- **Frontend**: Deployed on Vercel with auto-deploy from GitHub
+- **Backend**: Still local (`localhost:8080`) - production deployment planned for v0.6
+- **Database**: Still local PostgreSQL - Cloud SQL/Supabase planned for v0.6
+- **Authentication**: Clerk production instance configured and working
+
+### 🚀 What's Next (v0.6 Roadmap)
+- Deploy backend to Google Cloud Run
+- Set up production PostgreSQL database (Cloud SQL or Supabase)
+- Configure custom domain
+- Implement environment-specific configurations
+- Add production monitoring and logging
 
 ---
 
