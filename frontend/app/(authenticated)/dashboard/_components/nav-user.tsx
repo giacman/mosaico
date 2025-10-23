@@ -23,7 +23,8 @@ import {
   LogOut,
   Moon,
   Sun,
-  User
+  User,
+  Home as HomeIcon
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
@@ -94,6 +95,12 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link href="/home">
+                  <HomeIcon />
+                  Home
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/account">
                   <User />

@@ -1,23 +1,23 @@
-import { CompaniesSection } from "./_components/sections/companies-section"
-import { CTASection } from "./_components/sections/cta-section"
-import { FAQSection } from "./_components/sections/faq-section"
-import { FeaturesSection } from "./_components/sections/features-section"
-import { HeroSection } from "./_components/sections/hero-section"
-import { PricingSection } from "./_components/sections/pricing-section"
-import { SocialProofSection } from "./_components/sections/social-proof-section"
-import { VideoSection } from "./_components/sections/video-section"
+"use client"
+
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export default function MarketingPage() {
   return (
-    <main className="min-h-screen">
-      <HeroSection />
-      <CompaniesSection />
-      <VideoSection />
-      <FeaturesSection />
-      <SocialProofSection />
-      <PricingSection />
-      <FAQSection />
-      <CTASection />
+    <main className="flex min-h-screen items-center justify-center p-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-semibold tracking-tight">Mosaico</h1>
+        <p className="text-muted-foreground mt-2">Accedi o registrati per continuare</p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Button asChild>
+            <Link href="/signup">Sign up</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/login">Log in</Link>
+          </Button>
+        </div>
+      </div>
     </main>
   )
 }
