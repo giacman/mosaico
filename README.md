@@ -398,6 +398,8 @@ vercel --prod
 
 See `backend/PHASE2_SETUP.md` for detailed production deployment instructions.
 
+**Triggering a new build for Vercel.**
+
 ---
 
 ## 🤝 Contributing
