@@ -55,6 +55,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.1] - 2025-10-23
+
+### ✅ CI/CD
+- GitHub Actions: aggiunto `workflow_dispatch` per avviare manualmente il deploy su Cloud Run.
+- README: badge di stato per il job Cloud Run e note su come lanciare il workflow.
+
+### 🔧 Varie
+- Nessuna modifica funzionale al codice; release di manutenzione.
+
+---
+
 ## [0.5.0] - 2025-10-23
 
 **🚀 Production Deployment Release**

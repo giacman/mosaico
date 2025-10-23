@@ -1,11 +1,12 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com/)
+[![Cloud Run](https://img.shields.io/github/actions/workflow/status/giacman/mosaico/cloud-run-backend.yml?label=Cloud%20Run%20Deploy&logo=googlecloud&logoColor=white)](https://github.com/giacman/mosaico/actions/workflows/cloud-run-backend.yml)
 
 ---
 
@@ -399,6 +400,10 @@ vercel --prod
 See `backend/PHASE2_SETUP.md` for detailed production deployment instructions.
 
 **Triggering a new build for Vercel.**
+
+### Manual Cloud Run deploy via GitHub Actions
+- Go to GitHub → Actions → “Deploy Backend to Cloud Run” → Run workflow.
+- Or push any change under `backend/` to `main`.
 
 ---
 
