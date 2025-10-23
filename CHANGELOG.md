@@ -11,13 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - Google Sheets export functionality
-- Project templates
-- User roles & permissions
-- Approval workflow
-- Activity audit log
-- Backend deployment to Google Cloud Run
-- Production database setup
+- Airship integration
+- Jira integration
 
+
+- Activity audit log
+
+
+## [0.7.0] - 2025-10-23
+
+### Frontend - Multi-content hub (phase 1)
+- Added authenticated home `/home` with tiles (Newsletter live; others with pastel orange "Coming soon").
+- Moved dashboard to `/newsletter`; fixed tabs and links.
+- Newsletter: top-left logo now links back to `/home`.
+- Unauthenticated: minimal homepage with centered Sign up / Log in; removed template header/banner/footer.
+- Login/Signup: simplified to centered Clerk components; redirect to `/home`.
+- Middleware: explicit protected routes.
+
+### Backend
+- No changes.
+
+---
 
 ## [0.6.0] - 2025-10-23
 

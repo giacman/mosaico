@@ -64,8 +64,8 @@ export function AppSidebar({
     ],
     navMain: [
       {
-        title: "Projects",
-        url: "/dashboard",
+        title: "Newsletter",
+        url: "/newsletter",
         icon: FolderKanban,
         items: isLoading 
           ? [{ title: "Loading...", url: "#" }]
@@ -76,7 +76,7 @@ export function AppSidebar({
                   .filter(p => (p as any).status !== "approved")
                   .map(p => ({
                     title: p.name,
-                    url: `/dashboard/projects/${p.id}`,
+                    url: `/newsletter/projects/${p.id}`,
                     labels: p.labels || []
                   }))
               },
@@ -86,7 +86,7 @@ export function AppSidebar({
                   .filter(p => (p as any).status === "approved")
                   .map(p => ({
                     title: p.name,
-                    url: `/dashboard/projects/${p.id}`,
+                    url: `/newsletter/projects/${p.id}`,
                     labels: p.labels || []
                   }))
               }

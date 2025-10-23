@@ -17,7 +17,7 @@ export function StatusTabs() {
   return (
     <div className="flex items-center gap-2">
       {tabs.map(tab => (
-        <Link key={tab.key} href={`/dashboard?status=${tab.key}`}>
+        <Link key={tab.key} href={`/newsletter?status=${tab.key}`}>
           <Button variant={current === tab.key ? "default" : "outline"} size="sm">
             {tab.label}
           </Button>
