@@ -15,7 +15,6 @@ jobs:
     env:
       GAR_HOST: europe-west1-docker.pkg.dev
       IMAGE_NAME: backend
-      IMAGE_PATH: ${{ env.GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}
 
     steps:
       - name: Checkout
@@ -40,8 +39,8 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ env.IMAGE_PATH }}:${{ github.sha }}
-            ${{ env.IMAGE_PATH }}:latest
+            ${{ env.GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}:latest
           platforms: linux/amd64
 
       - name: Deploy to Cloud Run
@@ -49,8 +48,7 @@ jobs:
         with:
           service: ${{ secrets.CLOUD_RUN_SERVICE }}
           region: ${{ secrets.GCP_REGION }}
-          image: ${{ env.IMAGE_PATH }}:${{ github.sha }}
-          # Note: we do NOT pass env-vars to preserve existing service configuration
+          image: ${{ env.GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Output service URL
         run: |
