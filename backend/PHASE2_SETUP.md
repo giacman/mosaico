@@ -376,3 +376,6 @@ gcloud sql instances patch mosaico-db --tier=db-g1-small
 - Backups (auto): ~$1/month
 - **Total: $13-38/month**
 
+
+
+CI: trigger deploy 2025-10-23T18:35:06Z
