@@ -11,8 +11,6 @@ import { CreateProjectDialog } from "./_components/create-project-dialog"
 import { StatusTabs } from "./_components/status-tabs"
 import { ProjectsGrid } from "./_components/projects-grid"
 
-export const dynamic = "force-dynamic"
-
 export default async function DashboardPage() {
   const result = await listProjects()
 
