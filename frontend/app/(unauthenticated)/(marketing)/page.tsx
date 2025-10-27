@@ -8,7 +8,7 @@ export default function MarketingPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="text-center">
         <h1 className="text-3xl font-semibold tracking-tight">Mosaico</h1>
-        <p className="text-muted-foreground mt-2">Richiedi l'accesso oppure entra se hai già un account</p>
+        <p className="text-muted-foreground mt-2">Request access or log in if you already have an account</p>
         <div className="mt-6 flex items-center justify-center gap-3">
           <Button asChild>
             <Link href="#access">Request access</Link>
