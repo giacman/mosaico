@@ -9,12 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2025-10-23
+
+### Frontend
+- Add “Request access” form on unauthenticated homepage (sends to Slack via `SLACK_WEBHOOK_URL`).
+- Protect `/home` in middleware and reuse dashboard layout so user menu appears on `/home`.
+
+### Backend
+- No changes.
+
+---
 ### Planned
 - Google Sheets export functionality
 - Airship integration
 - Jira integration
-
-
 - Activity audit log
 
 
