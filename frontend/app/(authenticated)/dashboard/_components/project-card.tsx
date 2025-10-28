@@ -77,10 +77,17 @@ export function ProjectCard({ project }: { project: Project }) {
     }
   }
 
-  const componentCount = project.structure.reduce(
-    (total, item) => total + item.count,
-    0
-  )
+  const componentCount = Array.isArray(project.structure)
+    ? project.structure.reduce((total, item: any) => {
+        // New sections-based structure
+        if (Array.isArray(item?.components)) {
+          return total + item.components.length
+        }
+        // Legacy structure: { component, count }
+        const count = Number(item?.count ?? 0)
+        return total + (Number.isFinite(count) ? count : 0)
+      }, 0)
+    : 0
 
   const languageCount = project.target_languages.length
 

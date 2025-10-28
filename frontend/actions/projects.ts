@@ -37,7 +37,11 @@ export interface Project {
   id: number
   name: string
   brief_text: string | null
-  structure: Array<{ component: string; count: number }>
+  // Accept both legacy and new structure formats
+  structure: Array<
+    | { component: string; count: number }
+    | { key: string; name: string; components: string[] }
+  >
   tone: string | null
   target_languages: string[]
   labels: string[]
