@@ -13,17 +13,17 @@ class ProjectStatus(str, Enum):
     in_progress = "in_progress"
     approved = "approved"
 
-class StructureComponentCreate(BaseModel):
-    """Component in email structure"""
-    component: str = Field(..., description="Component type: subject, pre_header, title, body, cta")
-    count: int = Field(1, ge=1, le=10, description="Number of instances (for body, cta)")
-
+class SectionStructureCreate(BaseModel):
+    """A section in the email structure"""
+    key: str = Field(..., description="Unique identifier for the section (e.g., 'section_1')")
+    name: str = Field(..., description="Display name for the section (e.g., 'Hero Section')")
+    components: List[str] = Field(..., description="List of component types in this section (e.g., ['image', 'title', 'cta'])")
 
 class ProjectCreate(BaseModel):
     """Request to create a new project"""
     name: str = Field(..., min_length=1, max_length=255)
     brief_text: Optional[str] = None
-    structure: List[StructureComponentCreate]
+    structure: List[SectionStructureCreate]
     tone: Optional[str] = None
     target_languages: List[str] = Field(default_factory=list)
     labels: List[str] = Field(default_factory=list)
@@ -34,7 +34,7 @@ class ProjectUpdate(BaseModel):
     """Request to update a project"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     brief_text: Optional[str] = None
-    structure: Optional[List[StructureComponentCreate]] = None
+    structure: Optional[List[SectionStructureCreate]] = None
     tone: Optional[str] = None
     target_languages: Optional[List[str]] = None
     labels: Optional[List[str]] = None
@@ -102,6 +102,8 @@ class ComponentResponse(BaseModel):
     """Component response with translations"""
     id: int
     project_id: int
+    section_key: str
+    section_order: int
     component_type: str
     component_index: Optional[int]
     generated_content: Optional[str]

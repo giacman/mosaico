@@ -47,6 +47,9 @@ async def create_project(
         )
         
         return project
+    except HTTPException as e:
+        # Re-raise HTTP exceptions from the service layer (e.g., 409 Conflict)
+        raise e
     except Exception as e:
         logger.error(f"Error creating project: {str(e)}")
         raise HTTPException(

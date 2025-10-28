@@ -52,6 +52,14 @@ class ProjectService:
         project_data: ProjectCreate
     ) -> Project:
         """Create a new project"""
+        # Check for existing project with the same name
+        existing_project = db.query(Project).filter(Project.name == project_data.name).first()
+        if existing_project:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A project with this name already exists"
+            )
+
         # Convert structure to dict format for JSON storage
         structure_dict = [item.model_dump() for item in project_data.structure]
         
@@ -72,6 +80,11 @@ class ProjectService:
         
         db.add(project)
         db.flush()  # Get ID before logging
+
+        # Create default Subject and Pre-header components
+        subject_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="subject", component_index=0)
+        preheader_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="pre_header", component_index=1)
+        db.add_all([subject_comp, preheader_comp])
         
         # Log creation
         ProjectService._log_activity(
