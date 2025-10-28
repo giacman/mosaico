@@ -26,8 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
-import { EmailStructureBuilderV2 } from "../../../_components/email-structure-builder-v2"
-import { ImageUploadManager } from "../../../_components/image-upload-manager"
+import { SectionBuilder } from "./section-builder"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { ContentGenerator } from "../../../_components/content-generator"
 import { getLabelColor } from "../../../_components/create-project-dialog"
@@ -151,7 +150,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
     }
   }
 
-  const updateField = <K extends keyof Project>(field: K, value: Project[K]) => {
+  const updateField = <K extends keyof Project>(field: K, value: any) => {
     setProject((prev) => ({ ...prev, [field]: value }))
     setHasChanges(true)
   }
@@ -246,7 +245,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
         <div className="space-y-6">
           {(project as any).status !== "approved" && (
             <>
-          <Card>
+          <Card className="min-h-[420px]">
             <CardHeader>
               <CardTitle>Project Details</CardTitle>
               <CardDescription>
@@ -337,47 +336,29 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
                 </p>
               </div>
 
-              {/* Image Upload - Part of the Brief */}
-              <div className="space-y-2">
-                <Label>Reference Images (Optional)</Label>
-                <ImageUploadManager
-                  projectId={project.id}
-                  value={images}
-                  onChange={setImages}
-                />
-                <p className="text-xs text-muted-foreground">
-                  📸 Add images to provide visual context for AI generation
-                </p>
-              </div>
+              {/* Images moved inside Image components within the structure */}
 
-              <div className="space-y-2">
-                <Label htmlFor="tone">Tone of Voice</Label>
-                <Select
-                  value={project.tone ?? "professional"}
-                  onValueChange={(value) => updateField("tone", value)}
-                >
-                  <SelectTrigger id="tone">
-                    <SelectValue placeholder="Select tone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TONES.map((tone) => (
-                      <SelectItem key={tone.value} value={tone.value}>
-                        {tone.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Tone moved to AI Content Generation */}
             </CardContent>
           </Card>
 
-          {/* Email Structure */}
-          <EmailStructureBuilderV2
-            value={project.structure.map((s) => ({
-              component: s.component as "subject" | "pre_header" | "title" | "body" | "cta",
-              count: s.count
-            }))}
-            onChange={(structure) => updateField("structure", structure as Array<{component: string; count: number}>)}
+          {/* Email Structure (Sections) */}
+          <SectionBuilder
+            projectId={project.id}
+            value={(Array.isArray(project.structure) && (project.structure as any[])[0] && (project.structure as any[])[0].components)
+              ? (project.structure as Array<{ key: string; name: string; components: string[] }>)
+              : [{
+                  key: "main",
+                  name: "Main Section",
+                  components: (project.structure as Array<{ component: string; count: number }> | undefined)?.flatMap((it) => {
+                    const comp = (it as any).component as string
+                    const count = Number((it as any).count ?? 1) || 1
+                    if (comp === "subject" || comp === "pre_header") return []
+                    return Array.from({ length: count }, () => comp)
+                  }) || []
+                }]}
+            onChange={(newSections) => updateField("structure", newSections as unknown as Project["structure"])}
+            onImagesChange={(imgs) => setImages(imgs)}
           />
             </>
           )}
@@ -389,10 +370,11 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
             projectId={project.id}
             brief={project.brief_text ?? ""}
             tone={project.tone ?? "professional"}
-            structure={project.structure}
+            structure={project.structure as any}
             targetLanguages={project.target_languages}
             onLanguagesChange={(languages) => updateField("target_languages", languages)}
-            imageUrls={images.map((img) => img.url)}
+            onToneChange={(value) => updateField("tone", value)}
+            imageUrls={images.filter((img: any) => img && img.url).map((img: any) => img.url)}
             savedComponents={project.components || []}
             userName={user?.fullName || user?.firstName || "Unknown user"}
             readOnly={(project as any).status === "approved"}
@@ -408,7 +390,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
         originalBrief={project.brief_text ?? ""}
         contentType="newsletter"
         tone={project.tone ?? "professional"}
-        structure={project.structure}
+        structure={project.structure as any}
         onApply={(optimizedPrompt) => {
           updateField("brief_text", optimizedPrompt)
         }}

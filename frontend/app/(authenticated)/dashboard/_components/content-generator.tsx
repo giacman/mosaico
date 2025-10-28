@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { toast } from "sonner"
 import { generateContent } from "@/actions/generate"
 import { batchTranslate } from "@/actions/translate"
@@ -34,9 +35,10 @@ interface ContentGeneratorProps {
   projectId: number
   brief: string
   tone: string
-  structure: Array<{ component: string; count: number }>
+  structure: Array<{ component: string; count: number }> | Array<{ key: string; name: string; components: string[] }>
   targetLanguages: string[]
   onLanguagesChange?: (languages: string[]) => void
+  onToneChange?: (tone: string) => void
   imageUrls?: string[]
   savedComponents?: SavedComponent[]
   userName?: string
@@ -47,7 +49,10 @@ interface GeneratedComponent {
   key: string
   label: string
   content: string
+  sectionName?: string
   editing: boolean
+  imageUrl?: string
+  isImage?: boolean
 }
 
 export function ContentGenerator({
@@ -57,6 +62,7 @@ export function ContentGenerator({
   structure,
   targetLanguages,
   onLanguagesChange,
+  onToneChange,
   imageUrls = [],
   savedComponents = [],
   userName = "Unknown user",
@@ -73,50 +79,85 @@ export function ContentGenerator({
 
   // Load saved components on mount
   useEffect(() => {
-    if (savedComponents.length > 0) {
-      // Convert saved components from backend to display format
-      const loadedComponents: GeneratedComponent[] = savedComponents.map(comp => {
-        const key = comp.component_index 
-          ? `${comp.component_type}_${comp.component_index}`
-          : comp.component_type
-        
-        return {
-          key,
-          label: formatLabel(key),
-          content: comp.generated_content || "",
-          editing: false
-        }
-      })
-      
-      setComponents(loadedComponents)
-      
-      // Load translations
-      const loadedTranslations: Record<string, Record<string, string>> = {}
-      savedComponents.forEach(comp => {
-        const key = comp.component_index 
-          ? `${comp.component_type}_${comp.component_index}`
-          : comp.component_type
-        
-        if (comp.translations.length > 0) {
-          loadedTranslations[key] = {}
-          comp.translations.forEach(trans => {
-            loadedTranslations[key][trans.language_code] = trans.translated_content
-          })
-        }
-      })
-      
-      if (Object.keys(loadedTranslations).length > 0) {
-        setTranslations(loadedTranslations)
+    if (savedComponents.length === 0) return
+    
+    // Map saved components by type and index
+    const textQueues: Record<string, string[]> = { title: [], body: [], cta: [] }
+    let subjectText = ""
+    let preHeaderText = ""
+    const translationsMap: Record<string, Record<string, string>> = {}
+
+    savedComponents.forEach((comp) => {
+      const type = comp.component_type
+      const idx = comp.component_index || 1
+      const key = comp.component_index ? `${type}_${comp.component_index}` : type
+      if (comp.translations && comp.translations.length > 0) {
+        translationsMap[key] = {}
+        comp.translations.forEach((t) => {
+          translationsMap[key][t.language_code] = t.translated_content
+        })
       }
+      if (type === "subject") subjectText = comp.generated_content || ""
+      else if (type === "pre_header") preHeaderText = comp.generated_content || ""
+      else if (type === "title" || type === "body" || type === "cta") {
+        // Ensure order by index
+        const arr = textQueues[type] || []
+        arr[idx - 1] = comp.generated_content || ""
+        textQueues[type] = arr
+      }
+    })
+
+    // Build ordered output; if sections present, follow sections and inject images
+    const isSections = Array.isArray(structure) && (structure as any[])[0] && (structure as any[])[0].components
+    const ordered: GeneratedComponent[] = []
+    if (subjectText) ordered.push({ key: "subject", label: "Subject", content: subjectText, sectionName: "Header", editing: false })
+    if (preHeaderText) ordered.push({ key: "pre_header", label: "Pre Header", content: preHeaderText, sectionName: "Header", editing: false })
+
+    if (isSections) {
+      const sections = structure as Array<{ key: string; name: string; components: string[] }>
+      const queues = {
+        title: [...textQueues.title],
+        body: [...textQueues.body],
+        cta: [...textQueues.cta],
+      }
+      const imageQueue = Array.isArray(imageUrls) ? [...imageUrls] : []
+      let counters: Record<string, number> = { title: 1, body: 1, cta: 1 }
+      let imageCounter = 1
+      sections.forEach((sec, sIdx) => {
+        const secName = sec.name || `Section ${sIdx + 1}`
+        ;(sec.components || []).forEach((type) => {
+          if (type === "image") {
+            const nextImg = imageQueue.shift()
+            if (nextImg) ordered.push({ key: `image_${imageCounter++}`, label: "Image", content: "", sectionName: secName, editing: false, isImage: true, imageUrl: nextImg })
+            return
+          }
+          if (type !== "title" && type !== "body" && type !== "cta") return
+          const text = (queues as any)[type]?.shift() || ""
+          const idx = counters[type]++
+          const key = idx === 1 ? type : `${type}_${idx}`
+          ordered.push({ key, label: formatLabel(type), content: type === "cta" ? (text || "").toUpperCase() : text, sectionName: secName, editing: false })
+        })
+      })
+    } else {
+      // Fallback flat
+      Object.entries(textQueues).forEach(([type, arr]) => {
+        arr.forEach((t, i) => {
+          const key = i === 0 ? type : `${type}_${i + 1}`
+          ordered.push({ key, label: formatLabel(type), content: type === "cta" ? (t || "").toUpperCase() : t, editing: false })
+        })
+      })
     }
-  }, [savedComponents])
+
+    setComponents(ordered)
+    if (Object.keys(translationsMap).length > 0) setTranslations(translationsMap)
+  }, [savedComponents, structure, imageUrls])
 
   // Helper function to save components to database with visual feedback
   const saveComponentsToDatabase = async (componentsToSave: GeneratedComponent[], translationsToSave: Record<string, Record<string, string>>) => {
     setIsSaving(true)
     try {
-      // Convert to backend format
-      const savedComponents = componentsToSave.map(comp => {
+      // Convert to backend format (skip images)
+      const savedComponents = componentsToSave.filter(c => !c.isImage).map(comp => {
         // Extract component type and index from key (e.g., "body_1" -> type: "body", index: 1)
         const match = comp.key.match(/^(.+?)_(\d+)$/)
         const componentType = match ? match[1] : comp.key
@@ -159,7 +200,30 @@ export function ContentGenerator({
       return
     }
 
-    if (structure.length === 0) {
+    // Normalize structure: accept sections-based structure or legacy
+    const isSections = Array.isArray(structure) && (structure as any[])[0] && (structure as any[])[0].components
+    const legacyStructure: Array<{ component: "subject" | "pre_header" | "title" | "body" | "cta"; count: number }> = (() => {
+      if (!isSections) {
+        return structure as Array<{ component: "subject" | "pre_header" | "title" | "body" | "cta"; count: number }>
+      }
+      const sections = structure as Array<{ key: string; name: string; components: string[] }>
+      const counts: Record<string, number> = { title: 0, body: 0, cta: 0 }
+      for (const sec of sections) {
+        for (const c of sec.components || []) {
+          if (c === "title" || c === "body" || c === "cta") counts[c] = (counts[c] || 0) + 1
+        }
+      }
+      const result: Array<{ component: any; count: number }> = [
+        { component: "subject", count: 1 },
+        { component: "pre_header", count: 1 },
+      ]
+      if (counts.title > 0) result.push({ component: "title", count: counts.title })
+      if (counts.body > 0) result.push({ component: "body", count: counts.body })
+      if (counts.cta > 0) result.push({ component: "cta", count: counts.cta })
+      return result as Array<{ component: "subject" | "pre_header" | "title" | "body" | "cta"; count: number }>
+    })()
+
+    if (legacyStructure.length === 0) {
       toast.error("Please select at least one email component")
       return
     }
@@ -167,8 +231,8 @@ export function ContentGenerator({
     setIsGenerating(true)
     try {
       // Determine if structure contains Body (narratives need Pro quality)
-      const hasBody = structure.some(s => s.component === 'body')
-      const totalComponents = structure.reduce((sum, s) => sum + s.count, 0)
+      const hasBody = legacyStructure.some(s => s.component === 'body')
+      const totalComponents = legacyStructure.reduce((sum, s) => sum + s.count, 0)
       const hasImage = imageUrls.length > 0
       const isComplexStructure = totalComponents >= 5 // 5+ components = complex
       
@@ -181,15 +245,15 @@ export function ContentGenerator({
           totalComponents,
           hasImage,
           hasBody,
-          structure: structure.map(s => `${s.component}(${s.count})`)
+          structure: legacyStructure.map(s => `${s.component}(${s.count})`)
         })
         toast.info("⚡ Using Flash model for fast generation")
       } else if (hasImage && isComplexStructure && hasBody) {
-        console.log("🎯 Using Pro model: Complex structure with body requires narrative quality", {
+          console.log("🎯 Using Pro model: Complex structure with body requires narrative quality", {
           totalComponents,
           hasImage,
           hasBody,
-          structure: structure.map(s => `${s.component}(${s.count})`)
+            structure: (legacyStructure as any[]).map((s: any) => `${s.component}(${s.count})`)
         })
       }
       
@@ -198,7 +262,7 @@ export function ContentGenerator({
         count: 1, // Generate 1 variation
         tone: tone,
         content_type: "newsletter",
-        structure: structure,
+        structure: legacyStructure,
         image_url: imageUrls[0], // Use first image if available
         temperature: temperature,
         use_flash: shouldUseFlash // Use Flash for complex generation with images
@@ -218,7 +282,7 @@ export function ContentGenerator({
             count: 1,
             tone: tone,
             content_type: "newsletter",
-            structure: structure,
+            structure: legacyStructure,
             image_url: imageUrls[0],
             temperature: temperature,
             use_flash: true // Force Flash on retry
@@ -231,32 +295,109 @@ export function ContentGenerator({
       }
 
       if (result.success && result.data) {
-        // Convert first (and only) variation to components
+        // Convert first (and only) variation to components, preserving section order if available
         const firstVariation = result.data.variations[0]
-        const generatedComponents: GeneratedComponent[] = Object.entries(firstVariation).map(
-          ([key, content]) => {
-            // Normalize CTAs to UPPERCASE for brand consistency
-            const isCTA = key.toLowerCase().includes('cta')
-            return {
-              key,
-              label: formatLabel(key),
-              content: isCTA ? (content as string).toUpperCase() : (content as string),
-              editing: false
-            }
+
+        const orderedComponents: GeneratedComponent[] = []
+
+        const pushComp = (key: string, label: string, content: string, sectionName?: string) => {
+          const isCTAKey = key.toLowerCase().startsWith("cta")
+          orderedComponents.push({
+            key,
+            label,
+            content: isCTAKey ? content.toUpperCase() : content,
+            sectionName,
+            editing: false
+          })
+        }
+
+        // Always show header first if present
+        if (typeof firstVariation.subject === "string") {
+          pushComp("subject", "Subject", firstVariation.subject, "Header")
+        }
+        if (typeof firstVariation.pre_header === "string") {
+          pushComp("pre_header", "Pre Header", firstVariation.pre_header, "Header")
+        }
+
+        // If structure prop is sections, map by section order with robust key matching; otherwise, default flat
+        const isSections = Array.isArray(structure) && (structure as any[])[0] && (structure as any[])[0].components
+        if (isSections) {
+          const sections = structure as Array<{ key: string; name: string; components: string[] }>
+
+          // Build pools of available generated contents per type (title/body/cta)
+          const buildPool = (type: string): string[] => {
+            const pairs = Object.entries(firstVariation)
+              .filter(([k]) => k === type || k.startsWith(`${type}_`))
+              .map(([k, v]) => {
+                const m = k.match(new RegExp(`^${type}(?:_(\\d+))?$`))
+                const idx = m && m[1] ? parseInt(m[1]) : 1
+                return { idx, key: k, content: String(v || "") }
+              })
+              .sort((a, b) => a.idx - b.idx)
+              .map((p) => p.content)
+              .filter((c) => c.trim().length > 0)
+            return pairs
           }
-        )
+
+          const pool: Record<string, string[]> = {
+            title: buildPool("title"),
+            body: buildPool("body"),
+            cta: buildPool("cta"),
+          }
+
+          // Queue of images coming from UI uploads
+          const imageQueue = Array.isArray(imageUrls) ? [...imageUrls] : []
+          let imageCounter = 1
+
+          sections.forEach((sec, secIdx) => {
+            const secName = sec.name || `Section ${secIdx + 1}`
+            ;(sec.components || []).forEach((type) => {
+              if (type === "image") {
+                const nextImg = imageQueue.shift()
+                if (nextImg) {
+                  orderedComponents.push({
+                    key: `image_${imageCounter++}`,
+                    label: "Image",
+                    content: "",
+                    sectionName: secName,
+                    editing: false,
+                    imageUrl: nextImg,
+                    isImage: true,
+                  })
+                }
+                return
+              }
+              if (type !== "title" && type !== "body" && type !== "cta") return
+              const content = (pool[type] && pool[type].length > 0) ? pool[type].shift()! : ""
+              if (content && content.trim().length > 0) {
+                // Derive a stable display key based on remaining count used
+                const usedIndex = (buildPool(type).length - (pool[type]?.length || 0))
+                const key = usedIndex <= 1 ? type : `${type}_${usedIndex}`
+                pushComp(key, `${formatLabel(type)}`, content, secName)
+              }
+            })
+          })
+        } else {
+          // Fallback: flat order by keys (skip empties)
+          Object.entries(firstVariation).forEach(([key, content]) => {
+            const text = String(content || "")
+            if (text.trim().length > 0) {
+              pushComp(key, formatLabel(key), text)
+            }
+          })
+        }
         
-        setComponents(generatedComponents)
+        setComponents(orderedComponents)
         toast.success("Content generated successfully!")
         
         // Auto-save to database
-        await saveComponentsToDatabase(generatedComponents, {})
+        await saveComponentsToDatabase(orderedComponents, {})
         
         // Add persistent notification for team handoff
         addNotification({
           type: "success",
           title: "Content Generated",
-          message: `AI has generated ${generatedComponents.length} components by ${userName}. Content team can now review for quality.`
+          message: `AI has generated ${orderedComponents.length} components by ${userName}. Content team can now review for quality.`
         })
       } else {
         const errorMsg = result.error || "Failed to generate content"
@@ -647,7 +788,8 @@ This is attempt #${iteration} - be creative and original!`
   }
 
   return (
-    <Card>
+    <>
+    <Card className="min-h-[420px]">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -683,6 +825,23 @@ This is attempt #${iteration} - be creative and original!`
           <p className="text-xs text-muted-foreground">
             Lower = more consistent, Higher = more creative
           </p>
+        </div>
+
+        {/* Tone of Voice */}
+        <div className="space-y-2">
+          <Label htmlFor="tone">Tone of Voice</Label>
+          <Select value={tone} onValueChange={(v) => onToneChange && onToneChange(v)}>
+            <SelectTrigger id="tone">
+              <SelectValue placeholder="Select tone" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="professional">Professional</SelectItem>
+              <SelectItem value="casual">Casual</SelectItem>
+              <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
+              <SelectItem value="elegant">Elegant</SelectItem>
+              <SelectItem value="direct">Direct</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Generate/Regenerate Button */}
@@ -771,26 +930,38 @@ This is attempt #${iteration} - be creative and original!`
           </div>
         )}
 
-        {/* Generated Components */}
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Email Structure Output</CardTitle>
+        <CardDescription>Preview of generated text and images</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* Generated Components (email-like mockup) */}
         {components.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Generated Content</h3>
+              <h3 className="text-base font-semibold">Rendered Components</h3>
               <Badge variant="secondary">{components.length} components</Badge>
             </div>
 
             {components.map((component, index) => (
               <div
                 key={component.key}
-                className="rounded-lg border bg-card p-4 space-y-2"
+                className="rounded-xl border bg-card p-5 space-y-3 shadow-sm"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{component.label}</Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {component.content.length} chars
-                    </span>
+                    <Badge variant="outline" className="text-xs px-2 py-0.5">{component.label}</Badge>
+                    {!component.isImage && (
+                      <span className="text-xs text-muted-foreground">
+                        {component.content.length} chars
+                      </span>
+                    )}
                   </div>
+                  {!component.isImage && (
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
@@ -831,15 +1002,16 @@ This is attempt #${iteration} - be creative and original!`
                       <FileCode className="h-3.5 w-3.5" />
                     </Button>
                   </div>
+                  )}
                 </div>
 
                 {component.editing ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <Textarea
                       value={component.content}
                       onChange={(e) => updateContent(index, e.target.value)}
-                      rows={4}
-                      className="font-mono text-sm"
+                      rows={8}
+                      className="font-mono text-base"
                       disabled={readOnly}
                     />
                     <div className="flex gap-2">
@@ -871,13 +1043,19 @@ This is attempt #${iteration} - be creative and original!`
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm whitespace-pre-wrap">
-                    {component.content}
-                  </p>
+                  component.isImage && component.imageUrl ? (
+                    <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border">
+                      <img src={component.imageUrl} alt={component.label} className="h-full w-full object-cover" />
+                    </div>
+                  ) : (
+                    <p className="text-base leading-7 whitespace-pre-wrap">
+                      {component.content}
+                    </p>
+                  )
                 )}
 
                 {/* Translations */}
-                {translations[component.key] &&
+                {!component.isImage && translations[component.key] &&
                   Object.keys(translations[component.key]).length > 0 && (
                     <div className="mt-4 space-y-3 pt-4 border-t">
                       <div className="flex items-center gap-2">
@@ -932,6 +1110,7 @@ This is attempt #${iteration} - be creative and original!`
         )}
       </CardContent>
     </Card>
+    </>
   )
 }
 
