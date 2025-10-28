@@ -2,7 +2,7 @@
 Pydantic schemas for Project-related API endpoints
 """
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from enum import Enum
 from typing import List, Optional
 
@@ -19,6 +19,12 @@ class SectionStructureCreate(BaseModel):
     name: str = Field(..., description="Display name for the section (e.g., 'Hero Section')")
     components: List[str] = Field(..., description="List of component types in this section (e.g., ['image', 'title', 'cta'])")
 
+
+class LegacyStructureComponentCreate(BaseModel):
+    """Legacy structure item: { component: str, count: int }"""
+    component: str
+    count: int = Field(1, ge=1, le=10)
+
 class ProjectCreate(BaseModel):
     """Request to create a new project"""
     name: str = Field(..., min_length=1, max_length=255)
@@ -28,6 +34,31 @@ class ProjectCreate(BaseModel):
     target_languages: List[str] = Field(default_factory=list)
     labels: List[str] = Field(default_factory=list)
     status: ProjectStatus = ProjectStatus.in_progress
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_structure(cls, data: dict):
+        # Accept old format: [{"component": "body", "count": 2}, ...]
+        if not isinstance(data, dict) or "structure" not in data:
+            return data
+        items = data["structure"]
+        if isinstance(items, list) and items and isinstance(items[0], dict) and "component" in items[0]:
+            components: List[str] = []
+            for item in items:
+                comp = item.get("component")
+                count = int(item.get("count", 1) or 1)
+                # Subject and pre_header are auto-created in service; ignore if present
+                if comp in ("subject", "pre_header"):
+                    continue
+                components.extend([comp] * max(1, count))
+            if not components:
+                components = ["title", "body", "cta"]
+            data["structure"] = [{
+                "key": "main",
+                "name": "Main Section",
+                "components": components
+            }]
+        return data
 
 
 class ProjectUpdate(BaseModel):
@@ -39,6 +70,29 @@ class ProjectUpdate(BaseModel):
     target_languages: Optional[List[str]] = None
     labels: Optional[List[str]] = None
     status: Optional[ProjectStatus] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_structure(cls, data: dict):
+        if not isinstance(data, dict) or "structure" not in data or data["structure"] is None:
+            return data
+        items = data["structure"]
+        if isinstance(items, list) and items and isinstance(items[0], dict) and "component" in items[0]:
+            components: List[str] = []
+            for item in items:
+                comp = item.get("component")
+                count = int(item.get("count", 1) or 1)
+                if comp in ("subject", "pre_header"):
+                    continue
+                components.extend([comp] * max(1, count))
+            if not components:
+                components = ["title", "body", "cta"]
+            data["structure"] = [{
+                "key": "main",
+                "name": "Main Section",
+                "components": components
+            }]
+        return data
 
 
 class ProjectResponse(BaseModel):
