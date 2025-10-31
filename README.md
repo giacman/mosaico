@@ -68,71 +68,90 @@ Export to Airship (Handlebar Templates)
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Local Setup Guide
+
+Follow these steps to set up and run Mosaico on your local machine.
 
 ### Prerequisites
 
-- **Python 3.11+**
-- **Node.js 18+** and npm
-- **PostgreSQL 14+**
-- **Google Cloud Project** with Vertex AI enabled
-- **Clerk Account** for authentication
+- **Python 3.11+**: [Install Python](https://www.python.org/downloads/)
+- **Node.js 18+**: [Install Node.js](https://nodejs.org/)
+- **PostgreSQL 14+**: We recommend using [Postgres.app](https://postgresapp.com/) on macOS.
+- **Google Cloud Project**: With Vertex AI enabled.
+- **Clerk Account**: For user authentication.
 
 ### 1. Backend Setup
 
+First, set up the Python backend server.
+
 ```bash
-# Navigate to backend
+# 1. Navigate to the backend directory
 cd backend
 
-# Create virtual environment
-python -m venv venv
+# 2. Create a virtual environment using Python 3.11
+#    Replace 'python3.11' with the command for your Python 3.11 installation
+python3.11 -m venv venv
+
+# 3. Activate the virtual environment
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# 4. Install dependencies
+#    This will fail if you are not using Python 3.11+
 pip install -r requirements.txt
 
-# Copy environment template
+# 5. Set up environment variables
 cp env.example .env
 
-# Edit .env with your credentials:
-# - GCP_PROJECT_ID
-# - DATABASE_URL
-# - CLERK_SECRET_KEY
-# - GCS_BUCKET_IMAGES
-# - GOOGLE_APPLICATION_CREDENTIALS (path to service account JSON)
-# - SLACK_WEBHOOK_URL (optional)
+# 6. Edit the .env file with your credentials:
+#    - GCP_PROJECT_ID
+#    - DATABASE_URL (e.g., postgresql://user:password@localhost:5432/mosaico)
+#    - CLERK_SECRET_KEY
+#    - GCS_BUCKET_IMAGES
+#    - GOOGLE_APPLICATION_CREDENTIALS (path to your service account JSON)
+#    - SLACK_WEBHOOK_URL (optional)
 
-# Run database migrations
-alembic upgrade head
+# 7. Create the PostgreSQL Database
+#    Ensure your PostgreSQL server is running before this step.
+createdb mosaico
 
-# Start backend server
-python -m uvicorn app.main:app --reload --port 8080
+# 8. Run database migrations
+#    We use the full path to the executable to avoid shell PATH issues.
+`pwd`/venv/bin/alembic upgrade head
+
+# 9. Start the backend server
+`pwd`/venv/bin/uvicorn app.main:app --reload --port 8080
 ```
 
-Backend will be available at: `http://localhost:8080`
+The backend will be available at `http://localhost:8080`.
+
+### A Note on Virtual Environments
+
+If you use `conda` or have multiple Python versions installed, your shell's `PATH` might not always prioritize the active virtual environment's executables. Using the full path like `` `pwd`/venv/bin/pip `` or `` `pwd`/venv/bin/alembic `` is a foolproof way to ensure you are always using the correct tools from your `venv`.
 
 ### 2. Frontend Setup
 
+Next, set up the Next.js frontend application.
+
 ```bash
-# Navigate to frontend
+# 1. Navigate to the frontend directory
 cd frontend
 
-# Install dependencies
+# 2. Install dependencies
 npm install
 
-# Copy environment template
+# 3. Set up environment variables
 cp .env.example .env.local
 
-# Edit .env.local with your credentials:
-# - NEXT_PUBLIC_API_URL=http://localhost:8080
-# - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-# - CLERK_SECRET_KEY
+# 4. Edit .env.local with your credentials:
+#    - NEXT_PUBLIC_API_URL=http://localhost:8080
+#    - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+#    - CLERK_SECRET_KEY
 
-# Start frontend dev server
+# 5. Start the frontend development server
 npm run dev
 ```
 
-Frontend will be available at: `http://localhost:3000`
+The frontend will be available at `http://localhost:3000`.
 
 ---
 
