@@ -120,13 +120,41 @@ createdb mosaico
 
 # 9. Start the backend server
 `pwd`/venv/bin/uvicorn app.main:app --reload --port 8080
+or 
+python -m app.main
 ```
 
 The backend will be available at `http://localhost:8080`.
 
-### A Note on Virtual Environments
+#### Google Cloud credentials
 
-If you use `conda` or have multiple Python versions installed, your shell's `PATH` might not always prioritize the active virtual environment's executables. Using the full path like `` `pwd`/venv/bin/pip `` or `` `pwd`/venv/bin/alembic `` is a foolproof way to ensure you are always using the correct tools from your `venv`.
+Mosaico calls Vertex AI from your backend. You must provide Google Cloud credentials locally in ONE of the following ways.
+
+- Option A — gcloud Application Default Credentials (recommended for local)
+  ```bash
+  # Install gcloud first: https://cloud.google.com/sdk/docs/install
+  gcloud auth application-default login
+  gcloud config set project <YOUR_PROJECT_ID>   # e.g. mosaico-474415
+
+  # Verify ADC are available
+  gcloud auth application-default print-access-token >/dev/null && echo OK
+  ```
+  Notes:
+  - No code/config changes are needed. The backend will automatically pick up ADC.
+  - Ensure `.env` contains `GCP_PROJECT_ID=<YOUR_PROJECT_ID>`.
+
+- Option B — Service Account JSON (works without gcloud)
+  1) In Google Cloud, create/download a service account key JSON.
+  2) Grant roles (minimum):
+     - Vertex AI User (`roles/aiplatform.user`)
+     - Storage Object Viewer (`roles/storage.objectViewer`) — for image reads
+  3) Save the key locally, e.g. `~/secrets/mosaico-sa.json`.
+  4) Point the backend to it:
+     ```bash
+     export GOOGLE_APPLICATION_CREDENTIALS=$HOME/secrets/mosaico-sa.json
+     # or set it in backend/.env (GOOGLE_APPLICATION_CREDENTIALS=/abs/path.json)
+     ```
+  5) Restart the backend.
 
 ### 2. Frontend Setup
 

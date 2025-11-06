@@ -20,6 +20,10 @@ import { uploadImage } from "@/actions/upload"
 import imageCompression from "browser-image-compression"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { RefreshCw, Edit2, Copy, FileCode, Check } from "lucide-react"
+import { Loader2 } from "lucide-react"
+import { generateContent } from "@/actions/generate"
+import { generateHandlebar } from "@/actions/export"
 
 type Section = {
   key: string
@@ -39,11 +43,21 @@ export function SectionBuilder({
   onChange,
   projectId,
   onImagesChange,
+  components,
+  brief,
+  tone,
+  onUpdateComponent,
+  currentLanguage = "en",
 }: {
   value: Section[]
   onChange: (next: Section[]) => void
   projectId: number
   onImagesChange?: (images: UploadedImage[]) => void
+  components?: Array<{ component_type: string; component_index?: number; generated_content: string; translations?: Record<string,string> }>
+  brief?: string
+  tone?: string
+  onUpdateComponent?: (type: string, index: number, content: string) => void
+  currentLanguage?: string
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -270,7 +284,64 @@ export function SectionBuilder({
     })
   }
 
-  const renderPreview = (type: string) => {
+  const renderTextWithLinks = (value: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = value.split(urlRegex)
+    return parts.map((part, i) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={`lnk-${i}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline hover:underline break-all"
+          >
+            {part}
+          </a>
+        )
+      }
+      return <span key={`txt-${i}`}>{part}</span>
+    })
+  }
+
+  const renderPreview = (type: string, displayIndex: number) => {
+    // Try to resolve generated or translated content for this component type/index
+    const idx = displayIndex <= 0 ? 1 : displayIndex
+    const found = components?.find(
+      (c) => c.component_type === type && (c.component_index || 1) === idx
+    )
+
+    const text = (() => {
+      if (!found) return ""
+      if (currentLanguage && currentLanguage !== "en") {
+        const t = found.translations?.[currentLanguage]
+        if (t && t.trim()) return t
+      }
+      return found.generated_content || ""
+    })()
+
+    if (text.trim()) {
+      if (type === "cta") {
+        return (
+          <div className="inline-flex rounded-md bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold shadow-sm">
+            {text.toUpperCase()}
+          </div>
+        )
+      }
+      return (
+        <p className="text-sm leading-6 whitespace-pre-wrap break-words">
+          {renderTextWithLinks(text)}
+        </p>
+      )
+    }
+
+    // Fallback placeholder skeletons
+    if (type === "subject" || type === "pre_header") {
+      return (
+        <div className="h-3.5 w-2/3 rounded bg-muted-foreground/20" />
+      )
+    }
     if (type === "title") {
       return (
         <div className="space-y-2">
@@ -289,7 +360,7 @@ export function SectionBuilder({
     }
     if (type === "cta") {
       return (
-        <div className="inline-flex rounded-md border bg-accent/40 px-3 py-1 text-[11px]">
+        <div className="inline-flex rounded-md bg-primary text-primary-foreground px-4 py-2 text-[11px] font-semibold shadow-sm">
           CTA Button
         </div>
       )
@@ -297,20 +368,140 @@ export function SectionBuilder({
     return null
   }
 
+  const [editing, setEditing] = useState<Record<string, boolean>>({})
+  const [editValues, setEditValues] = useState<Record<string, string>>({})
+  const [regenBusy, setRegenBusy] = useState<Record<string, boolean>>({})
+
+  const handleCopy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text) } catch {}
+  }
+
+  const handleCopyHandlebar = async (key: string, text: string) => {
+    try {
+      const res = await generateHandlebar({ component_key: key, translations: {}, english_fallback: text })
+      if (res.success && res.data?.handlebar_template) {
+        await navigator.clipboard.writeText(res.data.handlebar_template)
+      }
+    } catch {}
+  }
+
   return (
-    <Card>
+    <Card className="mx-auto max-w-[840px] bg-white shadow-xl ring-1 ring-black/5">
       <CardHeader>
         <CardTitle>Email Structure Input</CardTitle>
         <CardDescription>Arrange sections and components. Mock preview mirrors the output style.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-6 sm:px-8 md:px-10 py-8">
 
       {/* Fixed header components (visual only) */}
       <div className="mb-4 rounded-md border p-3 bg-muted/30">
         <div className="text-xs font-medium text-muted-foreground">Header (always included)</div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="text-xs px-2 py-0.5">Subject</Badge>
-          <Badge variant="outline" className="text-xs px-2 py-0.5">Pre-header</Badge>
+        <div className="mt-3 space-y-3">
+          {(() => {
+            const headerItems: Array<{ label: string; type: "subject" | "pre_header" }> = [
+              { label: "Subject", type: "subject" },
+              { label: "Pre-header", type: "pre_header" },
+            ]
+            return headerItems.map(({ label, type }) => {
+              const displayIndex = 1
+              const found = components?.find(
+                (c) => c.component_type === type && (c.component_index || 1) === 1
+              )
+              const currentText = found?.generated_content || ""
+              const compKey = `header:${type}:${displayIndex}`
+              const isEditing = !!editing[compKey]
+              const editText = editValues[compKey] ?? currentText
+              return (
+                <div key={type} className="rounded-xl border bg-card p-4 space-y-2 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs px-2 py-0.5">{label}</Badge>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                        disabled={!!regenBusy[compKey] || !brief}
+                        onClick={async () => {
+                          if (!brief) return
+                          setRegenBusy(v => ({ ...v, [compKey]: true }))
+                          try {
+                            const result = await generateContent({
+                              text: brief!,
+                              count: 1,
+                              tone: tone || "professional",
+                              content_type: "newsletter",
+                              structure: [{ component: type as any, count: 1 }],
+                              temperature: 0.7,
+                            })
+                            if (result.success && result.data) {
+                              const val = String(result.data.variations[0][type] || "")
+                              if (val) onUpdateComponent && onUpdateComponent(type, 1, val)
+                            }
+                          } finally {
+                            setRegenBusy(v => ({ ...v, [compKey]: false }))
+                          }
+                        }}
+                      >
+                        {regenBusy[compKey] ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        Regenerate
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                        onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
+                      >
+                        <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                        onClick={() => handleCopy(currentText)}
+                        disabled={!currentText}
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                        onClick={() => handleCopyHandlebar(type, currentText)}
+                        disabled={!currentText}
+                      >
+                        <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
+                      </button>
+                    </div>
+                  </div>
+
+                  {isEditing ? (
+                    <>
+                      <textarea
+                        className="w-full rounded-md border bg-background p-2 text-sm"
+                        rows={4}
+                        value={editText}
+                        onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
+                        onClick={() => {
+                          setEditing(v => ({ ...v, [compKey]: false }))
+                          onUpdateComponent && onUpdateComponent(type, 1, editText)
+                        }}
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1" /> Save
+                      </button>
+                    </>
+                  ) : (
+                    <div>{renderPreview(type, 1)}</div>
+                  )}
+                </div>
+              )
+            })
+          })()}
         </div>
       </div>
 
@@ -318,144 +509,236 @@ export function SectionBuilder({
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSectionsDragEnd}>
         <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
-            {ensureKeys(value).map((section, idx) => (
-              <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`}>
-                <div className="flex items-center gap-2">
-                  <input
-                    value={section.name}
-                    onChange={(e) => renameSection(idx, e.target.value)}
-                    placeholder={`Section ${idx + 1} name`}
-                    className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-                  />
-                  <button
-                    type="button"
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                    onClick={() => removeSection(idx)}
-                    aria-label="Remove section"
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                {/* Components DnD within section (no cross-section moves) */}
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={({ active, over }) => {
-                    if (!active?.id || !over?.id) return
-                    const prefix = `comp:${section.key}::`
-                    const aId = String(active.id)
-                    const oId = String(over.id)
-                    if (!aId.startsWith(prefix) || !oId.startsWith(prefix)) return
-                    const comps = section.components
-                    const ids = comps.map((_, i) => `${prefix}${i}`)
-                    const from = ids.indexOf(aId)
-                    const to = ids.indexOf(oId)
-                    if (from === -1 || to === -1 || from === to) return
-                    const reordered = arrayMove(comps, from, to)
-                    const next = value.slice()
-                    next[idx] = { ...section, components: reordered }
-                    // Reorder images slots accordingly
-                    setImagesBySection((prev) => {
-                      const arr = (prev[section.key] || []).slice()
-                      const re = arrayMove(arr, from, to)
-                      return { ...prev, [section.key]: re }
-                    })
-                    onChange(ensureKeys(next))
-                  }}
-                >
-                  <SortableContext
-                    items={section.components.map((_, i) => `comp:${section.key}::${i}`)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="mt-3 flex flex-col gap-2">
-                      {section.components.length === 0 && (
-                        <span className="text-xs text-muted-foreground">No components yet</span>
-                      )}
-                      {section.components.map((c, compIdx) => {
-                        const imgs = (imagesBySection[section.key]?.[compIdx]) || []
-                        return (
-                          <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`}>
-                            {({ attributes, listeners }) => (
-                            <div className="rounded-xl border bg-card p-5 space-y-3 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs px-2 py-0.5">{c === 'pre_header' ? 'Pre Header' : c.charAt(0).toUpperCase() + c.slice(1)}</Badge>
-                                  <span
-                                    {...attributes}
-                                    {...listeners}
-                                    className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground text-xs"
-                                  >
-                                    ⋮⋮ Drag
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  className="rounded border px-2 py-0.5 text-xs hover:bg-accent"
-                                  onClick={() => removeComponentAt(idx, compIdx)}
-                                  aria-label="Remove component"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-
-                              {c === "image" ? (
-                                imgs.length > 0 ? (
-                                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border">
-                                    <img src={imgs[0].url} alt={imgs[0].filename} className="h-full w-full object-cover" />
-                                    <button
-                                      type="button"
-                                      className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white"
-                                      onClick={() => removeImageFromComponent(section.key, compIdx, imgs[0].id)}
-                                      aria-label="Remove image"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <label className="flex h-24 items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground cursor-pointer">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      multiple
-                                      className="sr-only"
-                                      onChange={(e) => {
-                                        const files = e.target.files ? Array.from(e.target.files) : []
-                                        if (files.length) handleUploadToComponent(section.key, compIdx, files)
-                                      }}
-                                    />
-                                    Click to upload or drop images here
-                                  </label>
-                                )
-                              ) : (
-                                <div className="space-y-3">
-                                  {renderPreview(c)}
-                                </div>
-                              )}
-                            </div>
-                            )}
-                          </SortableComponentItem>
-                        )
-                      })}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Add component:</span>
-                  {componentsPalette.map((cp) => (
+            {(() => {
+              // Global per-type counters across ALL sections to map to generated components correctly
+              const globalTypeCounters: Record<string, number> = {}
+              return ensureKeys(value).map((section, idx) => (
+                <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={section.name}
+                      onChange={(e) => renameSection(idx, e.target.value)}
+                      placeholder={`Section ${idx + 1} name`}
+                      className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                    />
                     <button
-                      key={cp.id}
                       type="button"
                       className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                      onClick={() => addComponent(idx, cp.id)}
+                      onClick={() => removeSection(idx)}
+                      aria-label="Remove section"
                     >
-                      {cp.label}
+                      Remove
                     </button>
-                  ))}
-                </div>
-              </SortableSectionItem>
-            ))}
+                  </div>
+
+                  {/* Components DnD within section (no cross-section moves) */}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={({ active, over }) => {
+                      if (!active?.id || !over?.id) return
+                      const prefix = `comp:${section.key}::`
+                      const aId = String(active.id)
+                      const oId = String(over.id)
+                      if (!aId.startsWith(prefix) || !oId.startsWith(prefix)) return
+                      const comps = section.components
+                      const ids = comps.map((_, i) => `${prefix}${i}`)
+                      const from = ids.indexOf(aId)
+                      const to = ids.indexOf(oId)
+                      if (from === -1 || to === -1 || from === to) return
+                      const reordered = arrayMove(comps, from, to)
+                      const next = value.slice()
+                      next[idx] = { ...section, components: reordered }
+                      // Reorder images slots accordingly
+                      setImagesBySection((prev) => {
+                        const arr = (prev[section.key] || []).slice()
+                        const re = arrayMove(arr, from, to)
+                        return { ...prev, [section.key]: re }
+                      })
+                      onChange(ensureKeys(next))
+                    }}
+                  >
+                    <SortableContext
+                      items={section.components.map((_, i) => `comp:${section.key}::${i}`)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="mt-3 flex flex-col gap-2">
+                        {section.components.length === 0 && (
+                          <span className="text-xs text-muted-foreground">No components yet</span>
+                        )}
+                        {section.components.map((c, compIdx) => {
+                          const imgs = (imagesBySection[section.key]?.[compIdx]) || []
+                          // Global display index: increment per type across all sections
+                          const displayIndex = (globalTypeCounters[c] = (globalTypeCounters[c] || 0) + 1)
+                          const contentObj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
+                          const currentText = contentObj?.generated_content || ""
+                          const compKey = `${section.key}:${c}:${displayIndex}`
+                          const isEditing = !!editing[compKey]
+                          const editText = editValues[compKey] ?? currentText
+                          return (
+                            <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`}>
+                              {({ attributes, listeners }) => (
+                              <div className="rounded-xl border bg-white p-5 space-y-3 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs px-2 py-0.5">{c === 'pre_header' ? 'Pre Header' : c.charAt(0).toUpperCase() + c.slice(1)}</Badge>
+                                    <span
+                                      {...attributes}
+                                      {...listeners}
+                                      className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground text-xs"
+                                    >
+                                      ⋮⋮ Drag
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="rounded border px-2 py-0.5 text-xs hover:bg-accent"
+                                    onClick={() => removeComponentAt(idx, compIdx)}
+                                    aria-label="Remove component"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+
+                                {c === "image" ? (
+                                  imgs.length > 0 ? (
+                                    <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border">
+                                      <img src={imgs[0].url} alt={imgs[0].filename} className="h-full w-full object-cover" />
+                                      <button
+                                        type="button"
+                                        className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white"
+                                        onClick={() => removeImageFromComponent(section.key, compIdx, imgs[0].id)}
+                                        aria-label="Remove image"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label className="flex h-24 items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground cursor-pointer">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        className="sr-only"
+                                        onChange={(e) => {
+                                          const files = e.target.files ? Array.from(e.target.files) : []
+                                          if (files.length) handleUploadToComponent(section.key, compIdx, files)
+                                        }}
+                                      />
+                                      Click to upload or drop images here
+                                    </label>
+                                  )
+                                ) : (
+                                  <div className="space-y-3">
+                                    {isEditing ? (
+                                      <>
+                                        <textarea
+                                          className="w-full rounded-md border bg-background p-2 text-sm"
+                                          rows={6}
+                                          value={editText}
+                                          onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
+                                        />
+                                        <button
+                                          type="button"
+                                          className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
+                                          onClick={() => {
+                                            setEditing(v => ({ ...v, [compKey]: false }))
+                                            onUpdateComponent && onUpdateComponent(c, displayIndex, editText)
+                                          }}
+                                        >
+                                          <Check className="h-3.5 w-3.5 mr-1" /> Save
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>{renderPreview(c, displayIndex)}</>
+                                    )}
+
+                                    {/* Actions toolbar */}
+                                    <div className="flex items-center gap-1 pt-1">
+                                      <button
+                                        type="button"
+                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                        disabled={!!regenBusy[compKey]}
+                                        onClick={async () => {
+                                          if (!brief) return
+                                          setRegenBusy(v => ({ ...v, [compKey]: true }))
+                                          try {
+                                            const result = await generateContent({
+                                              text: brief,
+                                              count: 1,
+                                              tone: tone || "professional",
+                                              content_type: "newsletter",
+                                              structure: [{ component: c as any, count: 1 }],
+                                              temperature: 0.8,
+                                            })
+                                            if (result.success && result.data) {
+                                              const val = String(result.data.variations[0][c] || "")
+                                              const finalVal = c === "cta" ? val.toUpperCase() : val
+                                              if (finalVal) onUpdateComponent && onUpdateComponent(c, displayIndex, finalVal)
+                                            }
+                                          } finally {
+                                            setRegenBusy(v => ({ ...v, [compKey]: false }))
+                                          }
+                                        }}
+                                      >
+                                        {regenBusy[compKey] ? (
+                                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                        ) : (
+                                          <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                        )}
+                                        Regenerate
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                        onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                        onClick={() => handleCopy(currentText)}
+                                        disabled={!currentText}
+                                      >
+                                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                        onClick={() => handleCopyHandlebar(`${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, currentText)}
+                                        disabled={!currentText}
+                                      >
+                                        <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              )}
+                            </SortableComponentItem>
+                          )
+                        })}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Add component:</span>
+                    {componentsPalette.map((cp) => (
+                      <button
+                        key={cp.id}
+                        type="button"
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                        onClick={() => addComponent(idx, cp.id)}
+                      >
+                        {cp.label}
+                      </button>
+                    ))}
+                  </div>
+                </SortableSectionItem>
+              ))
+            })()}
           </div>
         </SortableContext>
       </DndContext>
