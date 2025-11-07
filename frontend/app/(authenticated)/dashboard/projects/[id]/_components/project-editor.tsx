@@ -26,10 +26,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
-import { SectionBuilder } from "./section-builder"
 import { EmailStructure } from "./email-structure" // Import the new component
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
-import { ContentGenerator } from "../../../_components/content-generator"
 import { getLabelColor } from "../../../_components/create-project-dialog"
 
 interface ProjectEditorProps {
