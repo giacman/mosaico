@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { uploadImage } from "@/actions/upload"
+import { toast } from "sonner"
 import imageCompression from "browser-image-compression"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +25,7 @@ import { RefreshCw, Edit2, Copy, FileCode, Check } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { generateContent } from "@/actions/generate"
 import { generateHandlebar } from "@/actions/export"
+import { batchTranslate } from "@/actions/translate"
 
 type Section = {
   key: string
@@ -48,6 +50,8 @@ export function SectionBuilder({
   tone,
   onUpdateComponent,
   currentLanguage = "en",
+  targetLanguages = [],
+  onUpdateComponents,
 }: {
   value: Section[]
   onChange: (next: Section[]) => void
@@ -58,6 +62,8 @@ export function SectionBuilder({
   tone?: string
   onUpdateComponent?: (type: string, index: number, content: string) => void
   currentLanguage?: string
+  targetLanguages?: string[]
+  onUpdateComponents?: (list: Array<{ component_type: string; component_index?: number; generated_content: string; translations?: Record<string,string> }>) => void
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -376,13 +382,32 @@ export function SectionBuilder({
     try { await navigator.clipboard.writeText(text) } catch {}
   }
 
-  const handleCopyHandlebar = async (key: string, text: string) => {
+  const handleCopyHandlebar = async (
+    key: string,
+    englishFallback: string,
+    translations?: Record<string, string>
+  ) => {
     try {
-      const res = await generateHandlebar({ component_key: key, translations: {}, english_fallback: text })
+      const res = await generateHandlebar({
+        component_key: key,
+        translations: translations || {},
+        english_fallback: englishFallback || "",
+      })
       if (res.success && res.data?.handlebar_template) {
-        await navigator.clipboard.writeText(res.data.handlebar_template)
+        try {
+          await navigator.clipboard.writeText(res.data.handlebar_template)
+          toast.success("Handlebar copied to clipboard")
+        } catch {
+          toast.message("Handlebar ready", {
+            description: "Clipboard unavailable. Click to copy manually.",
+          })
+        }
+      } else {
+        toast.error(res.error || "Failed to generate handlebar")
       }
-    } catch {}
+    } catch (e) {
+      toast.error("Error generating handlebar")
+    }
   }
 
   return (
@@ -433,10 +458,30 @@ export function SectionBuilder({
                               content_type: "newsletter",
                               structure: [{ component: type as any, count: 1 }],
                               temperature: 0.7,
+                              use_few_shot: true,
+                              use_flash: true,
                             })
                             if (result.success && result.data) {
                               const val = String(result.data.variations[0][type] || "")
                               if (val) onUpdateComponent && onUpdateComponent(type, 1, val)
+                              if ((targetLanguages || []).length > 0 && val) {
+                                try {
+                                  const texts = [{ key: type, content: val }]
+                                  const langs = targetLanguages || []
+                                  const res = await batchTranslate(texts, langs)
+                                  if (res.success && res.data && onUpdateComponents) {
+                                    const key = type
+                                    const t = (res.data[key] || {}) as Record<string, string>
+                                    const merged = (components || []).map((c) => {
+                                      if (c.component_type === type && (c.component_index || 1) === 1) {
+                                        return { ...c, generated_content: val, translations: { ...(c.translations || {}), ...t } }
+                                      }
+                                      return c
+                                    })
+                                    onUpdateComponents(merged as any)
+                                  }
+                                } catch {}
+                              }
                             }
                           } finally {
                             setRegenBusy(v => ({ ...v, [compKey]: false }))
@@ -460,16 +505,37 @@ export function SectionBuilder({
                       <button
                         type="button"
                         className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                        onClick={() => handleCopy(currentText)}
-                        disabled={!currentText}
+                        onClick={() => {
+                          const textToCopy = (() => {
+                            if (!found) return ""
+                            if (currentLanguage && currentLanguage !== "en") {
+                              const t = (found as any).translations?.[currentLanguage]
+                              if (t && String(t).trim()) return String(t)
+                            }
+                            return currentText
+                          })()
+                          handleCopy(textToCopy)
+                        }}
+                        disabled={!currentText && !(found && (found as any).translations && (found as any).translations[currentLanguage || ""]) }
                       >
                         <Copy className="h-3.5 w-3.5 mr-1" /> Copy
                       </button>
                       <button
                         type="button"
                         className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                        onClick={() => handleCopyHandlebar(type, currentText)}
-                        disabled={!currentText}
+                        onClick={() => {
+                          const en = (found?.generated_content || "")
+                          const trAny = (found as any)?.translations
+                          const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
+                          const allowed = new Set((targetLanguages || []).map(l => String(l).toLowerCase()))
+                          const tr = Object.fromEntries(
+                            Object.entries(trRaw)
+                              .filter(([k]) => allowed.has(String(k).toLowerCase()))
+                              .map(([k, v]) => [k, String(v ?? "")])
+                          ) as Record<string, string>
+                          handleCopyHandlebar(type, en, tr)
+                        }}
+                        disabled={!((found?.generated_content || "").trim())}
                       >
                         <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
                       </button>
@@ -571,7 +637,14 @@ export function SectionBuilder({
                           // Global display index: increment per type across all sections
                           const displayIndex = (globalTypeCounters[c] = (globalTypeCounters[c] || 0) + 1)
                           const contentObj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
-                          const currentText = contentObj?.generated_content || ""
+                          const currentText = (() => {
+                            if (!contentObj) return ""
+                            if (currentLanguage && currentLanguage !== "en") {
+                              const t = (contentObj as any).translations?.[currentLanguage]
+                              if (t && String(t).trim()) return String(t)
+                            }
+                            return contentObj.generated_content || ""
+                          })()
                           const compKey = `${section.key}:${c}:${displayIndex}`
                           const isEditing = !!editing[compKey]
                           const editText = editValues[compKey] ?? currentText
@@ -614,7 +687,19 @@ export function SectionBuilder({
                                       </button>
                                     </div>
                                   ) : (
-                                    <label className="flex h-24 items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground cursor-pointer">
+                                    <label
+                                      className="flex h-24 items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground cursor-pointer"
+                                      onDragOver={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                      onDrop={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith("image/"))
+                                        if (files.length) handleUploadToComponent(section.key, compIdx, files)
+                                      }}
+                                    >
                                       <input
                                         type="file"
                                         accept="image/*"
@@ -670,11 +755,34 @@ export function SectionBuilder({
                                               content_type: "newsletter",
                                               structure: [{ component: c as any, count: 1 }],
                                               temperature: 0.8,
+                                              use_few_shot: true,
+                                              use_flash: c === "cta",
                                             })
                                             if (result.success && result.data) {
                                               const val = String(result.data.variations[0][c] || "")
                                               const finalVal = c === "cta" ? val.toUpperCase() : val
                                               if (finalVal) onUpdateComponent && onUpdateComponent(c, displayIndex, finalVal)
+                                              if ((targetLanguages || []).length > 0 && finalVal && onUpdateComponents) {
+                                                try {
+                                                  const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
+                                                  const langs = targetLanguages || []
+                                                  const res = await batchTranslate(texts, langs)
+                                                  if (res.success && res.data) {
+                                                    const key = `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`
+                                                    const rawT = (res.data[key] || {}) as Record<string, string>
+                                                    const t = c === "cta"
+                                                      ? Object.fromEntries(Object.entries(rawT).map(([k,v]) => [k, String(v || "").toUpperCase()])) as Record<string,string>
+                                                      : rawT
+                                                    const merged = (components || []).map((item) => {
+                                                      if (item.component_type === c && (item.component_index || 1) === displayIndex) {
+                                                        return { ...item, generated_content: finalVal, translations: { ...(item.translations || {}), ...t } }
+                                                      }
+                                                      return item
+                                                    })
+                                                    onUpdateComponents(merged as any)
+                                                  }
+                                                } catch {}
+                                              }
                                             }
                                           } finally {
                                             setRegenBusy(v => ({ ...v, [compKey]: false }))
@@ -706,8 +814,20 @@ export function SectionBuilder({
                                       <button
                                         type="button"
                                         className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                                        onClick={() => handleCopyHandlebar(`${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, currentText)}
-                                        disabled={!currentText}
+                                        onClick={() => {
+                                          const obj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
+                                          const en = (obj?.generated_content) || ""
+                                          const trAny = (obj as any)?.translations
+                                          const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
+                                          const allowed = new Set((targetLanguages || []).map(l => String(l).toLowerCase()))
+                                          const tr = Object.fromEntries(
+                                            Object.entries(trRaw)
+                                              .filter(([k]) => allowed.has(String(k).toLowerCase()))
+                                              .map(([k, v]) => [k, String(v ?? "")])
+                                          ) as Record<string, string>
+                                          handleCopyHandlebar(`${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, en, tr)
+                                        }}
+                                        disabled={!((components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)?.generated_content || "").trim())}
                                       >
                                         <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
                                       </button>

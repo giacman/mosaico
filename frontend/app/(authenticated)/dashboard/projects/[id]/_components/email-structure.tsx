@@ -32,6 +32,7 @@ import { SectionBuilder } from "./section-builder"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { batchTranslate } from "@/actions/translate"
 import { saveGeneratedComponents } from "@/actions/components"
+import { useNotifications } from "../../../_components/notifications-provider"
 
 const LANGUAGES = [
   { value: "it", label: "Italian" },
@@ -107,6 +108,47 @@ export function EmailStructure({
   const hasComponents = Array.isArray((project as any).components) && ((project as any).components.length > 0)
   const [isTranslating, setIsTranslating] = useState(false)
   const [viewLang, setViewLang] = useState<string>("en")
+  const { addNotification } = useNotifications()
+
+  // Normalize translations into a plain { lang: text } map and filter to current target languages
+  const normalizeTranslationsMap = (input: any): Record<string, string> => {
+    if (!input) return {}
+    if (typeof input === "object" && !Array.isArray(input)) {
+      const out: Record<string, string> = {}
+      Object.entries(input).forEach(([k, v]) => {
+        if (v == null) return
+        if (typeof v === "string") {
+          out[String(k).toLowerCase()] = v
+        } else if (typeof v === "object") {
+          const lang = (v as any).language_code || k
+          const text = (v as any).translated_content || (v as any).content || String(v)
+          out[String(lang).toLowerCase()] = String(text)
+        }
+      })
+      return out
+    }
+    if (Array.isArray(input)) {
+      const out: Record<string, string> = {}
+      input.forEach((it) => {
+        if (it && typeof it === "object") {
+          const lang = (it as any).language_code || (it as any).lang || (it as any).code
+          const text = (it as any).translated_content || (it as any).content || (it as any).text
+          if (lang && text) out[String(lang).toLowerCase()] = String(text)
+        }
+      })
+      return out
+    }
+    return {}
+  }
+
+  const normalizeComponentList = (list: any[]): any[] => {
+    const allowed = new Set((project.target_languages || []).map((l) => String(l).toLowerCase()))
+    return (list || []).map((c: any) => {
+      const raw = normalizeTranslationsMap(c.translations)
+      const filtered = Object.fromEntries(Object.entries(raw).filter(([k]) => allowed.has(String(k).toLowerCase())))
+      return { ...c, translations: filtered }
+    })
+  }
 
   const toggleLabel = (label: string) => {
     const currentLabels = project.labels || []
@@ -158,6 +200,11 @@ export function EmailStructure({
 
       if (result.success && result.data) {
         toast.success("Content generated successfully!")
+        addNotification({
+          type: "success",
+          title: "Generation Completed",
+          message: `Generated ${Object.keys(result.data.variations?.[0] || {}).length} components`
+        })
         
         // Extract the components from the first variation with stable per-type indices
         const variation = result.data.variations[0]
@@ -174,7 +221,7 @@ export function EmailStructure({
             component_type: type,
             component_index: index,
             generated_content: type === "cta" ? text.toUpperCase() : text,
-            translations: [] as any[]
+            translations: {} as Record<string, string>
           }]
         })
 
@@ -372,15 +419,22 @@ export function EmailStructure({
                       if (res.success && res.data) {
                         const merged = (project.components || []).map((c: any) => {
                           const key = `${c.component_type}${c.component_index ? `_${c.component_index}`: ""}`
-                          const rawT = res.data[key] || {}
+                          const rawT = (res.data as any)[key] || {}
                           const t = c.component_type === "cta"
                             ? Object.fromEntries(Object.entries(rawT).map(([k,v]) => [k, String(v || "").toUpperCase()]))
                             : rawT
-                          return { ...c, translations: { ...(c.translations || {}), ...t } }
+                          const curr = normalizeTranslationsMap(c.translations)
+                          return { ...c, translations: { ...curr, ...t } }
                         })
-                        onProjectChange("components", merged as any)
-                        await saveGeneratedComponents(project.id, merged)
+                        const normalized = normalizeComponentList(merged as any)
+                        onProjectChange("components", normalized as any)
+                        await saveGeneratedComponents(project.id, normalized as any)
                         toast.success(`Translated to ${langs.length} language(s)`)  
+                        addNotification({
+                          type: "success",
+                          title: "Translation Completed",
+                          message: `Translated ${texts.length} component(s) to ${langs.length} language(s)`
+                        })
                       } else {
                         toast.error(res.error || "Translation failed")
                       }
@@ -432,13 +486,20 @@ export function EmailStructure({
         brief={project.brief_text || ""}
         tone={tone}
         currentLanguage={viewLang}
+        targetLanguages={(project.target_languages as any) || []}
+        onUpdateComponents={(list) => {
+          const normalized = normalizeComponentList(list as any)
+          onProjectChange("components", normalized as any)
+          saveGeneratedComponents(project.id, normalized as any)
+        }}
         onUpdateComponent={(type, index, content) => {
-          const list = [...(project.components || [])]
+          const list: any[] = [...((project.components as any) || [])]
           const idx = list.findIndex((c: any) => c.component_type === type && (c.component_index || 1) === index)
           const finalContent = type === "cta" ? (content || "").toUpperCase() : content
           if (idx >= 0) list[idx] = { ...list[idx], generated_content: finalContent }
-          else list.push({ component_type: type, component_index: index, generated_content: finalContent, translations: {} })
-          onProjectChange("components", list as any)
+          else list.push({ component_type: type, component_index: index, generated_content: finalContent, translations: [] })
+          const normalized = normalizeComponentList(list as any)
+          onProjectChange("components", normalized as any)
         }}
       />
 

@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -31,6 +31,8 @@
 - 📤 **Handlebar Export**: Export components with multi-language handlebar templates for Airship integration
 - 🔠 **CTA Consistency**: CTAs normalized to UPPERCASE across generation and regeneration
 - 🔁 **Auto-Retranslation**: Regeneration and manual edits trigger translation updates with clear UX states
+  - Single-component regenerate now automatically re-translates only that component
+  - Notification bell persists entries across navigation
 
 ---
 

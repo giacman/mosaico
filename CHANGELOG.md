@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Email-like styling: centered container (max-width 840px), white background, soft shadow/ring; solid primary CTA buttons; linkified URLs in content.
 - Fixed duplicate Body mapping and ensured correct indexing for multiple Body/CTA instances.
 - Clear loading states for generation and translation.
+- Auto-translate on single-component regenerate restored (and CTA translations uppercased); English content no longer reverts post-save.
+- Handlebar export: always base on English + include only selected target_languages; robust request normalization.
+- Image upload: drag-and-drop enabled on empty slot.
+- Notification bell: persisted via localStorage; survives navigation after actions.
 
 ### Backend
 - No functional API changes.
@@ -29,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generate: map section-based structure to legacy format before calling backend.
 - Import path corrections after refactor (`RenderedComponent`).
 - Vertex AI auth confusion: clarified ADC vs Service Account usage and required env vars (prevents 503 invalid_grant due to wrong project/credentials).
+ - Handlebar 422 and wrong structure: backend now accepts array/dict shapes and normalizes to { lang: text }.
+ - Components save 500: translations normalized to strings before save; filtered to target languages.
 
 ### Documentation
 - README: consolidated local setup with explicit venv usage, PostgreSQL creation, Alembic migrations, and absolute-path commands.
