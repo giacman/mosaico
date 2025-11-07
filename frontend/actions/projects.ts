@@ -37,7 +37,11 @@ export interface Project {
   id: number
   name: string
   brief_text: string | null
-  structure: Array<{ component: string; count: number }>
+  // Accept both legacy and new structure formats
+  structure: Array<
+    | { component: string; count: number }
+    | { key: string; name: string; components: string[] }
+  >
   tone: string | null
   target_languages: string[]
   labels: string[]
@@ -55,7 +59,10 @@ export interface Project {
 export interface CreateProjectInput {
   name: string
   brief_text?: string
-  structure: Array<{ component: string; count: number }>
+  structure: Array<
+    | { component: string; count: number }
+    | { key: string; name: string; components: string[] }
+  >
   tone?: string
   target_languages?: string[]
   labels?: string[]
@@ -65,7 +72,10 @@ export interface CreateProjectInput {
 export interface UpdateProjectInput {
   name?: string
   brief_text?: string
-  structure?: Array<{ component: string; count: number }>
+  structure?: Array<
+    | { component: string; count: number }
+    | { key: string; name: string; components: string[] }
+  >
   tone?: string
   target_languages?: string[]
   labels?: string[]

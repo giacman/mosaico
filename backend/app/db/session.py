@@ -6,8 +6,13 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
 # Create database engine
+# Ensure the URL uses the psycopg driver
+db_url = settings.database_url
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
 engine = create_engine(
-    settings.database_url,
+    db_url,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=5

@@ -26,10 +26,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
-import { EmailStructureBuilderV2 } from "../../../_components/email-structure-builder-v2"
-import { ImageUploadManager } from "../../../_components/image-upload-manager"
+import { EmailStructure } from "./email-structure" // Import the new component
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
-import { ContentGenerator } from "../../../_components/content-generator"
 import { getLabelColor } from "../../../_components/create-project-dialog"
 
 interface ProjectEditorProps {
@@ -151,7 +149,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
     }
   }
 
-  const updateField = <K extends keyof Project>(field: K, value: Project[K]) => {
+  const updateField = <K extends keyof Project>(field: K, value: any) => {
     setProject((prev) => ({ ...prev, [field]: value }))
     setHasChanges(true)
   }
@@ -241,164 +239,17 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
       </div>
 
       {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column: Project Settings */}
-        <div className="space-y-6">
-          {(project as any).status !== "approved" && (
-            <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Details</CardTitle>
-              <CardDescription>
-                Basic information about your email campaign
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="project-name">Project Name</Label>
-                <Input
-                  id="project-name"
-                  value={project.name}
-                  onChange={(e) => updateField("name", e.target.value)}
-                  placeholder="e.g., Spring Collection Launch"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Project Labels</Label>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    {["promo", "category", "design", "october 2025", "november 2025", "december 2025"].map((label) => {
-                      const isSelected = project.labels?.includes(label) || false
-                      const colors = getLabelColor(label)
-                      return (
-                        <Badge
-                          key={label}
-                          variant={isSelected ? "default" : "outline"}
-                          className={`cursor-pointer hover:opacity-80 transition-opacity ${
-                            isSelected ? `${colors.bg} ${colors.text} ${colors.border} border` : ""
-                          }`}
-                          onClick={() => toggleLabel(label)}
-                        >
-                          {label}
-                        </Badge>
-                      )
-                    })}
-                  </div>
-                  {project.labels && project.labels.length > 0 && (
-                    <div className="pt-2 border-t">
-                      <p className="text-xs font-medium mb-2">Selected:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.labels.map((label) => {
-                          const colors = getLabelColor(label)
-                          return (
-                            <Badge 
-                              key={label} 
-                              variant="secondary"
-                              className={`${colors.bg} ${colors.text} ${colors.border} border`}
-                            >
-                              {label}
-                            </Badge>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Click to add or remove labels for easier project organization.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="project-brief">Creative Brief</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPromptAssistant(true)}
-                    disabled={!project.brief_text?.trim()}
-                    className="gap-2"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Optimize Prompt
-                  </Button>
-                </div>
-                <Textarea
-                  id="project-brief"
-                  value={project.brief_text ?? ""}
-                  onChange={(e) => updateField("brief_text", e.target.value || null)}
-                  placeholder="Describe the theme, target audience, key messages... Keep it under 600 characters for best results with images."
-                  rows={4}
-                />
-                <p className="text-xs text-muted-foreground">
-                  💡 Use the Prompt Assistant to enhance your brief, or keep under 600 chars when using images
-                </p>
-              </div>
-
-              {/* Image Upload - Part of the Brief */}
-              <div className="space-y-2">
-                <Label>Reference Images (Optional)</Label>
-                <ImageUploadManager
-                  projectId={project.id}
-                  value={images}
-                  onChange={setImages}
-                />
-                <p className="text-xs text-muted-foreground">
-                  📸 Add images to provide visual context for AI generation
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tone">Tone of Voice</Label>
-                <Select
-                  value={project.tone ?? "professional"}
-                  onValueChange={(value) => updateField("tone", value)}
-                >
-                  <SelectTrigger id="tone">
-                    <SelectValue placeholder="Select tone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TONES.map((tone) => (
-                      <SelectItem key={tone.value} value={tone.value}>
-                        {tone.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Email Structure */}
-          <EmailStructureBuilderV2
-            value={project.structure.map((s) => ({
-              component: s.component as "subject" | "pre_header" | "title" | "body" | "cta",
-              count: s.count
-            }))}
-            onChange={(structure) => updateField("structure", structure as Array<{component: string; count: number}>)}
-          />
-            </>
-          )}
-        </div>
-
-        {/* Right Column: Generated Content Preview */}
-        <div className="space-y-6">
-          <ContentGenerator
-            projectId={project.id}
-            brief={project.brief_text ?? ""}
-            tone={project.tone ?? "professional"}
-            structure={project.structure}
-            targetLanguages={project.target_languages}
-            onLanguagesChange={(languages) => updateField("target_languages", languages)}
-            imageUrls={images.map((img) => img.url)}
-            savedComponents={project.components || []}
-            userName={user?.fullName || user?.firstName || "Unknown user"}
-            readOnly={(project as any).status === "approved"}
-          />
-
-        </div>
+      <div className="space-y-6">
+        {/* This is where the new, single-column layout will go. */}
+        <EmailStructure
+          project={project}
+          onProjectChange={updateField}
+          onStructureChange={(newSections) =>
+            updateField("structure", newSections as any)
+          }
+          onImagesChange={(imgs) => setImages(imgs)}
+          userName={user?.fullName || user?.firstName || "Unknown user"}
+        />
       </div>
 
       {/* Prompt Assistant Dialog */}
@@ -408,7 +259,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
         originalBrief={project.brief_text ?? ""}
         contentType="newsletter"
         tone={project.tone ?? "professional"}
-        structure={project.structure}
+        structure={project.structure as any}
         onApply={(optimizedPrompt) => {
           updateField("brief_text", optimizedPrompt)
         }}

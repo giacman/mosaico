@@ -74,8 +74,13 @@ class Component(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-    component_type = Column(String(50), nullable=False)  # "subject", "body", "cta", etc.
-    component_index = Column(Integer)  # 1, 2, 3 for body_1, body_2, etc. (null for unique components)
+    
+    # New fields for sections
+    section_key = Column(String(100), nullable=False, server_default='default', index=True)
+    section_order = Column(Integer, default=0, nullable=False)
+    
+    component_type = Column(String(50), nullable=False)  # "subject", "body", "cta", "image", etc.
+    component_index = Column(Integer)  # Order within the section
     generated_content = Column(Text)  # Original language content
     component_url = Column(String(500))  # Optional URL for this component (CTA link, product page, etc.)
     image_id = Column(Integer, ForeignKey("images.id", ondelete="SET NULL"))

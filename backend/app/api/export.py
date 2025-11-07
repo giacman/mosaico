@@ -3,8 +3,8 @@ Google Sheets Export API and Handlebar Generation
 """
 import logging
 import re
-from typing import Dict
-from pydantic import BaseModel
+from typing import Dict, Any, List
+from pydantic import BaseModel, field_validator
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from googleapiclient.discovery import build
@@ -26,8 +26,55 @@ router = APIRouter()
 class HandlebarExportRequest(BaseModel):
     """Request for generating handlebar template for a component"""
     component_key: str
-    translations: Dict[str, str]  # {language_code: translated_text}
+    translations: Dict[str, str] | List[Dict[str, Any]]
     english_fallback: str
+
+    @field_validator('translations', mode='before')
+    @classmethod
+    def normalize_translations(cls, v: Any) -> Dict[str, str]:
+        """
+        Accept both a map {lang: text} and an array of objects from DB
+        like [{language_code, translated_content}] and normalize to map.
+        """
+        if v is None:
+            return {}
+        # Already a mapping { lang: text }
+        if isinstance(v, dict):
+            out: Dict[str, str] = {}
+            for k, val in v.items():
+                if val is None:
+                    continue
+                # Case 1: value is already a string — treat key as language code
+                if isinstance(val, str):
+                    text = val
+                    if text.strip():
+                        out[str(k).lower()] = text
+                    continue
+                # Case 2: value is a dict (e.g., serialized DB row under numeric key)
+                if isinstance(val, dict):
+                    lang = val.get('language_code') or val.get('lang') or val.get('code') or k
+                    text = val.get('translated_content') or val.get('content') or val.get('text')
+                    if lang and text and str(text).strip():
+                        out[str(lang).lower()] = str(text)
+                    continue
+                # Fallback: cast to string
+                s = str(val)
+                if s.strip():
+                    out[str(k).lower()] = s
+            return out
+        # Array of objects (DB shape)
+        if isinstance(v, list):
+            out: Dict[str, str] = {}
+            for item in v:
+                if not isinstance(item, dict):
+                    continue
+                lang = item.get('language_code') or item.get('lang') or item.get('code')
+                text = item.get('translated_content') or item.get('content') or item.get('text')
+                if lang and text and str(text).strip():
+                    out[str(lang).lower()] = str(text)
+            return out
+        # Fallback
+        return {}
 
 
 class HandlebarExportResponse(BaseModel):
