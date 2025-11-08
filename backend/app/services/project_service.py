@@ -52,14 +52,6 @@ class ProjectService:
         project_data: ProjectCreate
     ) -> Project:
         """Create a new project"""
-        # Check for existing project with the same name
-        existing_project = db.query(Project).filter(Project.name == project_data.name).first()
-        if existing_project:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A project with this name already exists"
-            )
-
         # Convert structure to dict format for JSON storage
         structure_dict = [item.model_dump() for item in project_data.structure]
         

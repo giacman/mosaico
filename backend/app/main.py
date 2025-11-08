@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     # Auto-create DB tables if not present (simple bootstrap for MVP)
     try:
-        Base.metadata.create_all(bind=engine)
+        # Base.metadata.create_all(bind=engine) # Removed to enable Alembic for schema management
         logger.info("Database tables ensured (create_all).")
     except Exception as e:
         logger.error(f"DB bootstrap failed: {e}")

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1.1] - 2025-11-08
+
+### Backend
+- Removed project name uniqueness check from `ProjectService.create_project`, allowing projects to have duplicate names (uniqueness now enforced by project ID only).
+- Removed `Base.metadata.create_all()` call from `app/main.py` to ensure Alembic is the sole manager of database schema.
+
+### CI/CD
+- Updated `.github/workflows/cloud-run-backend.yml` to automatically run Alembic migrations (`alembic upgrade head`) as part of the Cloud Run backend deployment.
+- Added steps to set up Python environment, install backend dependencies, install Cloud SQL Proxy, and execute migrations.
+
+### Configuration
+- Requires new GitHub repository secrets for CI/CD pipeline: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `CLOUD_SQL_INSTANCE_NAME`, `CLERK_SECRET_KEY`, `VERTEX_AI_MODEL`, `VERTEX_AI_MODEL_FLASH`, `GCS_BUCKET_PROMPTS`, `GCS_BUCKET_EXAMPLES`, `GCS_BUCKET_IMAGES`.
+
 ## [0.8.1] - 2025-11-08
 
 ### Backend
