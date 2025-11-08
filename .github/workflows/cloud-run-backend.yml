@@ -66,8 +66,21 @@ jobs:
           # Start the proxy in the background
           ./cloud_sql_proxy -instances="${{ secrets.GCP_PROJECT_ID }}:${{ secrets.GCP_REGION }}:${{ secrets.CLOUD_SQL_INSTANCE_NAME }}"=tcp:5432 > proxy.log 2>&1 &
           
-          # Wait a few seconds for the proxy to start
-          sleep 5
+          # --- NEW: Wait for proxy to be ready ---
+          echo "Waiting for Cloud SQL Proxy to be ready..."
+          timeout=60
+          until grep -q "Ready for new connections" proxy.log || [ $timeout -eq 0 ]; do
+            sleep 1
+            timeout=$((timeout - 1))
+          done
+          
+          if ! grep -q "Ready for new connections" proxy.log; then
+            echo "Error: Cloud SQL Proxy did not start in time. Proxy log:"
+            cat proxy.log
+            exit 1
+          fi
+          echo "Cloud SQL Proxy is ready."
+          # --- END NEW ---
           
           # Run Alembic migrations
           alembic upgrade head
