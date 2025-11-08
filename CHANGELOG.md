@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2025-11-08
+
+### Backend
+- Fix ResponseValidationError in production when listing projects by relaxing `ComponentResponse` schema:
+  - `section_key` now optional (defaults to null)
+  - `section_order` now optional (defaults to 0)
+- Compatible with legacy component rows created before sections were tracked.
+
+### Notes
+- Recommended follow-up: backfill existing component rows to set `section_key='main'` and `section_order=0` for consistency.
+
 ## [0.8.0] - 2025-11-06
 
 ### Frontend

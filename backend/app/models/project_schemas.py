@@ -156,8 +156,8 @@ class ComponentResponse(BaseModel):
     """Component response with translations"""
     id: int
     project_id: int
-    section_key: str
-    section_order: int
+    section_key: Optional[str] = None
+    section_order: Optional[int] = 0
     component_type: str
     component_index: Optional[int]
     generated_content: Optional[str]
