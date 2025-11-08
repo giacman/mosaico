@@ -52,42 +52,47 @@ class ProjectService:
         project_data: ProjectCreate
     ) -> Project:
         """Create a new project"""
-        # Convert structure to dict format for JSON storage
-        structure_dict = [item.model_dump() for item in project_data.structure]
-        
-        # Handle status value (enum or string)
-        status_val = getattr(project_data.status, "value", None) or getattr(project_data, "status", None) or "in_progress"
+        try:
+            # Convert structure to dict format for JSON storage
+            structure_dict = [item.model_dump() for item in project_data.structure]
+            
+            # Handle status value (enum or string)
+            status_val = getattr(project_data.status, "value", None) or getattr(project_data, "status", None) or "in_progress"
 
-        project = Project(
-            name=project_data.name,
-            brief_text=project_data.brief_text,
-            structure=structure_dict,
-            tone=project_data.tone,
-            target_languages=project_data.target_languages or [],
-            labels=project_data.labels or [],
-            status=status_val,
-            created_by_user_id=user_id,
-            created_by_user_name=user_name
-        )
-        
-        db.add(project)
-        db.flush()  # Get ID before logging
+            project = Project(
+                name=project_data.name,
+                brief_text=project_data.brief_text,
+                structure=structure_dict,
+                tone=project_data.tone,
+                target_languages=project_data.target_languages or [],
+                labels=project_data.labels or [],
+                status=status_val,
+                created_by_user_id=user_id,
+                created_by_user_name=user_name
+            )
+            
+            db.add(project)
+            db.flush()  # Get ID before logging
 
-        # Create default Subject and Pre-header components
-        subject_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="subject", component_index=0)
-        preheader_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="pre_header", component_index=1)
-        db.add_all([subject_comp, preheader_comp])
-        
-        # Log creation
-        ProjectService._log_activity(
-            db, project.id, user_id, user_name, "created_project"
-        )
-        
-        db.commit()
-        db.refresh(project)
-        
-        logger.info(f"Created project {project.id} by user {user_id}")
-        return project
+            # Create default Subject and Pre-header components
+            subject_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="subject", component_index=0)
+            preheader_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="pre_header", component_index=1)
+            db.add_all([subject_comp, preheader_comp])
+            
+            # Log creation
+            ProjectService._log_activity(
+                db, project.id, user_id, user_name, "created_project"
+            )
+            
+            db.commit()
+            db.refresh(project)
+            
+            logger.info(f"Created project {project.id} by user {user_id}")
+            return project
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating project for user {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create project")
     
     @staticmethod
     def duplicate_project(
