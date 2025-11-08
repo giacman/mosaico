@@ -26,7 +26,7 @@ from app.api import optimize_prompt
 
 # Configure logging
 logging.basicConfig(
-    level=settings.log_level,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -118,5 +118,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8080,
         reload=True,
-        log_level=settings.log_level.lower()
+        log_level="debug"
     )
