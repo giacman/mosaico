@@ -24,6 +24,8 @@ security = HTTPBearer()
 clerk_client = None
 if settings.clerk_secret_key:
     clerk_client = Clerk(bearer_auth=settings.clerk_secret_key)
+    logger.debug(f"Clerk client initialized: {clerk_client}")
+    logger.debug(f"Type of clerk_client: {type(clerk_client)}")
 
 
 async def get_current_user(
