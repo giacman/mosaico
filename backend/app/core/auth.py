@@ -69,7 +69,7 @@ async def get_current_user(
         # Authenticate the request
         # The authorized_parties is optional but good for security
         # For now, let's omit it for initial testing.
-        request_state = clerk_client.authenticate_request(httpx_request)
+        request_state = clerk_client.authenticate_request(httpx_request, AuthenticateRequestOptions())
         
         if not request_state.is_signed_in:
             raise HTTPException(
