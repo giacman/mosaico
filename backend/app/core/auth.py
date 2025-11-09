@@ -49,6 +49,7 @@ async def get_current_user(
     if not clerk_client:
         # For development/testing without Clerk
         if settings.environment == "development":
+            logger.info(f"Running in development mode with settings.environment: {settings.environment}")
             logger.warning("Clerk not configured, using development mode")
             return User(id="dev-user-123", name="Dev User")
         raise HTTPException(
@@ -56,6 +57,7 @@ async def get_current_user(
             detail="Authentication not configured"
         )
     
+    logger.info(f"Clerk client is active. Settings environment: {settings.environment}")
     token = credentials.credentials
     
     try:

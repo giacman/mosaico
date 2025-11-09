@@ -116,6 +116,7 @@ jobs:
             DATABASE_URL=postgresql+psycopg2://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@127.0.0.1:5432/${{ secrets.DB_NAME }}
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
             SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}
+            ENVIRONMENT=development
 
       - name: Output service URL
         run: |
