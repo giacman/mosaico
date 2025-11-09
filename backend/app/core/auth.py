@@ -23,9 +23,15 @@ security = HTTPBearer()
 # Initialize Clerk client
 clerk_client = None
 if settings.clerk_secret_key:
-    clerk_client = Clerk(bearer_auth=settings.clerk_secret_key)
-    logger.debug(f"Clerk client initialized: {clerk_client}")
-    logger.debug(f"Type of clerk_client: {type(clerk_client)}")
+    try:
+        clerk_client = Clerk(bearer_auth=settings.clerk_secret_key)
+        logger.debug(f"Clerk client initialized: {clerk_client}")
+        logger.debug(f"Type of clerk_client: {type(clerk_client)}")
+    except Exception as e:
+        logger.error(f"Failed to initialize Clerk client: {e}", exc_info=True)
+        clerk_client = None # Ensure it's None if init fails
+else:
+    logger.warning("CLERK_SECRET_KEY not provided. Running without Clerk authentication.")
 
 
 async def get_current_user(

@@ -37,12 +37,14 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    print("MOSAICO BACKEND LIFESPAN STARTING EARLY PRINT") # Sanity check for logs
     logger.info("=" * 50)
     logger.info(f"MOSAICO BACKEND v{__version__} STARTING")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"GCP Project: {settings.gcp_project_id}")
     logger.info(f"Vertex AI Model: {settings.vertex_ai_model}")
     logger.info(f"Database URL: {settings.database_url}")
+    logger.info(f"Configured Log Level: {settings.log_level}")
     logger.info("=" * 50)
     # Auto-create DB tables if not present (simple bootstrap for MVP)
     try:
