@@ -136,14 +136,23 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
  */
 export function NotificationBell() {
   const { notifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications()
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
   
   return (
-    <NotificationCenter
-      notifications={notifications}
-      onMarkAsRead={markAsRead}
-      onMarkAllAsRead={markAllAsRead}
-      onDismiss={dismissNotification}
-    />
+    <>
+      {isClient && (
+        <NotificationCenter
+          notifications={notifications}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onDismiss={dismissNotification}
+        />
+      )}
+    </>
   )
 }
 

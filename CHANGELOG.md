@@ -2,12 +2,20 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.9.0] - 2025-11-09
 
----
+### Added
+- **Local Docker Development Environment**: Added `docker-compose.yml` and associated configuration to run the entire backend stack (PostgreSQL and Python backend) locally in Docker containers. This provides a consistent and isolated development environment that mirrors production more closely.
+- **Automated Database Migrations on Startup**: The Docker environment now automatically runs `alembic upgrade head` on startup via a `docker-entrypoint.sh` script, ensuring the local database schema is always up-to-date.
+- **Google Cloud Credentials for Local Docker**: Configured `docker-compose.yml` to securely mount local Google Cloud credentials, enabling services like Vertex AI and Google Cloud Storage to work correctly in the local Docker environment.
+- **Dedicated Development GCS Bucket**: The local environment is now configured to use a separate `mosaico-images-dev-474415` bucket, safely isolating development image uploads from production data.
 
-## [Unreleased]
+### Fixed
+- **Clerk Authentication in Production**: Resolved a critical authentication bug in production by updating the Clerk SDK usage from the deprecated `verify_token` to the correct `authenticate_request` method, fixing `401 Unauthorized` errors.
+- **Frontend Build Errors**: Fixed multiple frontend compilation errors caused by inconsistent function naming and incorrect imports during refactoring (e.g., `generateContent` vs `generate`, `translateBatch` vs `batchTranslate`).
+- **Frontend API Endpoint Configuration**: Standardized all frontend API calls to use a single environment variable (`NEXT_PUBLIC_API_URL`), fixing `ECONNREFUSED` errors by ensuring the frontend correctly points to the backend.
+- **GCS Image Upload ACL Issue**: Fixed a `500 Internal Server Error` on image uploads by removing legacy ACL code (`blob.make_public()`) and configuring the development GCS bucket for modern, uniform bucket-level access.
+- **React Hydration Error**: Resolved a frontend hydration error by ensuring the `NotificationCenter` component only renders on the client side.
 
 ## [0.8.1.1] - 2025-11-08
 

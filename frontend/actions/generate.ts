@@ -2,9 +2,10 @@
 
 import { auth } from "@clerk/nextjs/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
-interface GenerateContentInput {
+export type GenerateParams = {
+  project_id: number,
   text: string
   count: number
   tone: string
@@ -31,7 +32,7 @@ interface GenerateContentResult {
 /**
  * Get authentication token from Clerk
  */
-async function getAuthToken(): Promise<string | null> {
+export async function getAuthToken(): Promise<string | null> {
   const { getToken } = await auth()
   return getToken()
 }
@@ -39,19 +40,17 @@ async function getAuthToken(): Promise<string | null> {
 /**
  * Generate email content variations using AI
  */
-export async function generateContent(
-  input: GenerateContentInput
-): Promise<{ success: boolean; data?: GenerateContentResult; error?: string }> {
+export async function generate(params: GenerateParams) {
   try {
     const token = await getAuthToken()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/generate`, {
+    const response = await fetch(`${API_URL}/api/v1/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` })
       },
-      body: JSON.stringify(input)
+      body: JSON.stringify(params)
     })
 
     if (!response.ok) {

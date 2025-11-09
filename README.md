@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -70,118 +70,74 @@ Export to Airship (Handlebar Templates)
 
 ---
 
-## 🚀 Local Setup Guide
+## 🚀 Local Setup Guide (Docker)
 
-Follow these steps to set up and run Mosaico on your local machine.
+Follow these steps to set up and run Mosaico on your local machine using Docker. This is the recommended approach for a consistent development environment.
 
 ### Prerequisites
 
-- **Python 3.11+**: [Install Python](https://www.python.org/downloads/)
-- **Node.js 18+**: [Install Node.js](https://nodejs.org/)
-- **PostgreSQL 14+**: We recommend using [Postgres.app](https://postgresapp.com/) on macOS.
-- **Google Cloud Project**: With Vertex AI enabled.
+- **Docker Desktop**: [Install Docker](https://www.docker.com/products/docker-desktop/)
+- **Node.js 18+**: [Install Node.js](https://nodejs.org/) (for the frontend)
+- **Google Cloud SDK (`gcloud`)**: [Install gcloud](https://cloud.google.com/sdk/docs/install)
 - **Clerk Account**: For user authentication.
 
-### 1. Backend Setup
+### 1. Environment Setup
 
-First, set up the Python backend server.
+First, configure the necessary environment variables for all services.
 
 ```bash
-# 1. Navigate to the backend directory
-cd backend
+# 1. Navigate to the project root directory
+cd /path/to/mosaico
 
-# 2. Create a virtual environment using Python 3.11
-#    Replace 'python3.11' with the command for your Python 3.11 installation
-python3.11 -m venv venv
+# 2. Create the environment file from the example
+#    Note: Docker Compose automatically reads the `.env` file in the root.
+cp .env.example .env
 
-# 3. Activate the virtual environment
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# 3. Edit the .env file with your actual credentials:
+#    - POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB (can be anything for local dev)
+#    - DATABASE_URL (should match the postgres values)
+#    - CLERK_SECRET_KEY (your development key from Clerk)
+#    - GCP_PROJECT_ID, GCP_LOCATION, VERTEX_AI_MODEL, etc.
+#    - GCS_BUCKET_* (use your development bucket names, e.g., mosaico-images-dev-474415)
 
-# 4. Install dependencies
-#    This will fail if you are not using Python 3.11+
-pip install -r requirements.txt
-
-# 5. Set up environment variables
-cp env.example .env
-
-# 6. Edit the .env file with your credentials:
-#    - GCP_PROJECT_ID
-#    - DATABASE_URL (e.g., postgresql://user:password@localhost:5432/mosaico)
-#    - CLERK_SECRET_KEY
-#    - GCS_BUCKET_IMAGES
-#    - GOOGLE_APPLICATION_CREDENTIALS (path to your service account JSON)
-#    - SLACK_WEBHOOK_URL (optional)
-
-# 7. Create the PostgreSQL Database
-#    Ensure your PostgreSQL server is running before this step.
-createdb mosaico
-
-# 8. Run database migrations
-#    We use the full path to the executable to avoid shell PATH issues.
-`pwd`/venv/bin/alembic upgrade head
-
-# 9. Start the backend server
-`pwd`/venv/bin/uvicorn app.main:app --reload --port 8080
-or 
-python -m app.main
+# 4. Authenticate with Google Cloud for Application Default Credentials
+#    This allows the backend container to access GCP services like Vertex AI and GCS.
+gcloud auth application-default login
+gcloud config set project <YOUR_GCP_PROJECT_ID>
 ```
 
-The backend will be available at `http://localhost:8080`.
+### 2. Run the Application
 
-#### Google Cloud credentials
-
-Mosaico calls Vertex AI from your backend. You must provide Google Cloud credentials locally in ONE of the following ways.
-
-- Option A — gcloud Application Default Credentials (recommended for local)
-  ```bash
-  # Install gcloud first: https://cloud.google.com/sdk/docs/install
-  gcloud auth application-default login
-  gcloud config set project <YOUR_PROJECT_ID>   # e.g. mosaico-474415
-
-  # Verify ADC are available
-  gcloud auth application-default print-access-token >/dev/null && echo OK
-  ```
-  Notes:
-  - No code/config changes are needed. The backend will automatically pick up ADC.
-  - Ensure `.env` contains `GCP_PROJECT_ID=<YOUR_PROJECT_ID>`.
-
-- Option B — Service Account JSON (works without gcloud)
-  1) In Google Cloud, create/download a service account key JSON.
-  2) Grant roles (minimum):
-     - Vertex AI User (`roles/aiplatform.user`)
-     - Storage Object Viewer (`roles/storage.objectViewer`) — for image reads
-  3) Save the key locally, e.g. `~/secrets/mosaico-sa.json`.
-  4) Point the backend to it:
-     ```bash
-     export GOOGLE_APPLICATION_CREDENTIALS=$HOME/secrets/mosaico-sa.json
-     # or set it in backend/.env (GOOGLE_APPLICATION_CREDENTIALS=/abs/path.json)
-     ```
-  5) Restart the backend.
-
-### 2. Frontend Setup
-
-Next, set up the Next.js frontend application.
+With the configuration in place, you can start the entire stack.
 
 ```bash
-# 1. Navigate to the frontend directory
+# 1. Build and start the Docker containers (PostgreSQL and Backend)
+#    This command will also run database migrations automatically.
+docker-compose up --build
+
+# 2. In a NEW terminal, navigate to the frontend directory
 cd frontend
 
-# 2. Install dependencies
-npm install
-
-# 3. Set up environment variables
+# 3. Set up frontend environment variables
 cp .env.example .env.local
 
-# 4. Edit .env.local with your credentials:
-#    - NEXT_PUBLIC_API_URL=http://localhost:8080
+# 4. Edit .env.local with your frontend-specific keys:
+#    - NEXT_PUBLIC_API_URL=http://localhost:8000
+#    - BACKEND_URL=http://localhost:8000
 #    - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 #    - CLERK_SECRET_KEY
 
-# 5. Start the frontend development server
+# 5. Install frontend dependencies
+npm install
+
+# 6. Start the frontend development server
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000`.
+### Accessing the Application
+- **Frontend**: `http://localhost:3000`
+- **Backend API Docs**: `http://localhost:8000/docs`
+- **Database (local)**: Connect on host port `5433` (to avoid conflicts)
 
 ---
 

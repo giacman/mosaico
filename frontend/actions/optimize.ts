@@ -1,11 +1,12 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
+import { getAuthToken } from "@/actions/generate"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
-interface OptimizePromptInput {
-  text: string
+export type OptimizePromptParams = {
+  prompt: string
   content_type: string
   tone: string
   structure: Array<{ component: string; count: number }>
@@ -17,29 +18,19 @@ interface OptimizePromptResult {
 }
 
 /**
- * Get authentication token from Clerk
- */
-async function getAuthToken(): Promise<string | null> {
-  const { getToken } = await auth()
-  return getToken()
-}
-
-/**
  * Optimize a user's brief/prompt for better AI generation
  */
-export async function optimizePrompt(
-  input: OptimizePromptInput
-): Promise<{ success: boolean; data?: OptimizePromptResult; error?: string }> {
+export async function optimizePrompt(params: OptimizePromptParams) {
   try {
     const token = await getAuthToken()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/optimize-prompt`, {
+    const response = await fetch(`${API_URL}/api/v1/optimize-prompt`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` })
       },
-      body: JSON.stringify(input)
+      body: JSON.stringify(params)
     })
 
     if (!response.ok) {

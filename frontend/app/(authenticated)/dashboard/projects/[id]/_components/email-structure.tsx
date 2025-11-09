@@ -24,7 +24,7 @@ import {
   SelectValue
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { generateContent } from "@/actions/generate"
+import { generate } from "@/actions/generate"
 import { toast } from "sonner"
 import { Separator } from "@/components/ui/separator"
 import { getLabelColor } from "../../../_components/create-project-dialog"
@@ -188,7 +188,7 @@ export function EmailStructure({
           return result
         })()
 
-      const result = await generateContent({
+      const result = await generate({
         text: project.brief_text,
         count: 1,
         tone: tone,

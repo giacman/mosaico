@@ -1,8 +1,10 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
+import { MosaicoFile } from "@/lib/mosaico-file"
+import { getAuthToken } from "@/actions/generate"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 interface TranslateContentInput {
   text: string
@@ -20,14 +22,6 @@ interface TranslateContentResult {
 }
 
 /**
- * Get authentication token from Clerk
- */
-async function getAuthToken(): Promise<string | null> {
-  const { getToken } = await auth()
-  return getToken()
-}
-
-/**
  * Translate text content to target language
  */
 export async function translateContent(
@@ -36,7 +30,7 @@ export async function translateContent(
   try {
     const token = await getAuthToken()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/translate`, {
+    const response = await fetch(`${API_URL}/api/v1/translate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -90,7 +84,7 @@ export async function batchTranslate(
   try {
     const token = await getAuthToken()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/translate/batch`, {
+    const response = await fetch(`${API_URL}/api/v1/translate/batch`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
