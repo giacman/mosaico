@@ -78,29 +78,16 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Access user information from the user object within RequestState
-        # Ensure request_state.user is not None before accessing its attributes
-        if not request_state.user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authenticated but user object not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # ONLY attempt to access user details if authentication was successful
+        # With clerk-backend-api v1.5.0, user_id is directly on the RequestState object
+        # if the user is signed in. There is no .user or .claims nested object.
+        user_id = request_state.user_id
         
-        user_id = request_state.user.id
-        # user_name and user_email might be nested or direct attributes depending on ClerkUser object
-        # Check common patterns or refer to ClerkUser object structure
-        user_name = request_state.user.first_name
-        if request_state.user.last_name:
-            user_name += f" {request_state.user.last_name}"
-        user_name = user_name or request_state.user.email_addresses[0].email_address if request_state.user.email_addresses else "Unknown User"
-        
-        # Fallback if first_name/last_name are not set, use email
-        if user_name == "": # If first_name and last_name were empty strings
-            if request_state.user.email_addresses and request_state.user.email_addresses[0].email_address:
-                user_name = request_state.user.email_addresses[0].email_address
-            else:
-                user_name = "Unknown User"
+        # The name is not directly available in the session token by default.
+        # We will use the user_id as a placeholder for the name.
+        # A more advanced implementation might fetch user details from Clerk's User API
+        # using the user_id, but for now, this will suffice.
+        user_name = f"User {user_id}"
         
         return User(id=user_id, name=user_name)
         
