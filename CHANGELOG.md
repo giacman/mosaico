@@ -4,6 +4,9 @@ All notable changes to the Mosaico project will be documented in this file.
 
 ## [0.9.0] - 2025-11-09
 
+### Changed
+- **Deployment Process**: Removed the automated database migration (Alembic) step from the CI/CD workflow for increased deployment stability. Migrations must now be run manually in the production environment.
+
 ### Added
 - **Local Docker Development Environment**: Added `docker-compose.yml` and associated configuration to run the entire backend stack (PostgreSQL and Python backend) locally in Docker containers. This provides a consistent and isolated development environment that mirrors production more closely.
 - **Automated Database Migrations on Startup**: The Docker environment now automatically runs `alembic upgrade head` on startup via a `docker-entrypoint.sh` script, ensuring the local database schema is always up-to-date.
