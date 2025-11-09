@@ -7,6 +7,7 @@ import asyncio
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from fastapi import Request # Import Request
 
 from app.core.auth import get_current_user, User
 from app.db.session import get_db
@@ -28,6 +29,7 @@ router = APIRouter()
 @router.post("/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_data: ProjectCreate,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -62,6 +64,7 @@ async def create_project(
 async def list_projects(
     skip: int = 0,
     limit: int = 100,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -82,6 +85,7 @@ async def list_projects(
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: int,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -104,6 +108,7 @@ async def get_project(
 async def update_project(
     project_id: int,
     project_data: ProjectUpdate,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -133,6 +138,7 @@ async def update_project(
 @router.post("/projects/{project_id}/duplicate", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def duplicate_project(
     project_id: int,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -158,6 +164,7 @@ async def duplicate_project(
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: int,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -180,6 +187,7 @@ async def delete_project(
 async def get_project_activity(
     project_id: int,
     limit: int = 50,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -203,6 +211,7 @@ async def get_project_activity(
 async def save_generated_content(
     project_id: int,
     request_data: SaveGeneratedContentRequest,
+    request: Request, # Add Request dependency
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

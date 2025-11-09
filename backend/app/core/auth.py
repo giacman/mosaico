@@ -7,6 +7,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from clerk_backend_api import Clerk
 from app.core.config import settings
+from fastapi import Request # Import Request
+from clerk_backend_api.jwks_helpers import AuthenticateRequestOptions # Import AuthenticateRequestOptions
+import httpx # Import httpx for httpx.Request
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,7 @@ else:
 
 
 async def get_current_user(
+    request: Request,  # Inject FastAPI's Request object
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> User:
     """
@@ -47,7 +51,6 @@ async def get_current_user(
         HTTPException: If token is invalid or user not authenticated
     """
     if not clerk_client:
-        # For development/testing without Clerk
         if settings.environment == "development":
             logger.info(f"Running in development mode with settings.environment: {settings.environment}")
             logger.warning("Clerk not configured, using development mode")
@@ -57,28 +60,31 @@ async def get_current_user(
             detail="Authentication not configured"
         )
     
-    logger.info(f"Clerk client is active. Settings environment: {settings.environment}")
-    token = credentials.credentials
-    
     try:
-        # Verify JWT token with Clerk
-        session = clerk_client.verify_token(token)
+        # Clerk's authenticate_request expects an httpx.Request.
+        # We can construct a minimal httpx.Request with the Authorization header.
+        headers = {"Authorization": f"Bearer {credentials.credentials}"}
+        httpx_request = httpx.Request("GET", "/", headers=headers) # Minimal dummy request
         
-        if not session or not session.get("sub"):
+        # Authenticate the request
+        # The authorized_parties is optional but good for security
+        # For now, let's omit it for initial testing.
+        request_state = clerk_client.authenticate_request(httpx_request)
+        
+        if not request_state.is_signed_in:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        user_id = session["sub"]
-        # Try to get user name from session claims
-        user_name = session.get("name") or session.get("email") or "Unknown User"
+        user_id = request_state.user_id
+        user_name = request_state.user_name or request_state.user_email or "Unknown User"
         
         return User(id=user_id, name=user_name)
         
     except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
+        logger.error(f"Authentication error: {str(e)}", exc_info=True) # Log full traceback
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
