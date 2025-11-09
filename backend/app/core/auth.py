@@ -35,6 +35,23 @@ if settings.clerk_secret_key:
         clerk_client = None # Ensure it's None if init fails
 else:
     logger.warning("CLERK_SECRET_KEY not provided. Running without Clerk authentication.")
+    logger.info(f"Clerk client is active. Settings environment: {settings.environment}")
+
+
+def _get_httpx_request(request: Request) -> httpx.Request:
+    """Converts a FastAPI Request to an httpx.Request."""
+    # Extract headers, excluding host, as httpx will add it.
+    headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
+
+    # Get the full URL
+    url = str(request.url)
+
+    # Reconstruct the httpx.Request
+    return httpx.Request(
+        method=request.method,
+        url=url,
+        headers=headers,
+    )
 
 
 async def get_current_user(
