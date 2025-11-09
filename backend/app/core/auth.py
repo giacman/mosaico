@@ -85,11 +85,6 @@ async def get_current_user(
         # For now, let's omit it for initial testing.
         request_state = clerk_client.authenticate_request(httpx_request, AuthenticateRequestOptions())
         
-        # CRITICAL DIAGNOSTIC LOGGING:
-        # We need to inspect the structure of the RequestState object.
-        logger.info(f"Clerk RequestState object: {request_state}")
-        logger.info(f"Clerk RequestState attributes: {dir(request_state)}")
-        
         if not request_state.is_signed_in:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -100,7 +95,14 @@ async def get_current_user(
         # ONLY attempt to access user details if authentication was successful
         # With clerk-backend-api v1.5.0, user_id is directly on the RequestState object
         # if the user is signed in. There is no .user or .claims nested object.
-        user_id = request_state.user_id
+        # The user ID is the 'sub' (subject) claim in the JWT payload.
+        user_id = request_state.payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User ID (sub) not found in token payload",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
         # The name is not directly available in the session token by default.
         # We will use the user_id as a placeholder for the name.
