@@ -13,7 +13,7 @@ RUN pip freeze > installed_packages.txt
 # --- END DEBUG ---
 
 # Copy application code
-COPY ./app /app
+COPY ./app /app/app
 
 # Expose port
 EXPOSE 8080
