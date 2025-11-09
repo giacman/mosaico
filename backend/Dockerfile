@@ -8,8 +8,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# --- DEBUG: List installed packages ---
+RUN pip freeze > installed_packages.txt
+# --- END DEBUG ---
+
 # Copy application code
-COPY app/ ./app/
+COPY ./app /app
 
 # Expose port
 EXPOSE 8080
