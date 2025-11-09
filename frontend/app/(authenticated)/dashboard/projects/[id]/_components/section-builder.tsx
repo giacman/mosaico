@@ -23,8 +23,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { RefreshCw, Edit2, Copy, FileCode, Check } from "lucide-react"
 import { Loader2 } from "lucide-react"
-import { generateContent } from "@/actions/generate"
-import { generateHandlebar } from "@/actions/export"
+import { generate } from "@/actions/generate"
+import { handlebarsGenerate } from "@/actions/export"
 import { batchTranslate } from "@/actions/translate"
 
 type Section = {
@@ -388,7 +388,7 @@ export function SectionBuilder({
     translations?: Record<string, string>
   ) => {
     try {
-      const res = await generateHandlebar({
+      const res = await handlebarsGenerate({
         component_key: key,
         translations: translations || {},
         english_fallback: englishFallback || "",
@@ -451,7 +451,7 @@ export function SectionBuilder({
                           if (!brief) return
                           setRegenBusy(v => ({ ...v, [compKey]: true }))
                           try {
-                            const result = await generateContent({
+                            const result = await generate({
                               text: brief!,
                               count: 1,
                               tone: tone || "professional",
@@ -748,7 +748,7 @@ export function SectionBuilder({
                                           if (!brief) return
                                           setRegenBusy(v => ({ ...v, [compKey]: true }))
                                           try {
-                                            const result = await generateContent({
+                                            const result = await generate({
                                               text: brief,
                                               count: 1,
                                               tone: tone || "professional",
@@ -764,22 +764,21 @@ export function SectionBuilder({
                                               if (finalVal) onUpdateComponent && onUpdateComponent(c, displayIndex, finalVal)
                                               if ((targetLanguages || []).length > 0 && finalVal && onUpdateComponents) {
                                                 try {
-                                                  const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
-                                                  const langs = targetLanguages || []
-                                                  const res = await batchTranslate(texts, langs)
-                                                  if (res.success && res.data) {
-                                                    const key = `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`
-                                                    const rawT = (res.data[key] || {}) as Record<string, string>
-                                                    const t = c === "cta"
-                                                      ? Object.fromEntries(Object.entries(rawT).map(([k,v]) => [k, String(v || "").toUpperCase()])) as Record<string,string>
-                                                      : rawT
-                                                    const merged = (components || []).map((item) => {
-                                                      if (item.component_type === c && (item.component_index || 1) === displayIndex) {
-                                                        return { ...item, generated_content: finalVal, translations: { ...(item.translations || {}), ...t } }
-                                                      }
-                                                      return item
-                                                    })
-                                                    onUpdateComponents(merged as any)
+                                                  if (finalVal) {
+                                                    const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
+                                                    const langs = targetLanguages || []
+                                                    const res = await batchTranslate(texts, langs)
+                                                    if (res.success && res.data) {
+                                                      const key = `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`
+                                                      const newTranslations = res.data[key]
+                                                      const merged = (components || []).map((item) => {
+                                                        if (item.component_type === c && (item.component_index || 1) === displayIndex) {
+                                                          return { ...item, generated_content: finalVal, translations: { ...(item.translations || {}), ...newTranslations } }
+                                                        }
+                                                        return item
+                                                      })
+                                                      onUpdateComponents(merged as any)
+                                                    }
                                                   }
                                                 } catch {}
                                               }

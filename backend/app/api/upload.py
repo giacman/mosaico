@@ -96,9 +96,9 @@ async def upload_image(
             content_type=file.content_type
         )
         
-        # Make the blob publicly accessible
-        blob.make_public()
-        
+        # The bucket is now publicly readable via IAM, so this is no longer needed and causes an error.
+        # blob.make_public()
+
         # Get public URL
         public_url = blob.public_url
         

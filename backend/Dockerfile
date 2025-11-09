@@ -4,16 +4,18 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Copy the entire backend directory into the container.
+# This includes alembic.ini, migrations/, app/, etc.
+COPY . .
+
 # Install dependencies
-COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- DEBUG: List installed packages ---
-RUN pip freeze
-# --- END DEBUG ---
+# Make the entrypoint script executable
+RUN chmod +x /app/docker-entrypoint.sh
 
-# Copy application code
-COPY ./app /app/app
+# For hot-reloading during development
+WORKDIR /app
 
 # Expose port
 EXPOSE 8080
@@ -22,6 +24,9 @@ EXPOSE 8080
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 
-# Run application
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1
+# Set the entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
+# The command to run when the container starts
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
 

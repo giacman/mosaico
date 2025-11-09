@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15
+    container_name: mosaico_db_local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5433:5432" # Map container port 5432 to host port 5433 to avoid conflicts
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mosaico_backend_local
+    env_file:
+      - .env
+    environment:
+      # Point to the mounted credentials file
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
+    ports:
+      - "8000:8080" # Map container port 8080 to host port 8000
+    volumes:
+      - ./backend/app:/app/app # Mount local code for hot-reloading
+      # Mount the GCP credentials file from the host into the container
+      - ~/.config/gcloud/application_default_credentials.json:/app/gcp-credentials.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
