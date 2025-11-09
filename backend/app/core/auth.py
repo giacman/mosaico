@@ -78,8 +78,29 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        user_id = request_state.user_id
-        user_name = request_state.user_name or request_state.user_email or "Unknown User"
+        # Access user information from the user object within RequestState
+        # Ensure request_state.user is not None before accessing its attributes
+        if not request_state.user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authenticated but user object not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user_id = request_state.user.id
+        # user_name and user_email might be nested or direct attributes depending on ClerkUser object
+        # Check common patterns or refer to ClerkUser object structure
+        user_name = request_state.user.first_name
+        if request_state.user.last_name:
+            user_name += f" {request_state.user.last_name}"
+        user_name = user_name or request_state.user.email_addresses[0].email_address if request_state.user.email_addresses else "Unknown User"
+        
+        # Fallback if first_name/last_name are not set, use email
+        if user_name == "": # If first_name and last_name were empty strings
+            if request_state.user.email_addresses and request_state.user.email_addresses[0].email_address:
+                user_name = request_state.user.email_addresses[0].email_address
+            else:
+                user_name = "Unknown User"
         
         return User(id=user_id, name=user_name)
         
