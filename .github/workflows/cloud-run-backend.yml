@@ -68,18 +68,23 @@ jobs:
           
           # --- NEW: Wait for proxy to be ready ---
           echo "Waiting for Cloud SQL Proxy to be ready..."
-          timeout=60
-          until grep -q "Ready for new connections" proxy.log || [ $timeout -eq 0 ]; do
+          for i in {1..20}; do
+            # Use netcat to check if the port is open and available
+            if nc -z 127.0.0.1 5432; then
+              echo "Proxy is ready."
+              break
+            fi
+            echo "Waiting for proxy... attempt $i of 20"
             sleep 1
-            timeout=$((timeout - 1))
           done
-          
-          if ! grep -q "Ready for new connections" proxy.log; then
-            echo "Error: Cloud SQL Proxy did not start in time. Proxy log:"
+
+          # Check if the loop completed without the proxy being ready
+          if ! nc -z 127.0.0.1 5432; then
+            echo "Error: Cloud SQL Proxy did not start in time."
+            echo "--- Proxy Log ---"
             cat proxy.log
             exit 1
           fi
-          echo "Cloud SQL Proxy is ready."
           # --- END NEW ---
           
           # Run Alembic migrations
