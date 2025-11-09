@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"GCP Project: {settings.gcp_project_id}")
     logger.info(f"Vertex AI Model: {settings.vertex_ai_model}")
+    logger.info(f"Database URL: {settings.database_url}")
     logger.info("=" * 50)
     # Auto-create DB tables if not present (simple bootstrap for MVP)
     try:
