@@ -1,4 +1,4 @@
-# Mosaico Backend - Dockerfile for Cloud Run
+# Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
 # Set working directory
@@ -14,9 +14,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Make the entrypoint script executable
 RUN chmod +x /app/docker-entrypoint.sh
 
-# For hot-reloading during development
-WORKDIR /app
-
 # Expose port
 EXPOSE 8080
 
@@ -27,6 +24,6 @@ ENV PORT=8080
 # Set the entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
-# The command to run when the container starts
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# The command to run when the container starts (passed to the entrypoint)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--log-level", "info"]
 
