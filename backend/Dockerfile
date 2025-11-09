@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- DEBUG: List installed packages ---
-RUN pip freeze > installed_packages.txt
+RUN pip freeze
 # --- END DEBUG ---
 
 # Copy application code
