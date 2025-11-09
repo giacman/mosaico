@@ -61,15 +61,17 @@ async def get_current_user(
         )
     
     try:
-        # Clerk's authenticate_request expects an httpx.Request.
-        # We can construct a minimal httpx.Request with the Authorization header.
-        headers = {"Authorization": f"Bearer {credentials.credentials}"}
-        httpx_request = httpx.Request("GET", "/", headers=headers) # Minimal dummy request
+        httpx_request = _get_httpx_request(request)
         
-        # Authenticate the request
-        # The authorized_parties is optional but good for security
+        # Authenticate the request with Clerk
+        # Note: The 'options' parameter is currently an empty dict. 
         # For now, let's omit it for initial testing.
         request_state = clerk_client.authenticate_request(httpx_request, AuthenticateRequestOptions())
+        
+        # CRITICAL DIAGNOSTIC LOGGING:
+        # We need to inspect the structure of the RequestState object.
+        logger.info(f"Clerk RequestState object: {request_state}")
+        logger.info(f"Clerk RequestState attributes: {dir(request_state)}")
         
         if not request_state.is_signed_in:
             raise HTTPException(
