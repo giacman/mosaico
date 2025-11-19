@@ -26,6 +26,8 @@ services:
     environment:
       # Point to the mounted credentials file
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
+      # Explicitly map GCS bucket from root .env to override any defaults
+      - GCS_BUCKET_IMAGES=${GCS_BUCKET_IMAGES}
     ports:
       - "8000:8080" # Map container port 8080 to host port 8000
     volumes:
