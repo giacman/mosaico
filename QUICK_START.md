@@ -2,9 +2,9 @@
 
 ## ✅ Current Status
 
-**Backend:** Running on http://localhost:8080  
-**Frontend:** Running on http://localhost:3000  
-**Database:** PostgreSQL ready  
+**Backend:** Running on http://localhost:8000 (Docker)  
+**Frontend:** Running on http://localhost:3000 (Next.js)  
+**Database:** PostgreSQL ready (Docker)  
 **Auth:** Clerk configured
 
 ---
@@ -25,7 +25,7 @@ You should see:
    - **Name:** "Spring Campaign 2025"
    - **Brief:** "Promote our new handbag collection"
 3. Click "Create Project"
-4. You'll be redirected to the project editor (404 expected - we'll build it next!)
+4. You'll be redirected to the project editor!
 
 ### 3. View Projects
 - Each project card shows:
@@ -46,18 +46,22 @@ You should see:
 ## 🔧 If Something's Not Working
 
 ### Backend Not Running?
+
+We use Docker Compose now.
+
 ```bash
-cd /Users/gvannucchi/Projects/mosaico/backend
-source .venv-mosaico/bin/activate
-python -m app.main
+cd /Users/gvannucchi/Projects/mosaico
+docker compose up -d --build
 ```
 
 You should see:
-```
-INFO:     Uvicorn running on http://127.0.0.1:8080
-```
+- `mosaico_backend_local`
+- `mosaico_db_local`
+
+Check status: `docker compose ps`
 
 ### Frontend Not Running?
+
 ```bash
 cd /Users/gvannucchi/Projects/mosaico/frontend
 npm run dev
@@ -70,33 +74,39 @@ You should see:
 ```
 
 ### Database Connection Issues?
+
+The database runs in Docker on port `5433` (host).
+
 ```bash
-# Check PostgreSQL is running
-brew services list | grep postgresql
-
-# If not running:
-brew services start postgresql@15
-
 # Test connection
-psql mosaico -c "SELECT COUNT(*) FROM projects;"
+psql -h localhost -p 5433 -U mosaico -d mosaico -c "SELECT COUNT(*) FROM projects;"
 ```
 
 ### Authentication Not Working?
-- Make sure `frontend/.env.local` has valid Clerk keys
-- Keys should start with:
+
+- Make sure `frontend/.env.local` has valid Clerk keys:
   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...`
   - `CLERK_SECRET_KEY=sk_test_...`
+
+### API Connection Refused?
+
+Make sure `frontend/.env.local` points to `127.0.0.1`:
+```bash
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
+```
 
 ---
 
 ## 📋 Test the Full Flow
 
 ### Step 1: Create a Test Project via API
+
 ```bash
 # Get your Clerk JWT token from browser DevTools
 # (Application > Local Storage > clerk-db-jwt)
 
-curl -X POST http://localhost:8080/api/v1/projects \
+curl -X POST http://localhost:8000/api/v1/projects \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -d '{
@@ -117,22 +127,18 @@ curl -X POST http://localhost:8080/api/v1/projects \
 
 ### Step 3: Verify in Database
 ```bash
-psql mosaico -c "SELECT id, name, created_at FROM projects;"
+psql -h localhost -p 5433 -U mosaico -d mosaico -c "SELECT id, name, created_at FROM projects;"
 ```
 
 ---
 
 ## 🐛 Known Issues (Expected)
 
-1. **Project Editor Page (404)** - We haven't built it yet!
-   - When you click "Edit" on a project, you'll get a 404
-   - This is expected - it's the next thing to build
-
-2. **"Customer table not available"** warnings in logs
+1. **"Customer table not available"** warnings in logs
    - These are harmless - we disabled billing features
    - The app gracefully handles this
 
-3. **"STRIPE_SECRET_KEY is not set"** warnings
+2. **"STRIPE_SECRET_KEY is not set"** warnings
    - Also harmless - Stripe is optional
    - Billing features are disabled
 
@@ -147,12 +153,14 @@ psql mosaico -c "SELECT id, name, created_at FROM projects;"
 - Clerk authentication
 - Clean UI with shadcn/ui components
 
-⏳ **Phase 2 Next:**
-- Project editor page
-- Email structure builder
-- Image upload manager
+✅ **Phase 2 Progress:**
+- Project editor page (in progress)
+- Email structure builder (V2 drag & drop)
+- Image upload manager (GCS integration)
 - AI content generation UI
 - Translation UI
+
+⏳ **Coming Soon:**
 - Google Sheets export
 
 ---
@@ -160,31 +168,19 @@ psql mosaico -c "SELECT id, name, created_at FROM projects;"
 ## 🎉 Quick Demo Commands
 
 ```bash
-# Start everything
+# 1. Start Backend & DB (Root)
 cd /Users/gvannucchi/Projects/mosaico
+docker compose up -d
 
-# Terminal 1: Backend
-cd backend && source .venv-mosaico/bin/activate && python -m app.main
+# 2. Start Frontend (Frontend dir)
+cd frontend
+npm run dev
 
-# Terminal 2: Frontend  
-cd frontend && npm run dev
-
-# Terminal 3: Database queries
-psql mosaico
+# 3. View logs
+docker logs -f mosaico_backend_local
 ```
 
 ---
 
-## 💡 Next Steps
-
-**Ready to continue building?** Say:
-- "Build the project editor" - I'll create the main editing interface
-- "Show me what to test" - I'll guide you through testing
-- "Something's broken" - Tell me what and I'll fix it!
-
----
-
-**Last Updated:** December 16, 2025  
-**Status:** Phase 1 Complete ✅ | Phase 2 Ready to Build 🚀
-
-
+**Last Updated:** November 19, 2025
+**Status:** Phase 2 Active Development 🚀

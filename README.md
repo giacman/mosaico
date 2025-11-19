@@ -48,7 +48,7 @@
 | **AI** | Google Vertex AI (Gemini 2.5 Pro/Flash) | Content generation, translation, prompt optimization |
 | **Storage** | Google Cloud Storage | User-uploaded images, prompt templates |
 | **Auth** | Clerk | User authentication and authorization |
-| **Deployment** | Google Cloud Run (planned) | Serverless container deployment |
+| **Deployment** | Google Cloud Run | Serverless container deployment |
 | **Monitoring** | Cloud Logging, Slack Webhooks | Error tracking and team notifications |
 
 ### System Flow
@@ -72,7 +72,7 @@ Export to Airship (Handlebar Templates)
 
 ## 🚀 Local Setup Guide (Docker)
 
-Follow these steps to set up and run Mosaico on your local machine using Docker. This is the recommended approach for a consistent development environment.
+This is the recommended way to run Mosaico locally. It ensures consistent environments and simplifies dependency management.
 
 ### Prerequisites
 
@@ -83,61 +83,67 @@ Follow these steps to set up and run Mosaico on your local machine using Docker.
 
 ### 1. Environment Setup
 
-First, configure the necessary environment variables for all services.
+**Note:** There are two main environment files you need to configure.
+
+#### A. Root Configuration (Backend & Docker)
+Create a `.env` file in the **project root** (`/mosaico/.env`). This configures Docker Compose, the Database, and the Backend.
 
 ```bash
-# 1. Navigate to the project root directory
-cd /path/to/mosaico
-
-# 2. Create the environment file from the example
-#    Note: Docker Compose automatically reads the `.env` file in the root.
 cp .env.example .env
+```
 
-# 3. Edit the .env file with your actual credentials:
-#    - POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB (can be anything for local dev)
-#    - DATABASE_URL (should match the postgres values)
-#    - CLERK_SECRET_KEY (your development key from Clerk)
-#    - GCP_PROJECT_ID, GCP_LOCATION, VERTEX_AI_MODEL, etc.
-#    - GCS_BUCKET_* (use your development bucket names, e.g., mosaico-images-dev-474415)
+Edit `.env` with your credentials:
+- **Postgres**: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (e.g., `mosaico`)
+- **Database URL**: `DATABASE_URL=postgresql+psycopg2://mosaico:mosaico@db:5432/mosaico` (must match Postgres values)
+- **Google Cloud**: `GCP_PROJECT_ID`, `GCP_LOCATION`
+- **Vertex AI**: `VERTEX_AI_MODEL=gemini-2.5-pro`
+- **Storage**: `GCS_BUCKET_IMAGES` (e.g., `mosaico-images-dev-xxxxx`)
+- **Auth**: `CLERK_SECRET_KEY`
 
-# 4. Authenticate with Google Cloud for Application Default Credentials
-#    This allows the backend container to access GCP services like Vertex AI and GCS.
+**Authenticate locally:**
+To let the backend container access GCP services (Vertex AI, GCS):
+```bash
 gcloud auth application-default login
 gcloud config set project <YOUR_GCP_PROJECT_ID>
 ```
 
-### 2. Run the Application
-
-With the configuration in place, you can start the entire stack.
+#### B. Frontend Configuration
+Create a `.env.local` file in the **frontend directory** (`/mosaico/frontend/.env.local`).
 
 ```bash
-# 1. Build and start the Docker containers (PostgreSQL and Backend)
-#    This command will also run database migrations automatically.
-docker-compose up --build
-
-# 2. In a NEW terminal, navigate to the frontend directory
 cd frontend
-
-# 3. Set up frontend environment variables
 cp .env.example .env.local
-
-# 4. Edit .env.local with your frontend-specific keys:
-#    - NEXT_PUBLIC_API_URL=http://localhost:8000
-#    - BACKEND_URL=http://localhost:8000
-#    - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-#    - CLERK_SECRET_KEY
-
-# 5. Install frontend dependencies
-npm install
-
-# 6. Start the frontend development server
-npm run dev
 ```
 
-### Accessing the Application
-- **Frontend**: `http://localhost:3000`
-- **Backend API Docs**: `http://localhost:8000/docs`
-- **Database (local)**: Connect on host port `5433` (to avoid conflicts)
+Edit `.env.local`:
+- `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000` (Use 127.0.0.1 to avoid node/docker network issues)
+- `NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+
+---
+
+### 2. Run the Application
+
+#### Start Backend & Database
+From the project root:
+
+```bash
+docker compose up -d --build
+```
+- This starts PostgreSQL (port 5433 host / 5432 container) and Backend (port 8000 host / 8080 container).
+- It automatically runs database migrations on startup.
+
+**Verify Backend:** `curl http://localhost:8000/health`
+
+#### Start Frontend
+From the `frontend` directory:
+
+```bash
+npm install
+npm run dev
+```
+**Access Frontend:** `http://localhost:3000`
 
 ---
 
@@ -147,22 +153,13 @@ npm run dev
 
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and release notes
 - **[CURRENT_STATUS.md](CURRENT_STATUS.md)**: Current project status and recent changes
-- **[QUICK_START.md](QUICK_START.md)**: Step-by-step setup guide
+- **[QUICK_START.md](QUICK_START.md)**: Summary setup guide
 - **[TEAM_WORKFLOW_NOTIFICATIONS.md](TEAM_WORKFLOW_NOTIFICATIONS.md)**: Team collaboration workflow and notification system
 
 ### Backend Documentation
 
 - **[backend/README.md](backend/README.md)**: Backend architecture and API reference
-- **[backend/PHASE2_SETUP.md](backend/PHASE2_SETUP.md)**: Production deployment guide
 - **[backend/docs/FEW_SHOT_STRATEGY.md](backend/docs/FEW_SHOT_STRATEGY.md)**: Few-shot learning design and rationale
-
-### Frontend Documentation
-
-- **[frontend/MOSAICO_SETUP.md](frontend/MOSAICO_SETUP.md)**: Frontend architecture and component guide
-
-### Archive
-
-- **[docs/](docs/)**: Historical documentation and design decisions
 
 ---
 
@@ -199,178 +196,6 @@ Mosaico supports a collaborative multi-team workflow:
 ```handlebars
 {{#eq selected_language "IT"}}Scopri la collezione{{else eq selected_language "FR"}}Découvrez la collection{{else}}Discover the collection{{/eq}}
 ```
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-#### Backend (`.env`)
-```bash
-# Google Cloud
-GCP_PROJECT_ID=your-project-id
-GCP_LOCATION=europe-west1
-GCS_BUCKET_IMAGES=mosaico-images
-
-# Vertex AI
-VERTEX_AI_MODEL=gemini-2.5-pro
-VERTEX_AI_MODEL_FLASH=gemini-2.5-flash
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/mosaico
-
-# Authentication
-CLERK_SECRET_KEY=sk_test_xxxxx
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-
-# API
-RATE_LIMIT_PER_SECOND=30
-ALLOWED_ORIGINS=http://localhost:3000
-
-# Notifications (optional)
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-```
-
-#### Frontend (`.env.local`)
-```bash
-# API
-NEXT_PUBLIC_API_URL=http://localhost:8080
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
-
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
-CLERK_SECRET_KEY=sk_test_xxxxx
-```
-
----
-
-## 🛠️ Development
-
-### Backend Development
-
-```bash
-cd backend
-source venv/bin/activate
-
-# Run with auto-reload
-uvicorn app.main:app --reload --port 8080
-
-# Run tests
-pytest tests/
-
-# Create new migration
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-
-# Run dev server
-npm run dev
-
-# Build for production
-npm run build
-
-# Run production build
-npm start
-
-# Lint
-npm run lint
-```
-
-### Database Migrations
-
-```bash
-# Create migration
-alembic revision --autogenerate -m "add new table"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-
-# View history
-alembic history
-```
-
----
-
-## 📊 API Endpoints
-
-### Content Generation
-- `POST /api/v1/generate` - Generate email content with dynamic structure
-- `POST /api/v1/optimize-prompt` - Optimize user briefs with AI assistance
-- `POST /api/v1/refine` - Refine/improve existing content
-  - Options: `use_flash`, `use_few_shot`, `temperature`, `count`
-
-### Translation
-- `POST /api/v1/translate` - Translate single text
-- `POST /api/v1/translate/batch` - Batch translate multiple texts to multiple languages
-
-### Projects
-- `GET /api/v1/projects` - List all projects
-- `POST /api/v1/projects` - Create new project
-- `GET /api/v1/projects/{id}` - Get project details
-- `PUT /api/v1/projects/{id}` - Update project
-- `DELETE /api/v1/projects/{id}` - Delete project
-
-### Media & Export
-- `POST /api/v1/upload-image` - Upload image to Google Cloud Storage
-- `POST /api/v1/handlebars/generate` - Generate handlebar template for component
-- `POST /api/v1/projects/{id}/export` - Export project to Google Sheets (future)
-
-Full API documentation: `http://localhost:8080/docs` (when backend is running)
-
----
-
-## 🎨 Features Deep Dive
-
-### AI Content Generation
-- **Drag-and-Drop Structure Builder (V2)**: Subject + Pre-header always present; add/reorder Title/Body/CTA
-- **Tone Control**: Professional, casual, enthusiastic, elegant, direct
-- **Temperature Control**: 0.0 (consistent) to 1.0 (creative)
-- **Image Context**: Upload product images for AI to reference during generation
-- **Prompt Assistant**: AI-powered brief optimization for better results
-- **Regenerate**: Regenerate all components or individual ones with preserved context
-- **Few-Shot Strategy**: Only on regeneration to boost variety; kept off for initial generation to avoid JSON errors
-- **Intelligent Model Selection**: Pro for long/narrative, Flash for short or image+complex, with auto-fallback
-- **CTA Uppercase Normalization**: Enforced at prompt and post-processing
-
-### Translation System
-- **Batch Processing**: Translate multiple components to multiple languages in parallel
-- **Context Preservation**: Maintains tone, formality, and brand voice across languages
-- **Auto-Retranslation**: Regenerate All/Single re-triggers translations for changed content
-- **Save & Retranslate**: Manual edits can persist and refresh all translations for that component
-- **Visual Feedback**: Spinner, muted cards, disabled copy buttons during translation
-- **Retry Logic & Limits**: Robustness under rate limits, with Flash model for speed
-
-### Project Management & Navigation
-- **Labels**: Colored badges on cards, editor, and sidebar; quick toggle + autosave in editor
-- **Status**: `in_progress` (editable) vs `approved` (read-only UI with output-only view)
-- **Sidebar**: Projects nested under In Progress / Approved; collapsible groups; persisted state
-- **Dashboard Tabs**: Quick filter by In Progress, Approved, All
-
-### Notification System
-
-**Dual Notification Approach:**
-1. **Toasts** (temporary, 3-5 seconds): Immediate feedback
-2. **Notification Center** (persistent): Activity history with bell icon and badge
-
-**Key Notifications:**
-- Project created (CRM team kickoff)
-- Content generated (content team review)
-- Translation completed (translation team review + Airship export)
-
-**Backend Integration:**
-- Slack webhooks for team-wide visibility
-- Manager oversight without being in the app
 
 ---
 
@@ -426,14 +251,6 @@ cd frontend
 vercel --prod
 ```
 
-See `backend/PHASE2_SETUP.md` for detailed production deployment instructions.
-
-**Triggering a new build for Vercel.**
-
-### Manual Cloud Run deploy via GitHub Actions
-- Go to GitHub → Actions → “Deploy Backend to Cloud Run” → Run workflow.
-- Or push any change under `backend/` to `main`.
-
 ---
 
 ## 🤝 Contributing
@@ -482,5 +299,3 @@ For questions or issues:
 ---
 
 **Built with ❤️ for modern marketing teams**
-
-*Webhook test.*
