@@ -15,24 +15,24 @@
 
 **Mosaico** is an AI-powered platform for creating, translating, and managing multilingual email campaign content. Built for modern marketing teams, it streamlines the workflow from content creation to export, leveraging **Google Vertex AI (Gemini 2.5)** for intelligent content generation.
 
-### Key Features
+---
 
-- ✨ **AI Content Generation**: Create email components (subjects, pre-headers, title, body, CTAs) with customizable tone and structure
+## ✨ Key Features
+
+- 🤖 **AI Content Generation**: Create email components (subjects, pre-headers, title, body, CTAs) with customizable tone and structure
+- 🎓 **Few-Shot Learning**: Strategic use of examples during regeneration to increase content variety while maintaining JSON stability
 - 🌍 **Batch Translation**: Translate content to multiple languages simultaneously with context preservation
-- 🎯 **Drag-and-Drop Email Structure**: Visual builder with always-on Subject & Pre-header; add/reorder Title, Body, CTAs
+- 🎯 **Drag-and-Drop Email Structure**: Visual builder with always-on Subject & Pre-header; add/reorder Title, Body, CTAs, and Images
 - 🖼️ **Image Context**: Generate content based on uploaded product images
 - 🔄 **Regenerate & Refine**: Fine-tune individual components with temperature control (0.0-1.0)
 - 🧠 **Intelligent Model Selection**: Auto-choose Gemini Pro vs Flash with JSON-stability fallback
 - 📊 **Project Management**: Organize campaigns with team collaboration and activity tracking
-- 🏷️ **Labels**: Add pastel color labels to projects (dashboard, editor, sidebar)
-- ✅ **Status**: `in_progress` (editable) vs `approved` (read-only) with UI gating
+- 🏷️ **Labels & Status**: Add pastel color labels; `in_progress` (editable) vs `approved` (read-only) with UI gating
 - 🧭 **Sidebar & Filters**: Projects nested under In Progress / Approved; dashboard tabs for filtering
-- 🔔 **Notifications**: Real-time in-app and Slack notifications for team handoffs
+- 🔔 **Notifications**: Real-time in-app and Slack notifications for team handoffs with persistent notification bell
 - 📤 **Handlebar Export**: Export components with multi-language handlebar templates for Airship integration
 - 🔠 **CTA Consistency**: CTAs normalized to UPPERCASE across generation and regeneration
-- 🔁 **Auto-Retranslation**: Regeneration and manual edits trigger translation updates with clear UX states
-  - Single-component regenerate now automatically re-translates only that component
-  - Notification bell persists entries across navigation
+- 🔁 **Auto-Retranslation**: Regeneration and manual edits trigger translation updates with clear UX feedback states
 
 ---
 
@@ -44,26 +44,27 @@
 |-------|-----------|---------|
 | **Frontend** | Next.js 15, React, TypeScript, Tailwind CSS, shadcn/ui | Modern web application with real-time updates |
 | **Backend** | Python, FastAPI, SQLAlchemy, Alembic | RESTful API with async support |
-| **Database** | PostgreSQL | Project data, components, translations, activity logs |
+| **Database** | PostgreSQL (local), Google Cloud SQL (production) | Project data, components, translations, activity logs |
 | **AI** | Google Vertex AI (Gemini 2.5 Pro/Flash) | Content generation, translation, prompt optimization |
 | **Storage** | Google Cloud Storage | User-uploaded images, prompt templates |
 | **Auth** | Clerk | User authentication and authorization |
-| **Deployment** | Google Cloud Run | Serverless container deployment |
+| **Deployment** | Vercel (Frontend), Google Cloud Run (Backend) | Serverless deployment |
 | **Monitoring** | Cloud Logging, Slack Webhooks | Error tracking and team notifications |
 
 ### System Flow
 
 ```
-User (Next.js Frontend)
+User (Next.js Frontend on Vercel)
     ↓
 Clerk Authentication
     ↓
 FastAPI Backend (Cloud Run)
     ↓
-┌─────────────┬──────────────┬───────────────┐
-│  PostgreSQL │  Vertex AI   │  Cloud Storage│
-│  (Projects) │  (Gemini)    │  (Images)     │
-└─────────────┴──────────────┴───────────────┘
+┌──────────────────┬──────────────┬───────────────┐
+│  PostgreSQL      │  Vertex AI   │  Cloud Storage│
+│  (Local Dev) or  │  (Gemini)    │  (Images)     │
+│  Cloud SQL (Prod)│              │               │
+└──────────────────┴──────────────┴───────────────┘
     ↓
 Export to Airship (Handlebar Templates)
 ```
@@ -123,79 +124,72 @@ Edit `.env.local`:
 
 ---
 
-### 2. Run the Application
+### 2. Initial Build
 
-#### Start Backend & Database
-From the project root:
+Build the Docker images for the first time or after code changes:
 
 ```bash
 docker compose up -d --build
 ```
-- This starts PostgreSQL (port 5433 host / 5432 container) and Backend (port 8000 host / 8080 container).
-- It automatically runs database migrations on startup.
+- This **rebuilds** the Docker images with your latest code
+- Starts PostgreSQL (port 5433 host / 5432 container) and Backend (port 8000 host / 8080 container)
+- Automatically runs database migrations on startup
 
 **Verify Backend:** `curl http://localhost:8000/health`
 
-#### Start Frontend
+---
+
+## 🏃 Run Locally
+
+Once you've completed the setup above, use these commands for daily development:
+
+### Start Backend & Database (using existing images)
+
+```bash
+docker compose up -d
+```
+*Note: Only use `--build` flag when you've made changes to the backend code.*
+
+### View Logs
+
+To follow the logs after starting in detached mode:
+
+```bash
+# View all service logs
+docker compose logs -f
+
+# View logs for specific service
+docker compose logs -f backend
+docker compose logs -f db
+
+# View last 100 lines and then follow
+docker compose logs -f --tail=100
+```
+
+*Press `Ctrl+C` to stop following logs (containers continue running).*
+
+### Start Frontend
+
 From the `frontend` directory:
 
 ```bash
-npm install
 npm run dev
 ```
-**Access Frontend:** `http://localhost:3000`
+
+**Access the Application:**
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+- API Docs: `http://localhost:8000/docs`
 
 ---
 
 ## 📖 Documentation
 
-### Core Documentation
-
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and release notes
-- **[CURRENT_STATUS.md](CURRENT_STATUS.md)**: Current project status and recent changes
-- **[QUICK_START.md](QUICK_START.md)**: Summary setup guide
+- **[QUICK_START.md](QUICK_START.md)**: Quick setup guide
 - **[TEAM_WORKFLOW_NOTIFICATIONS.md](TEAM_WORKFLOW_NOTIFICATIONS.md)**: Team collaboration workflow and notification system
-
-### Backend Documentation
-
-- **[backend/README.md](backend/README.md)**: Backend architecture and API reference
 - **[backend/docs/FEW_SHOT_STRATEGY.md](backend/docs/FEW_SHOT_STRATEGY.md)**: Few-shot learning design and rationale
-
----
-
-## 🎯 Team Workflow
-
-Mosaico supports a collaborative multi-team workflow:
-
-### 1. **Project Setup** (CRM Team)
-- Create new campaign project
-- Define email structure (subjects, CTAs, body sections)
-- Add creative brief and context
-- Upload product images
-- Add URLs for CTAs and products
-
-### 2. **Content Generation** (AI + Content Team Review)
-- AI generates email components based on brief and images
-- Intelligent model selection (Pro/Flash) with automatic Flash fallback for JSON stability
-- Few-shot examples used during regeneration only, for higher variety without breaking JSON
-- Individual component regeneration with temperature control
-- Real-time editing and approval
-
-### 3. **Translation** (AI + Translation Team Review)
-- Batch translate to multiple languages (IT, DE, FR, ES, PT, RU, ZH, JA, AR, NL)
-- Auto-retranslation after Regenerate All / Regenerate Single if translations existed
-- "Save & Retranslate" after manual edits to keep translations in sync
-- Spinner + greyed-out states + disabled actions during translation
-
-### 4. **Export to Airship** (CRM Team)
-- Export components as handlebar templates
-- Copy/paste into Airship email editor
-- Handlebar format supports dynamic language selection
-
-**Example Handlebar Output:**
-```handlebars
-{{#eq selected_language "IT"}}Scopri la collezione{{else eq selected_language "FR"}}Découvrez la collection{{else}}Discover the collection{{/eq}}
-```
+- **API Documentation**: `http://localhost:8000/docs` (when running locally)
 
 ---
 
@@ -287,15 +281,3 @@ Private & Confidential - All Rights Reserved
 - **FastAPI** for the high-performance backend framework
 - **Next.js** for the modern React framework
 
----
-
-## 📞 Support
-
-For questions or issues:
-- Check the [documentation](docs/)
-- Review [CURRENT_STATUS.md](CURRENT_STATUS.md) for known issues
-- Contact the development team
-
----
-
-**Built with ❤️ for modern marketing teams**
