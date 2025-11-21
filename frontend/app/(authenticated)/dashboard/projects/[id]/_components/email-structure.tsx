@@ -148,7 +148,14 @@ export function EmailStructure({
     return (list || []).map((c: any) => {
       const raw = normalizeTranslationsMap(c.translations)
       const filtered = Object.fromEntries(Object.entries(raw).filter(([k]) => allowed.has(String(k).toLowerCase())))
-      return { ...c, translations: filtered }
+      // Remove section_key and section_order as backend doesn't accept them in save requests
+      const { section_key, section_order, image, ...rest } = c
+      // Ensure generated_content is never null (backend requires string)
+      return { 
+        ...rest, 
+        generated_content: rest.generated_content ?? "",
+        translations: filtered 
+      }
     })
   }
 
@@ -497,6 +504,7 @@ export function EmailStructure({
           onProjectChange("components", normalized as any)
           // Save and get the definitive state from the backend
           const result = await saveGeneratedComponents(project.id, normalized as any)
+          
           if (result.success && result.components) {
             // Sync the UI with the backend's source of truth
             onProjectChange("components", result.components as any)

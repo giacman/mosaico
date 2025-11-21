@@ -102,7 +102,12 @@ export function SectionBuilder({
         if (!image && comp?.image_id && projectImages) {
           const foundImage = projectImages.find(img => Number(img.id) === comp.image_id)
           if (foundImage) {
-            image = foundImage
+            // Normalize: backend returns gcs_public_url, but frontend expects url
+            image = {
+              id: String(foundImage.id),
+              url: (foundImage as any).gcs_public_url || (foundImage as any).url,
+              filename: foundImage.filename
+            }
           }
         }
 
@@ -244,9 +249,12 @@ export function SectionBuilder({
       const counters: Record<string, number> = {}
       let targetType: string | null = null
       let targetIndex: number = -1
+      let targetSectionOrder: number = 0
 
-      for (const section of value) {
+      for (let sectionIdx = 0; sectionIdx < value.length; sectionIdx++) {
+        const section = value[sectionIdx]
         if (section.key === sectionKey) {
+          targetSectionOrder = sectionIdx
           for (let i = 0; i < section.components.length; i++) {
             const type = section.components[i]
             counters[type] = (counters[type] || 0) + 1
@@ -278,6 +286,8 @@ export function SectionBuilder({
             image_id: Number(uploaded.id),
             image: uploaded,
             translations: {},
+            section_key: sectionKey,
+            section_order: targetSectionOrder,
           })
         }
         await onUpdateComponents(list as any)
