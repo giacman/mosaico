@@ -73,6 +73,23 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
   const [showPromptAssistant, setShowPromptAssistant] = useState(false)
   const [savingStatus, setSavingStatus] = useState(false)
 
+  // Debug: Log initial project data once on mount
+  useEffect(() => {
+    if (!mounted) {
+      console.log("=== INITIAL PROJECT DATA ===");
+      console.log("Project ID:", initialProject.id);
+      console.log("Project Images Count:", initialProject.images?.length || 0);
+      console.log("Project Images:", initialProject.images);
+      console.log("Project Components Count:", initialProject.components?.length || 0);
+      initialProject.components?.forEach((comp, idx) => {
+        if (comp.image_id) {
+          console.log(`Component ${idx} (${comp.component_type} #${comp.component_index}): image_id = ${comp.image_id}`);
+        }
+      });
+      console.log("=== END INITIAL PROJECT DATA ===");
+    }
+  }, [mounted, initialProject]);
+
   // Fix hydration by only rendering after mount
   useEffect(() => {
     setMounted(true)

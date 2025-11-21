@@ -28,7 +28,7 @@ async function getAuthToken(): Promise<string | null> {
 export async function saveGeneratedComponents(
   projectId: number,
   components: SavedComponent[]
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; components?: any[]; images?: any[] }> {
   try {
     const token = await getAuthToken()
 
@@ -55,10 +55,12 @@ export async function saveGeneratedComponents(
       }
     }
 
+    const savedData = await response.json()
+
     // Revalidate the project page to show saved components
     revalidatePath(`/dashboard/projects/${projectId}`)
 
-    return { success: true }
+    return { success: true, components: savedData.components, images: savedData.images }
   } catch (error) {
     console.error("Error saving components:", error)
     return {

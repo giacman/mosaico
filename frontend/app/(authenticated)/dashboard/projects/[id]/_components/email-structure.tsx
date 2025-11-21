@@ -77,6 +77,8 @@ export function EmailStructure({
 }: EmailStructureProps) {
   const [temperature, setTemperature] = useState(0.7)
   const [tone, setTone] = useState(project.tone ?? "professional")
+
+
   const [isGenerating, setIsGenerating] = useState(false)
   const [sections, setSections] = useState(() => {
     const initialStructure = Array.isArray(project.structure)
@@ -189,6 +191,7 @@ export function EmailStructure({
         })()
 
       const result = await generate({
+        project_id: project.id,
         text: project.brief_text,
         count: 1,
         tone: tone,
@@ -483,14 +486,25 @@ export function EmailStructure({
         }}
         onImagesChange={(imgs) => setImages(imgs)}
         components={(project.components as any) || []}
+        projectImages={(project.images as any) || []}
         brief={project.brief_text || ""}
         tone={tone}
         currentLanguage={viewLang}
         targetLanguages={(project.target_languages as any) || []}
-        onUpdateComponents={(list) => {
+        onUpdateComponents={async (list) => {
           const normalized = normalizeComponentList(list as any)
+          // Optimistically update the UI for responsiveness
           onProjectChange("components", normalized as any)
-          saveGeneratedComponents(project.id, normalized as any)
+          // Save and get the definitive state from the backend
+          const result = await saveGeneratedComponents(project.id, normalized as any)
+          if (result.success && result.components) {
+            // Sync the UI with the backend's source of truth
+            onProjectChange("components", result.components as any)
+            // Also update images if the backend returned them
+            if (result.images) {
+              onProjectChange("images", result.images as any)
+            }
+          }
         }}
         onUpdateComponent={(type, index, content) => {
           const list: any[] = [...((project.components as any) || [])]
