@@ -29,11 +29,12 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { formatDistanceToNow } from "date-fns"
-import { Copy, MoreVertical, Trash2 } from "lucide-react"
+import { Copy, MoreVertical, Trash2, ImageIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import { getLabelColor } from "./create-project-dialog"
+import Image from "next/image"
 
 export function ProjectCard({ project }: { project: Project }) {
   const router = useRouter()
@@ -179,6 +180,43 @@ export function ProjectCard({ project }: { project: Project }) {
             </DropdownMenu>
           </div>
         </CardHeader>
+        
+        {/* Image Preview Section */}
+        {project.images && project.images.length > 0 && (
+          <div className="px-6 pb-4">
+            <div className="flex gap-2 items-center">
+              {project.images.slice(0, 3).map((image, idx) => (
+                <div
+                  key={image.id}
+                  className="relative w-16 h-16 rounded-md overflow-hidden border border-border bg-muted"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {image.gcs_public_url ? (
+                    <Image
+                      src={image.gcs_public_url}
+                      alt={image.filename}
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {project.images.length > 3 && (
+                <div className="flex items-center justify-center w-16 h-16 rounded-md border border-dashed border-border bg-muted/50">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    +{project.images.length - 3}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <CardContent>
           <div className="flex gap-4 text-sm text-muted-foreground">
             <div>

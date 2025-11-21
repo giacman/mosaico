@@ -11,6 +11,15 @@ const nextConfig = {
     // Unblock deployment: don't fail the build on TS errors from non-app files (e.g., drizzle.config.ts)
     ignoreBuildErrors: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        pathname: '/mosaico-images-**/**',
+      },
+    ],
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
