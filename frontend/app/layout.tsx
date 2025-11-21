@@ -29,6 +29,22 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                // Suppress Clerk development warning
+                const originalWarn = console.warn;
+                console.warn = function(...args) {
+                  if (args[0]?.includes?.('Clerk has been loaded with development keys')) {
+                    return;
+                  }
+                  originalWarn.apply(console, args);
+                };
+              `
+            }}
+          />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >

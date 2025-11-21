@@ -46,6 +46,7 @@ export function SectionBuilder({
   projectId,
   onImagesChange,
   components,
+  projectImages,
   brief,
   tone,
   onUpdateComponent,
@@ -58,6 +59,7 @@ export function SectionBuilder({
   projectId: number
   onImagesChange?: (images: UploadedImage[]) => void
   components?: Array<{ id?: number, component_type: string; component_index?: number; generated_content: string; translations?: Record<string,string>, image_id?: number, image?: UploadedImage }>
+  projectImages?: UploadedImage[]
   brief?: string
   tone?: string
   onUpdateComponent?: (type: string, index: number, content: string, imageId?: number) => void
@@ -80,31 +82,44 @@ export function SectionBuilder({
     }))
   }
 
-  // images grouped by section, then by component index
-  // imagesBySection[sectionKey][componentIndex] = UploadedImage[]
-  const [imagesBySection, setImagesBySection] = useState<Record<string, UploadedImage[][]>>({})
-  
-  // Restore from components prop
-  useEffect(() => {
-    if (Array.isArray(components)) {
-      const next: Record<string, UploadedImage[][]> = {}
-      const counters: Record<string, number> = {}
-      for (const section of value) {
-        next[section.key] = []
-        for (const compType of section.components) {
-          const idx = (counters[compType] = (counters[compType] || 0) + 1)
-          const comp = components.find(c => c.component_type === compType && (c.component_index || 1) === idx)
-          const image = (comp as any)?.image
-          if (compType === "image" && image && image.url) {
-            next[section.key].push([{ id: String(image.id), url: image.url, filename: image.filename }])
-          } else {
-            next[section.key].push([])
+  // Derive imagesBySection from props (no state to avoid race conditions)
+  const imagesBySection = useMemo<Record<string, UploadedImage[][]>>(() => {
+    if (!projectImages || !components || value.length === 0) {
+      return {};
+    }
+
+    const result: Record<string, UploadedImage[][]> = {}
+    const counters: Record<string, number> = {}
+    
+    for (const section of value) {
+      result[section.key] = []
+      for (const compType of section.components) {
+        const idx = (counters[compType] = (counters[compType] || 0) + 1)
+        const comp = components.find(c => c.component_type === compType && (c.component_index || 1) === idx)
+        
+        let image: UploadedImage | undefined = (comp as any)?.image
+        
+        if (!image && comp?.image_id && projectImages) {
+          const foundImage = projectImages.find(img => Number(img.id) === comp.image_id)
+          if (foundImage) {
+            // Normalize: backend returns gcs_public_url, but frontend expects url
+            image = {
+              id: String(foundImage.id),
+              url: (foundImage as any).gcs_public_url || (foundImage as any).url,
+              filename: foundImage.filename
+            }
           }
         }
+
+        if (compType === "image" && image && image.url) {
+          result[section.key].push([{ id: String(image.id), url: image.url, filename: image.filename }])
+        } else {
+          result[section.key].push([])
+        }
       }
-      setImagesBySection(next)
     }
-  }, [components, value])
+    return result
+  }, [components, value, projectImages])
 
 
   const addSection = () => {
@@ -137,11 +152,6 @@ export function SectionBuilder({
     const section = next[idx]
     next[idx] = { ...section, components: [...section.components, comp] }
     onChange(ensureKeys(next))
-    const sKey = ensureKeys(next)[idx].key
-    setImagesBySection((prev) => ({
-      ...prev,
-      [sKey]: [...(prev[sKey] || []), []],
-    }))
   }
 
   const removeComponentAt = (idx: number, compIdx: number) => {
@@ -151,12 +161,6 @@ export function SectionBuilder({
     comps.splice(compIdx, 1)
     next[idx] = { ...section, components: comps }
     onChange(ensureKeys(next))
-    const sKey = ensureKeys(next)[idx].key
-    setImagesBySection((prev) => {
-      const arr = (prev[sKey] || []).slice()
-      arr.splice(compIdx, 1)
-      return { ...prev, [sKey]: arr }
-    })
   }
 
   // ---- Drag and Drop (Sections) ----
@@ -230,15 +234,6 @@ export function SectionBuilder({
     const file = files[0]
     if (!file) return
 
-    // Immediately show a temp preview
-    const tempId = `temp-${Math.random()}`
-    const tempUrl = URL.createObjectURL(file)
-    setImagesBySection((prev) => {
-      const list = (prev[sectionKey] || []).slice()
-      list[compIdx] = [{ id: tempId, url: tempUrl, filename: file.name, uploading: true }]
-      return { ...prev, [sectionKey]: list }
-    })
-
     try {
       const compressed = await compressImage(file)
       const res = await uploadImage(projectId, compressed)
@@ -254,9 +249,12 @@ export function SectionBuilder({
       const counters: Record<string, number> = {}
       let targetType: string | null = null
       let targetIndex: number = -1
+      let targetSectionOrder: number = 0
 
-      for (const section of value) {
+      for (let sectionIdx = 0; sectionIdx < value.length; sectionIdx++) {
+        const section = value[sectionIdx]
         if (section.key === sectionKey) {
+          targetSectionOrder = sectionIdx
           for (let i = 0; i < section.components.length; i++) {
             const type = section.components[i]
             counters[type] = (counters[type] || 0) + 1
@@ -288,21 +286,15 @@ export function SectionBuilder({
             image_id: Number(uploaded.id),
             image: uploaded,
             translations: {},
+            section_key: sectionKey,
+            section_order: targetSectionOrder,
           })
         }
-        onUpdateComponents(list as any)
+        await onUpdateComponents(list as any)
       }
 
     } catch (e) {
       toast.error("Image upload failed.")
-      // Revert preview on failure
-      setImagesBySection((prev) => {
-        const list = (prev[sectionKey] || []).slice()
-        if (list[compIdx] && list[compIdx][0]?.id === tempId) {
-          list[compIdx] = []
-        }
-        return { ...prev, [sectionKey]: list }
-      })
     }
   }
 
@@ -669,12 +661,6 @@ export function SectionBuilder({
                       const reordered = arrayMove(comps, from, to)
                       const next = value.slice()
                       next[idx] = { ...section, components: reordered }
-                      // Reorder images slots accordingly
-                      setImagesBySection((prev) => {
-                        const arr = (prev[section.key] || []).slice()
-                        const re = arrayMove(arr, from, to)
-                        return { ...prev, [section.key]: re }
-                      })
                       onChange(ensureKeys(next))
                     }}
                   >
