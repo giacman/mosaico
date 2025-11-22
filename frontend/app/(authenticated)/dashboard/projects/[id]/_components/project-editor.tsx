@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
-import { ArrowLeft, Save, Sparkles } from "lucide-react"
+import { ArrowLeft, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -230,10 +230,6 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
           >
             <Save className="mr-2 h-4 w-4" />
             {isSaving ? "Saving..." : "Save"}
-          </Button>
-          <Button disabled>
-            <Sparkles className="mr-2 h-4 w-4" />
-            Generate Content
           </Button>
         </div>
       </div>

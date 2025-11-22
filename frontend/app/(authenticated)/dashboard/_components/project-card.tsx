@@ -36,6 +36,19 @@ import { toast } from "sonner"
 import { getLabelColor } from "./create-project-dialog"
 import Image from "next/image"
 
+const LANGUAGE_FLAGS: Record<string, string> = {
+  it: "🇮🇹",
+  de: "🇩🇪",
+  fr: "🇫🇷",
+  es: "🇪🇸",
+  pt: "🇵🇹",
+  ru: "🇷🇺",
+  zh: "🇨🇳",
+  ja: "🇯🇵",
+  ar: "🇸🇦",
+  nl: "🇳🇱"
+}
+
 export function ProjectCard({ project }: { project: Project }) {
   const router = useRouter()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -218,19 +231,36 @@ export function ProjectCard({ project }: { project: Project }) {
         )}
 
         <CardContent>
-          <div className="flex gap-4 text-sm text-muted-foreground">
-            <div>
-              <span className="font-medium text-foreground">
-                {componentCount}
-              </span>{" "}
-              components
-            </div>
-            {languageCount > 0 && (
+          <div className="space-y-3">
+            <div className="flex gap-4 text-sm text-muted-foreground">
               <div>
                 <span className="font-medium text-foreground">
-                  {languageCount}
+                  {componentCount}
                 </span>{" "}
-                {languageCount === 1 ? "language" : "languages"}
+                components
+              </div>
+              {languageCount > 0 && (
+                <div>
+                  <span className="font-medium text-foreground">
+                    {languageCount}
+                  </span>{" "}
+                  {languageCount === 1 ? "language" : "languages"}
+                </div>
+              )}
+            </div>
+            
+            {/* Language Flags */}
+            {project.target_languages && project.target_languages.length > 0 && (
+              <div className="flex gap-1.5 items-center">
+                {project.target_languages.map((lang) => (
+                  <span 
+                    key={lang} 
+                    className="text-lg leading-none"
+                    title={lang.toUpperCase()}
+                  >
+                    {LANGUAGE_FLAGS[lang] || lang}
+                  </span>
+                ))}
               </div>
             )}
           </div>
