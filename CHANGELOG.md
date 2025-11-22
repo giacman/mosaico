@@ -2,6 +2,40 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [0.9.1] - 2025-11-22
+
+### Added
+- **Language Flag Emojis**: Added flag emojis (🇮🇹🇩🇪🇫🇷🇪🇸) throughout the UI for better visual language identification
+- **Translation Status Indicators**: Real-time feedback with spinner during translation and checkmark icon when translation is complete
+- **Language Flags on Project Cards**: Dashboard now displays language flags at the bottom of each project card showing which languages are available
+- **Translation State Tracking**: New state management to track which languages have been successfully translated
+
+### Changed
+- **Redesigned Project Editor UI**: Reorganized into three clear sections:
+  - Top section: Project Details (name and labels)
+  - Left column: Content Generation (creative brief, tone of voice, creativity level)
+  - Right column: Translation & Languages (language selection and translation controls)
+- **Improved Creativity Level Control**: Slider now wider (60% width) and placed side-by-side with Tone of Voice, with visual labels (Conservative/Balanced/Creative)
+- **Default Temperature**: Changed from 0.7 to 0.5 for more balanced content generation
+- **Cleaned Header**: Removed redundant disabled "Generate Content" button from project editor header
+- **Button Labels**: Changed "Generate Email Content" to "Generate Content" for brevity
+
+### Fixed
+- **Critical: Translation Preservation Bug**: Fixed issue where regenerating a single component would break all existing translations
+  - Backend returns translations in array format, now properly converted to object format
+  - Component regeneration now correctly checks for existing translations before attempting retranslation
+  - Translations are properly merged instead of being lost during component updates
+- **Incomplete Save Logic**: Fixed RenderedComponent save button that had placeholder comment instead of actual implementation
+- **Redundant State Initialization**: Removed duplicate localStorage loading in NotificationsProvider (was loading in both useState initializer and useEffect)
+- **Translation Type Inconsistency**: Fixed new components being created with `translations: []` instead of `translations: {}`
+- **Images Disappearing on Content Generation**: Fixed bug where regenerating all content would remove existing image components
+
+### Technical Improvements
+- Added comprehensive translation state management with `translatedLanguages` Set
+- Improved `onUpdateComponents` callback to properly normalize backend translation format
+- Enhanced regeneration logic in `section-builder.tsx` to detect and preserve existing translations
+- Better separation of concerns between content generation and translation workflows
+
 ## [0.9.0] - 2025-11-09
 
 ### Changed
