@@ -48,28 +48,6 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     }
   })
 
-  // Load persisted notifications
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey)
-      if (raw) {
-        const arr = JSON.parse(raw)
-        if (Array.isArray(arr)) {
-          // revive timestamps
-          const revived: Notification[] = arr.map((n: any) => ({
-            id: String(n.id || ""),
-            type: n.type === "error" ? "error" : n.type === "success" ? "success" : "info",
-            title: String(n.title || ""),
-            message: String(n.message || ""),
-            timestamp: n.timestamp ? new Date(n.timestamp) : new Date(),
-            read: Boolean(n.read)
-          }))
-          setNotifications(revived)
-        }
-      }
-    } catch {}
-  }, [])
-
   // Persist on change
   useEffect(() => {
     try {

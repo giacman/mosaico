@@ -113,7 +113,10 @@ export function RenderedComponent({
             <Button
               size="sm"
               onClick={() => {
-                /* save logic */
+                const updatedComponent = { ...component, content: editedContent }
+                onUpdate(editedContent)
+                onSave(updatedComponent, translations)
+                setEditing(false)
               }}
               disabled={isTranslating || readOnly}
               className="gap-2"
@@ -124,7 +127,10 @@ export function RenderedComponent({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setEditing(false)}
+              onClick={() => {
+                setEditedContent(component.content)
+                setEditing(false)
+              }}
             >
               Cancel
             </Button>

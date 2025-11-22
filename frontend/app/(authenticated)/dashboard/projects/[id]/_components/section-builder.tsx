@@ -509,24 +509,44 @@ export function SectionBuilder({
                             })
                             if (result.success && result.data) {
                               const val = String(result.data.variations[0][type] || "")
-                              if (val) onUpdateComponent && onUpdateComponent(type, 1, val)
-                              if ((targetLanguages || []).length > 0 && val) {
-                                try {
-                                  const texts = [{ key: type, content: val }]
-                                  const langs = targetLanguages || []
-                                  const res = await batchTranslate(texts, langs)
-                                  if (res.success && res.data && onUpdateComponents) {
-                                    const key = type
-                                    const t = (res.data[key] || {}) as Record<string, string>
-                                    const merged = (components || []).map((c) => {
-                                      if (c.component_type === type && (c.component_index || 1) === 1) {
-                                        return { ...c, generated_content: val, translations: { ...(c.translations || {}), ...t } }
-                                      }
-                                      return c
-                                    })
-                                    onUpdateComponents(merged as any)
+                              
+                              if (val && onUpdateComponents) {
+                                // Check if this component had existing translations
+                                const existingComp = (components || []).find((c) => c.component_type === type && (c.component_index || 1) === 1)
+                                const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
+                                
+                                // If component had translations and target languages are set, retranslate
+                                if (hadTranslations && (targetLanguages || []).length > 0) {
+                                  try {
+                                    const texts = [{ key: type, content: val }]
+                                    const langs = targetLanguages || []
+                                    const res = await batchTranslate(texts, langs)
+                                    
+                                    if (res.success && res.data) {
+                                      const key = type
+                                      const t = (res.data[key] || {}) as Record<string, string>
+                                      
+                                      const merged = (components || []).map((c) => {
+                                        if (c.component_type === type && (c.component_index || 1) === 1) {
+                                          return { ...c, generated_content: val, translations: t }
+                                        }
+                                        return c
+                                      })
+                                      onUpdateComponents(merged as any)
+                                    }
+                                  } catch (err) {
+                                    console.error(`Error retranslating ${type}:`, err)
                                   }
-                                } catch {}
+                                } else {
+                                  // No translations to regenerate, just update English content
+                                  const merged = (components || []).map((c) => {
+                                    if (c.component_type === type && (c.component_index || 1) === 1) {
+                                      return { ...c, generated_content: val }
+                                    }
+                                    return c
+                                  })
+                                  onUpdateComponents(merged as any)
+                                }
                               }
                             }
                           } finally {
@@ -802,10 +822,14 @@ export function SectionBuilder({
                                             if (result.success && result.data) {
                                               const val = String(result.data.variations[0][c] || "")
                                               const finalVal = c === "cta" ? val.toUpperCase() : val
-                                              if (finalVal) onUpdateComponent && onUpdateComponent(c, displayIndex, finalVal)
-                                              if ((targetLanguages || []).length > 0 && finalVal && onUpdateComponents) {
-                                                try {
-                                                  if (finalVal) {
+                                              if (finalVal && onUpdateComponents) {
+                                                // Check if this component had existing translations
+                                                const existingComp = (components || []).find((item) => item.component_type === c && (item.component_index || 1) === displayIndex)
+                                                const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
+                                                
+                                                // If component had translations and target languages are set, retranslate
+                                                if (hadTranslations && (targetLanguages || []).length > 0) {
+                                                  try {
                                                     const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
                                                     const langs = targetLanguages || []
                                                     const res = await batchTranslate(texts, langs)
@@ -814,14 +838,23 @@ export function SectionBuilder({
                                                       const newTranslations = res.data[key]
                                                       const merged = (components || []).map((item) => {
                                                         if (item.component_type === c && (item.component_index || 1) === displayIndex) {
-                                                          return { ...item, generated_content: finalVal, translations: { ...(item.translations || {}), ...newTranslations } }
+                                                          return { ...item, generated_content: finalVal, translations: newTranslations }
                                                         }
                                                         return item
                                                       })
                                                       onUpdateComponents(merged as any)
                                                     }
-                                                  }
-                                                } catch {}
+                                                  } catch {}
+                                                } else {
+                                                  // No translations to regenerate, just update English content
+                                                  const merged = (components || []).map((item) => {
+                                                    if (item.component_type === c && (item.component_index || 1) === displayIndex) {
+                                                      return { ...item, generated_content: finalVal }
+                                                    }
+                                                    return item
+                                                  })
+                                                  onUpdateComponents(merged as any)
+                                                }
                                               }
                                             }
                                           } finally {
