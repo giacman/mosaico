@@ -42,12 +42,13 @@ async def translate_text_content(
         content_type="newsletter"
     )
     
-    # Use gemini-2.5-flash for faster translations with higher rate limits
+    # Use gemini-2.5-pro for higher quality transcreation
+    # Pro model is better at cultural nuances and creative adaptation
     response_text = await ai_client.generate_content(
         prompt=prompt,
         temperature=0.5,  # Higher for more creative, natural transcreation
         response_mime_type="application/json",
-        use_flash=True  # Use Flash model for translations
+        use_flash=False  # Use Pro model for better transcreation quality
     )
     
     response_data = json.loads(response_text)
@@ -197,12 +198,13 @@ async def translate_text(
             content_type=req.content_type.value
         )
         
-        # Use gemini-2.5-flash for faster translations with higher rate limits
+        # Use gemini-2.5-pro for higher quality transcreation
+        # Pro model better at cultural nuances and creative adaptation
         response_text = await vertex_client.generate_content(
             prompt=prompt,
             temperature=0.5,  # Higher for more creative, natural transcreation
             response_mime_type="application/json",
-            use_flash=True  # Use Flash model for translations
+            use_flash=False  # Use Pro model for better transcreation quality
         )
         
         response_data = json.loads(response_text)
@@ -252,11 +254,12 @@ async def translate_single_with_retry(
                 content_type="newsletter"
             )
             
+            # Use gemini-2.5-pro for higher quality transcreation
             response_text = await vertex_client.generate_content(
                 prompt=prompt,
                 temperature=0.5,  # Higher for more creative, natural transcreation
                 response_mime_type="application/json",
-                use_flash=True  # Use Flash model for translations
+                use_flash=False  # Use Pro model for better transcreation quality
             )
             
             response_data = json.loads(response_text)

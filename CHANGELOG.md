@@ -7,11 +7,16 @@ All notable changes to the Mosaico project will be documented in this file.
 ### Changed
 - **Enhanced Translation Prompt Engineering**: Major refactor of translation prompt based on best practices from Anthropic (Claude) and Google (Gemini)
   - Restructured prompt with clear sections (TASK, APPROACH, RULES, INPUT, OUTPUT)
-  - Added step-by-step reasoning encouragement (Chain-of-Thought pattern)
+  - Added internal reasoning guidance to encourage better decision-making
   - Integrated explicit DO/DON'T lists for better instruction clarity
   - Expanded language-specific guidance with concrete examples for DE, FR, ES, PT, IT
   - Implemented "Cultural Translator" pattern focusing on intent and emotional impact
   - Temperature increased from 0.3 to 0.5 for more creative, natural transcreation
+- **Model Upgrade for Translations**: Switched from Gemini 2.5 Flash to Gemini 2.5 Pro for all translations
+  - Pro model provides better cultural nuance understanding
+  - Improved handling of metaphors and idiomatic expressions
+  - Better transcreation quality (creative adaptation vs literal translation)
+  - Cost not a concern for internal application
 
 ### Added
 - **Translation Quality Documentation**: New comprehensive documentation on translation approaches
