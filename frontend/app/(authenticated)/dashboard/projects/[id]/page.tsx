@@ -2,6 +2,9 @@ import { getProject } from "@/actions/projects"
 import { notFound } from "next/navigation"
 import { ProjectEditor } from "./_components/project-editor"
 
+// Force dynamic rendering since this page uses headers() via getProject()
+export const dynamic = 'force-dynamic'
+
 export default async function ProjectEditorPage({
   params
 }: {
