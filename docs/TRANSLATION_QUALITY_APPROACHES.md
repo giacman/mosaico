@@ -24,12 +24,12 @@ Passare da **traduzione letterale** a **transcreation** (adattamento creativo ch
 ```
 ┌─────────────────────────────────────────────────┐
 │ 1. Prompt Engineering ✅                        │
-│                                                  │
-│ Base: Ottimizzazione del prompt                │
+│                                                 │
+│ Base: Ottimizzazione del prompt                 │
 │ • Focus su "transcreation" vs traduzione        │
 │ • Note inline per evitare errori comuni         │
 │ • Temperature 0.5 (creatività)                  │
-│                                                  │
+│                                                 │
 │ Setup: 5 minuti                                 │
 │ Qualità: 70-80%                                 │
 │ Costo: $0.0002/traduzione                       │
@@ -37,12 +37,12 @@ Passare da **traduzione letterale** a **transcreation** (adattamento creativo ch
                     +
 ┌─────────────────────────────────────────────────┐
 │ 2. Sequential Validation                        │
-│                                                  │
-│ Aggiungi: Auto-validazione con retry           │
+│                                                 │
+│ Aggiungi: Auto-validazione con retry            │
 │ • Validation agent verifica qualità             │
 │ • Confidence score (0-1)                        │
 │ • Auto-retry se score < 0.7                     │
-│                                                  │
+│                                                 │
 │ Setup: +2-3 giorni                              │
 │ Qualità: 80-85%                                 │
 │ Costo: $0.0004/traduzione (+1 chiamata)         │
@@ -50,13 +50,13 @@ Passare da **traduzione letterale** a **transcreation** (adattamento creativo ch
                     +
 ┌─────────────────────────────────────────────────┐
 │ 3. Google File Search RAG ⭐                    │
-│                                                  │
-│ Aggiungi: Esempi contestuali automatici        │
+│                                                 │
+│ Aggiungi: Esempi contestuali automatici         │
 │ • Semantic search esempi rilevanti              │
 │ • RAG fully managed (Google)                    │
 │ • Storage + query: GRATIS                       │
 │ • Richiede: 15-20 esempi validati per lingua    │
-│                                                  │
+│                                                 │
 │ Setup: +3-4 giorni                              │
 │ Qualità: 90-95%                                 │
 │ Costo: $0.0004/traduzione (unchanged)           │
@@ -64,12 +64,12 @@ Passare da **traduzione letterale** a **transcreation** (adattamento creativo ch
                     +
 ┌─────────────────────────────────────────────────┐
 │ 4. DSPy (Probabilmente non servirà)             │
-│                                                  │
-│ Aggiungi: Ottimizzazione automatica ML         │
+│                                                 │
+│ Aggiungi: Ottimizzazione automatica ML          │
 │ • ML ottimizza struttura prompt                 │
 │ • Selezione dinamica esempi migliori            │
 │ • Richiede: 100+ esempi + team ML               │
-│                                                  │
+│                                                 │
 │ Setup: +1-2 settimane                           │
 │ Qualità: 95-98%                                 │
 │ Costo: $0.0009/traduzione                       │

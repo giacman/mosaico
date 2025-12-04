@@ -71,7 +71,10 @@ def build_translation_prompt(
     maintain_tone: bool,
     content_type: str
 ) -> str:
-    """Build prompt for translation"""
+    """
+    Build transcreation prompt using best practices from Anthropic and Google.
+    Focuses on cultural adaptation over literal translation.
+    """
     
     target_lang_name = LANGUAGE_NAMES.get(target_language, target_language.upper())
     source_instruction = f"from {LANGUAGE_NAMES.get(source_language, source_language)}" if source_language else "(auto-detect source language)"
@@ -79,50 +82,97 @@ def build_translation_prompt(
     tone_instruction = ""
     if maintain_tone:
         tone_instruction = """
-IMPORTANT: Maintain the original tone, style, and formality level.
-- If the original is casual, keep it casual
-- If the original is formal, keep it formal
-- Preserve any brand voice characteristics"""
+TONE PRESERVATION:
+- Match the original formality level (formal ↔ casual)
+- Preserve brand voice characteristics
+- Maintain emotional register (enthusiastic, serious, playful, etc.)"""
     
-    # Language-specific guidance for common pitfalls
-    language_notes = {
-        "de": "For German: Use 'genießen' (enjoy/appreciate) for experiences/content, not 'schmecken' (taste) unless referring to food. Use compound words naturally. Prefer 'Sie' form for professional tone.",
-        "fr": "For French: Embrace elegant, flowing expressions. Avoid anglicisms. Use 'vous' for professional tone, 'tu' only if clearly casual.",
-        "es": "For Spanish: Use warm, engaging expressions natural to Spanish marketing. Consider regional variations.",
-        "pt": "For Portuguese: Consider Brazilian vs European Portuguese. Use natural expressions, not literal word-for-word.",
-        "it": "For Italian: Embrace expressive, emotional style. Use metaphors that resonate with Italian culture."
+    # Enhanced language-specific guidance with concrete examples
+    language_guidance = {
+        "de": """
+German-Specific Guidelines:
+- Verbs for "enjoy": Use "genießen" (experiences/content), NOT "schmecken" (food only)
+  Example: "Enjoy exclusive content" → "Genießen Sie exklusive Inhalte" ✓
+  WRONG: "Schmecken Sie exklusive Inhalte" ✗
+- Compound words: Use natural German compounds (e.g., "Kauferlebnis" not "Kauf Erlebnis")
+- Formality: Use "Sie" for professional/marketing content unless explicitly casual
+- Imperative: Use polite forms ("Entdecken Sie" not "Entdeck")""",
+        
+        "fr": """
+French-Specific Guidelines:
+- Style: Embrace elegant, flowing expressions natural to French marketing
+- Anglicisms: Avoid unless widely accepted (e.g., "smartphone" OK, "shopping" → "achats")
+- Formality: "vous" for professional tone, "tu" only if source is clearly casual
+- Word order: French often inverts subject-verb for elegance in marketing""",
+        
+        "es": """
+Spanish-Specific Guidelines:
+- Tone: Use warm, engaging expressions typical of Spanish marketing
+- Regional: Consider Spain vs Latin America vocabulary (ordenador vs computadora)
+- Imperative: Use inclusive forms ("Descubre" works for both tú/usted contexts)
+- Emotion: Spanish marketing is more expressive - embrace it!""",
+        
+        "pt": """
+Portuguese-Specific Guidelines:
+- Variant: Consider Brazilian (você/seu) vs European (tu/teu) Portuguese
+- Formality: Brazilian marketing often uses "você" (more casual but still professional)
+- Expressions: Use natural Portuguese metaphors, not literal translations
+- Gerunds: Portuguese uses them differently than English - adapt naturally""",
+        
+        "it": """
+Italian-Specific Guidelines:
+- Style: Embrace expressive, emotional language natural to Italian
+- Metaphors: Use Italian cultural references (calcio, cibo, famiglia resonate)
+- Formality: "Lei" for professional, "tu" for casual (context-dependent)
+- Enthusiasm: Italian marketing is passionate - don't tone it down"""
     }
     
-    lang_note = language_notes.get(target_language.lower(), "")
-    lang_section = f"\n{lang_note}\n" if lang_note else ""
+    lang_guidance = language_guidance.get(target_language.lower(), "")
     
-    prompt = f"""You are an expert marketing transcreator, not just a translator. Your goal is TRANSCREATION: creative adaptation that sounds natural to native speakers.
+    # Core prompt with enhanced structure (Anthropic-inspired)
+    prompt = f"""You are a professional cultural translator specializing in {content_type} content.
 
-Task: Adapt the following marketing text to {target_lang_name} {source_instruction}.
+Your expertise is TRANSCREATION, not literal translation. This means preserving the INTENT and EMOTIONAL IMPACT while adapting the expression for the target culture.
+
+=== TASK ===
+Transcreate the following text to {target_lang_name} {source_instruction}.
 {tone_instruction}
 
-CRITICAL PRINCIPLES:
-1. NATURAL FLUENCY: Write as a native {target_lang_name} marketer would write, not word-for-word translation
-2. CULTURAL ADAPTATION: Change idioms, metaphors, and expressions to fit {target_lang_name} culture
-3. CONTEXT MATTERS: "Enjoy/taste/savor" → adapt based on context (food vs experience vs content)
-4. AVOID LITERAL: If a phrase sounds awkward literally, rewrite completely while keeping the meaning
+=== YOUR APPROACH ===
+Before translating, ask yourself:
+1. What is the core message and emotion this text conveys?
+2. How would a native {target_lang_name} marketer express this same idea?
+3. Are there idioms, metaphors, or cultural references that need adaptation?
+4. Does this sound natural when read aloud by a native speaker?
 
-Guidelines:
-- Think: "How would a native speaker naturally say this?"
-- Adapt idioms to cultural equivalents (don't translate literally)
-- Maintain the emotional impact and persuasive power
-- Keep grammar, syntax natural and fluent
-- Preserve formality level and brand personality{lang_section}
-Text to adapt:
+=== CRITICAL RULES ===
+✓ DO:
+  - Write as a native {target_lang_name} copywriter would originally write it
+  - Adapt idioms and metaphors to cultural equivalents
+  - Rewrite completely if literal translation sounds awkward
+  - Maintain marketing effectiveness and persuasive power
+  - Consider context (food/experience/emotion) for word choice
+
+✗ DON'T:
+  - Translate word-for-word if it sounds unnatural
+  - Use literal translations of idioms
+  - Ignore cultural context
+  - Lose emotional impact for the sake of accuracy
+  - Use formal terms where casual fits better (or vice versa)
+
+{lang_guidance}
+
+=== INPUT TEXT ===
 "{text}"
 
-Output as JSON matching this structure:
+=== OUTPUT REQUIREMENTS ===
+Return ONLY valid JSON (no markdown, no explanations):
 {{
-  "translated_text": "your transcreated text (natural, culturally adapted)",
-  "detected_source_language": "language code"
+  "translated_text": "your transcreated text here",
+  "detected_source_language": "ISO language code"
 }}
 
-Return ONLY the JSON object, no markdown, no explanations."""
+Think step-by-step: understand intent → find natural expression → verify it sounds native."""
     
     return prompt
 
@@ -214,8 +264,19 @@ async def translate_single_with_retry(
         
         except json.JSONDecodeError as e:
             logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {target_language}: {str(e)}")
+            logger.warning(f"Raw response (first 500 chars): {response_text[:500]}")
+            
+            # Try to extract translated_text even if JSON is malformed
+            import re
+            match = re.search(r'"translated_text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', response_text, re.DOTALL)
+            if match and attempt == max_retries - 1:
+                extracted_text = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+                logger.info(f"Extracted text from malformed JSON: {extracted_text[:100]}")
+                return extracted_text
+            
             if attempt == max_retries - 1:
                 logger.error(f"Failed to translate to {target_language} after {max_retries} attempts")
+                logger.error(f"Full raw response: {response_text}")
                 return f"[Translation failed: {text[:50]}...]"
             await asyncio.sleep(0.5)  # Brief delay before retry
         
