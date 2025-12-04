@@ -45,7 +45,7 @@ async def translate_text_content(
     # Use gemini-2.5-flash for faster translations with higher rate limits
     response_text = await ai_client.generate_content(
         prompt=prompt,
-        temperature=0.3,
+        temperature=0.5,  # Higher for more creative, natural transcreation
         response_mime_type="application/json",
         use_flash=True  # Use Flash model for translations
     )
@@ -84,23 +84,41 @@ IMPORTANT: Maintain the original tone, style, and formality level.
 - If the original is formal, keep it formal
 - Preserve any brand voice characteristics"""
     
-    prompt = f"""You are a professional translator specialized in {content_type} content.
+    # Language-specific guidance for common pitfalls
+    language_notes = {
+        "de": "For German: Use 'genießen' (enjoy/appreciate) for experiences/content, not 'schmecken' (taste) unless referring to food. Use compound words naturally. Prefer 'Sie' form for professional tone.",
+        "fr": "For French: Embrace elegant, flowing expressions. Avoid anglicisms. Use 'vous' for professional tone, 'tu' only if clearly casual.",
+        "es": "For Spanish: Use warm, engaging expressions natural to Spanish marketing. Consider regional variations.",
+        "pt": "For Portuguese: Consider Brazilian vs European Portuguese. Use natural expressions, not literal word-for-word.",
+        "it": "For Italian: Embrace expressive, emotional style. Use metaphors that resonate with Italian culture."
+    }
+    
+    lang_note = language_notes.get(target_language.lower(), "")
+    lang_section = f"\n{lang_note}\n" if lang_note else ""
+    
+    prompt = f"""You are an expert marketing transcreator, not just a translator. Your goal is TRANSCREATION: creative adaptation that sounds natural to native speakers.
 
-Task: Translate the following text to {target_lang_name} {source_instruction}.
+Task: Adapt the following marketing text to {target_lang_name} {source_instruction}.
 {tone_instruction}
 
-Guidelines:
-- Preserve the core message and intent
-- Adapt idioms and expressions appropriately for the target culture
-- Maintain proper grammar and natural flow
-- Keep the same level of formality
+CRITICAL PRINCIPLES:
+1. NATURAL FLUENCY: Write as a native {target_lang_name} marketer would write, not word-for-word translation
+2. CULTURAL ADAPTATION: Change idioms, metaphors, and expressions to fit {target_lang_name} culture
+3. CONTEXT MATTERS: "Enjoy/taste/savor" → adapt based on context (food vs experience vs content)
+4. AVOID LITERAL: If a phrase sounds awkward literally, rewrite completely while keeping the meaning
 
-Text to translate:
+Guidelines:
+- Think: "How would a native speaker naturally say this?"
+- Adapt idioms to cultural equivalents (don't translate literally)
+- Maintain the emotional impact and persuasive power
+- Keep grammar, syntax natural and fluent
+- Preserve formality level and brand personality{lang_section}
+Text to adapt:
 "{text}"
 
 Output as JSON matching this structure:
 {{
-  "translated_text": "translation here",
+  "translated_text": "your transcreated text (natural, culturally adapted)",
   "detected_source_language": "language code"
 }}
 
@@ -132,7 +150,7 @@ async def translate_text(
         # Use gemini-2.5-flash for faster translations with higher rate limits
         response_text = await vertex_client.generate_content(
             prompt=prompt,
-            temperature=0.3,  # Lower for more accurate translation
+            temperature=0.5,  # Higher for more creative, natural transcreation
             response_mime_type="application/json",
             use_flash=True  # Use Flash model for translations
         )
@@ -186,7 +204,7 @@ async def translate_single_with_retry(
             
             response_text = await vertex_client.generate_content(
                 prompt=prompt,
-                temperature=0.3,
+                temperature=0.5,  # Higher for more creative, natural transcreation
                 response_mime_type="application/json",
                 use_flash=True  # Use Flash model for translations
             )
