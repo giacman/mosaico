@@ -3,6 +3,9 @@ import { CreateProjectDialog } from "../dashboard/_components/create-project-dia
 import { StatusTabs } from "../dashboard/_components/status-tabs"
 import { ProjectsGrid } from "../dashboard/_components/projects-grid"
 
+// Force dynamic rendering since this page uses headers() via listProjects()
+export const dynamic = 'force-dynamic'
+
 export default async function NewsletterPage() {
   const result = await listProjects()
   const projects = result.success && result.data ? result.data : []
