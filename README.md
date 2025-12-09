@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-0.9.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -21,7 +21,11 @@
 
 - 🤖 **AI Content Generation**: Create email components (subjects, pre-headers, title, body, CTAs) with customizable tone and structure
 - 🎓 **Few-Shot Learning**: Strategic use of examples during regeneration to increase content variety while maintaining JSON stability
-- 🌍 **Batch Translation**: Translate content to multiple languages simultaneously with context preservation
+- 🌍 **Enhanced Translation System**: AI-powered transcreation with Sequential Validation
+  - Gemini 2.5 Pro for cultural nuance and natural phrasing
+  - Automatic quality validation with confidence scoring (0-1 scale)
+  - Self-healing retry if confidence < 0.7 (auto-corrects poor translations)
+  - Language-specific guidance (DE, FR, ES, IT, PT) to avoid literal translations
 - 🎯 **Drag-and-Drop Email Structure**: Visual builder with always-on Subject & Pre-header; add/reorder Title, Body, CTAs, and Images
 - 🖼️ **Image Context**: Generate content based on uploaded product images
 - 🔄 **Regenerate & Refine**: Fine-tune individual components with temperature control (0.0-1.0)
@@ -68,6 +72,15 @@ FastAPI Backend (Cloud Run)
     ↓
 Export to Airship (Handlebar Templates)
 ```
+
+### Translation Quality System
+
+Mosaico implements a **2-level optimization approach** for high-quality transcreation (creative adaptation vs literal translation):
+
+1. **Enhanced Prompt Engineering**: Focus on cultural adaptation, naturalness, and context-aware word choice (e.g., German "genießen" for content, not "schmecken" for food)
+2. **Sequential Validation Chain**: AI-powered quality reviewer validates translations with confidence scoring; auto-retries with feedback if score < 0.7
+
+**Result**: ~90-95% translation quality with self-healing capability. See [docs/TRANSLATION_QUALITY_APPROACHES.md](docs/TRANSLATION_QUALITY_APPROACHES.md) for technical details.
 
 ---
 

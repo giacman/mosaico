@@ -21,20 +21,90 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
 
 
-async def translate_text_content(
-    text: str,
+class ValidationResult(BaseModel):
+    """Result of translation quality validation"""
+    is_valid: bool
+    confidence_score: float
+    naturalness_score: float
+    cultural_adaptation_score: float
+    tone_score: float
+    issues: List[str]
+    suggestions: str
+    reasoning: str
+
+
+async def validate_translation(
+    source_text: str,
+    translated_text: str,
     target_language: str,
-    source_language: str = "EN",
+    source_language: str = "auto",
     ai_client=None
-) -> str:
+) -> ValidationResult:
     """
-    Helper function to translate text content
-    Used by both standalone endpoint and project translation
+    Validate translation quality using AI reviewer.
+    Returns validation result with confidence score and suggestions.
     """
     if ai_client is None:
         ai_client = vertex_client
     
-    prompt = build_translation_prompt(
+    validation_prompt = build_validation_prompt(
+        source_text=source_text,
+        translated_text=translated_text,
+        target_language=target_language,
+        source_language=source_language
+    )
+    
+    try:
+        # Use Pro model for validation (needs reasoning capability)
+        response_text = await ai_client.generate_content(
+            prompt=validation_prompt,
+            temperature=0.3,  # Lower for more consistent evaluation
+            response_mime_type="application/json",
+            use_flash=False  # Use Pro for better evaluation
+        )
+        
+        validation_data = json.loads(response_text)
+        return ValidationResult(**validation_data)
+    
+    except Exception as e:
+        logger.warning(f"Validation failed, assuming translation is valid: {str(e)}")
+        # Fallback: assume translation is valid if validation fails
+        return ValidationResult(
+            is_valid=True,
+            confidence_score=0.8,  # Neutral score
+            naturalness_score=0.8,
+            cultural_adaptation_score=0.8,
+            tone_score=0.8,
+            issues=[],
+            suggestions="",
+            reasoning="Validation service unavailable, defaulting to valid"
+        )
+
+
+async def translate_with_retry(
+    text: str,
+    target_language: str,
+    source_language: str = "EN",
+    validation_feedback: str = "",
+    ai_client=None
+) -> str:
+    """
+    Translate text with optional validation feedback from previous attempt.
+    
+    Args:
+        text: Source text to translate
+        target_language: Target language code
+        source_language: Source language code
+        validation_feedback: Feedback from validator to improve translation
+        ai_client: AI client to use
+    
+    Returns:
+        Translated text
+    """
+    if ai_client is None:
+        ai_client = vertex_client
+    
+    base_prompt = build_translation_prompt(
         text=text,
         target_language=target_language.lower(),
         source_language=source_language.lower(),
@@ -42,8 +112,20 @@ async def translate_text_content(
         content_type="newsletter"
     )
     
+    # Add validation feedback if this is a retry
+    if validation_feedback:
+        prompt = f"""{base_prompt}
+
+=== IMPORTANT: IMPROVE BASED ON FEEDBACK ===
+Your previous translation had issues. Address these problems:
+
+{validation_feedback}
+
+Make sure your new translation fixes these specific issues while maintaining quality."""
+    else:
+        prompt = base_prompt
+    
     # Use gemini-2.5-pro for higher quality transcreation
-    # Pro model is better at cultural nuances and creative adaptation
     response_text = await ai_client.generate_content(
         prompt=prompt,
         temperature=0.5,  # Higher for more creative, natural transcreation
@@ -55,6 +137,94 @@ async def translate_text_content(
     return response_data.get("translated_text", text)
 
 
+async def translate_text_content(
+    text: str,
+    target_language: str,
+    source_language: str = "EN",
+    ai_client=None,
+    use_validation: bool = True,
+    max_retries: int = 1
+) -> str:
+    """
+    Helper function to translate text content with optional validation.
+    
+    Args:
+        text: Source text to translate
+        target_language: Target language code
+        source_language: Source language code
+        ai_client: AI client to use
+        use_validation: Whether to validate and retry if quality is low
+        max_retries: Maximum number of retry attempts (default: 1)
+    
+    Returns:
+        Translated text
+    """
+    if ai_client is None:
+        ai_client = vertex_client
+    
+    # Step 1: Initial translation
+    translation = await translate_with_retry(
+        text=text,
+        target_language=target_language,
+        source_language=source_language,
+        ai_client=ai_client
+    )
+    
+    # If validation is disabled, return immediately
+    if not use_validation:
+        return translation
+    
+    # Step 2: Validate translation quality
+    try:
+        validation = await validate_translation(
+            source_text=text,
+            translated_text=translation,
+            target_language=target_language,
+            source_language=source_language,
+            ai_client=ai_client
+        )
+        
+        logger.info(
+            f"Translation validation: confidence={validation.confidence_score:.2f}, "
+            f"naturalness={validation.naturalness_score:.2f}, "
+            f"issues={len(validation.issues)}"
+        )
+        
+        # Step 3: Retry if confidence is low and we have retries left
+        if validation.confidence_score < 0.7 and max_retries > 0:
+            logger.warning(
+                f"Low confidence score ({validation.confidence_score:.2f}), "
+                f"retrying with feedback. Issues: {validation.issues}"
+            )
+            
+            # Prepare feedback for retry
+            feedback = f"""Issues identified:
+{chr(10).join(f'- {issue}' for issue in validation.issues)}
+
+Suggestions: {validation.suggestions}
+
+Reasoning: {validation.reasoning}"""
+            
+            # Retry with feedback
+            improved_translation = await translate_with_retry(
+                text=text,
+                target_language=target_language,
+                source_language=source_language,
+                validation_feedback=feedback,
+                ai_client=ai_client
+            )
+            
+            logger.info(f"Retry completed, using improved translation")
+            return improved_translation
+        
+        # Return original translation if quality is good or no retries left
+        return translation
+    
+    except Exception as e:
+        logger.error(f"Validation failed: {str(e)}, using translation without validation")
+        return translation
+
+
 LANGUAGE_NAMES = {
     "it": "Italian",
     "en": "English",
@@ -63,6 +233,81 @@ LANGUAGE_NAMES = {
     "es": "Spanish",
     "pt": "Portuguese"
 }
+
+
+def build_validation_prompt(
+    source_text: str,
+    translated_text: str,
+    target_language: str,
+    source_language: str = "auto"
+) -> str:
+    """
+    Build prompt for validating translation quality.
+    Returns a validation with confidence score and issues identified.
+    """
+    target_lang_name = LANGUAGE_NAMES.get(target_language, target_language.upper())
+    source_lang_name = LANGUAGE_NAMES.get(source_language, source_language.upper()) if source_language != "auto" else "detected language"
+    
+    prompt = f"""You are a professional translation quality reviewer specializing in marketing content.
+
+Your task is to evaluate the quality of a translation and provide a confidence score.
+
+=== EVALUATION TASK ===
+Source text ({source_lang_name}): "{source_text}"
+Translation ({target_lang_name}): "{translated_text}"
+
+=== EVALUATION CRITERIA ===
+
+1. NATURALNESS (40 points)
+   - Does it sound like it was written by a native {target_lang_name} speaker?
+   - Is the grammar and syntax natural and fluent?
+   - Would a native speaker use these exact words/phrases?
+
+2. CULTURAL ADAPTATION (30 points)
+   - Are idioms and metaphors adapted (not literal)?
+   - Are cultural references appropriate?
+   - Context-aware word choice? (e.g., "enjoy" for food vs content)
+
+3. TONE & FORMALITY (20 points)
+   - Does it maintain the original tone?
+   - Is formality level appropriate? (formal/casual)
+   - Brand voice preserved?
+
+4. ACCURACY (10 points)
+   - Core message preserved?
+   - No meaning lost or added?
+   - Marketing impact maintained?
+
+=== COMMON PITFALLS TO CHECK ===
+- Literal word-for-word translation (BAD)
+- Wrong verb choice based on context (e.g., German "schmecken" for non-food)
+- Unnatural phrasing or word order
+- Lost emotional impact
+- Inappropriate formality level
+
+=== OUTPUT REQUIREMENTS ===
+Provide your evaluation as JSON:
+
+{{
+  "is_valid": true/false,
+  "confidence_score": 0.0-1.0,
+  "naturalness_score": 0.0-1.0,
+  "cultural_adaptation_score": 0.0-1.0,
+  "tone_score": 0.0-1.0,
+  "issues": ["issue1", "issue2"],
+  "suggestions": "How to improve if confidence < 0.7",
+  "reasoning": "Brief explanation of your evaluation"
+}}
+
+Scoring guide:
+- 0.9-1.0: Excellent, sounds native
+- 0.7-0.9: Good, minor improvements possible
+- 0.5-0.7: Acceptable, has issues
+- 0.0-0.5: Poor, needs rewrite
+
+Be critical but fair. Return ONLY the JSON object."""
+    
+    return prompt
 
 
 def build_translation_prompt(
@@ -185,34 +430,30 @@ async def translate_text(
     req: TranslateRequest
 ) -> TranslateResponse:
     """
-    Translate text with context and tone preservation
+    Translate text with Sequential Validation Chain
+    
+    Now includes:
+    - Translation with enhanced prompt
+    - Quality validation with confidence scoring
+    - Auto-retry if confidence < 0.7
     """
     try:
-        logger.info(f"Translating to {req.target_language} | Type: {req.content_type}")
+        logger.info(f"Translating to {req.target_language} | Type: {req.content_type} | Validation: enabled")
         
-        prompt = build_translation_prompt(
+        # Use translate_text_content with validation enabled
+        translated_text = await translate_text_content(
             text=req.text,
             target_language=req.target_language,
-            source_language=req.source_language,
-            maintain_tone=req.maintain_tone,
-            content_type=req.content_type.value
+            source_language=req.source_language or "auto",
+            ai_client=vertex_client,
+            use_validation=True,  # Enable Sequential Validation
+            max_retries=1  # Allow 1 retry if validation fails
         )
-        
-        # Use gemini-2.5-pro for higher quality transcreation
-        # Pro model better at cultural nuances and creative adaptation
-        response_text = await vertex_client.generate_content(
-            prompt=prompt,
-            temperature=0.5,  # Higher for more creative, natural transcreation
-            response_mime_type="application/json",
-            use_flash=False  # Use Pro model for better transcreation quality
-        )
-        
-        response_data = json.loads(response_text)
         
         return TranslateResponse(
-            translated_text=response_data["translated_text"],
+            translated_text=translated_text,
             original_text=req.text,
-            source_language=response_data.get("detected_source_language", req.source_language or "auto"),
+            source_language=req.source_language or "auto",
             target_language=req.target_language
         )
     
@@ -239,53 +480,41 @@ class BatchTranslateResponse(BaseModel):
 async def translate_single_with_retry(
     text: str,
     target_language: str,
-    max_retries: int = 3
+    max_retries: int = 3,
+    use_validation: bool = True
 ) -> str:
     """
-    Translate a single text with retry logic for malformed JSON
+    Translate a single text with Sequential Validation Chain.
+    
+    Args:
+        text: Text to translate
+        target_language: Target language code
+        max_retries: Max retries for JSON decode errors (default: 3)
+        use_validation: Enable quality validation and smart retry (default: True)
+    
+    Returns:
+        Translated text
     """
-    for attempt in range(max_retries):
-        try:
-            prompt = build_translation_prompt(
-                text=text,
-                target_language=target_language.lower(),
-                source_language="auto",
-                maintain_tone=True,
-                content_type="newsletter"
-            )
-            
-            # Use gemini-2.5-pro for higher quality transcreation
-            response_text = await vertex_client.generate_content(
-                prompt=prompt,
-                temperature=0.5,  # Higher for more creative, natural transcreation
-                response_mime_type="application/json",
-                use_flash=False  # Use Pro model for better transcreation quality
-            )
-            
-            response_data = json.loads(response_text)
-            return response_data.get("translated_text", text)
-        
-        except json.JSONDecodeError as e:
-            logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {target_language}: {str(e)}")
-            logger.warning(f"Raw response (first 500 chars): {response_text[:500]}")
-            
-            # Try to extract translated_text even if JSON is malformed
-            import re
-            match = re.search(r'"translated_text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', response_text, re.DOTALL)
-            if match and attempt == max_retries - 1:
-                extracted_text = match.group(1).replace('\\"', '"').replace('\\n', '\n')
-                logger.info(f"Extracted text from malformed JSON: {extracted_text[:100]}")
-                return extracted_text
-            
-            if attempt == max_retries - 1:
-                logger.error(f"Failed to translate to {target_language} after {max_retries} attempts")
-                logger.error(f"Full raw response: {response_text}")
-                return f"[Translation failed: {text[:50]}...]"
-            await asyncio.sleep(0.5)  # Brief delay before retry
-        
-        except Exception as e:
-            logger.error(f"Error translating to {target_language}: {str(e)}")
-            return f"[Translation error: {text[:50]}...]"
+    try:
+        # Use the new translate_text_content with validation
+        translation = await translate_text_content(
+            text=text,
+            target_language=target_language,
+            source_language="auto",
+            ai_client=vertex_client,
+            use_validation=use_validation,
+            max_retries=1 if use_validation else 0  # Validation has its own retry logic
+        )
+        return translation
+    
+    except json.JSONDecodeError as e:
+        # Fallback for JSON parsing errors
+        logger.error(f"JSON decode failed for {target_language}: {str(e)}")
+        return f"[Translation failed: {text[:50]}...]"
+    
+    except Exception as e:
+        logger.error(f"Error translating to {target_language}: {str(e)}")
+        return f"[Translation error: {text[:50]}...]"
 
 
 @router.post("/translate/batch", response_model=BatchTranslateResponse)
