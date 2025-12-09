@@ -196,6 +196,7 @@ export function NavMain({
                 open={currentOpenState[item.title] ?? false}
                 onOpenChange={isOpen => handleOpenChange(item.title, isOpen)}
                 className="group/collapsible"
+                suppressHydrationWarning
               >
                 <div>
                   <CollapsibleTrigger asChild>
@@ -216,6 +217,7 @@ export function NavMain({
                               <Collapsible
                                 open={currentSubOpenState[subItem.title] ?? false}
                                 onOpenChange={(isOpen) => setOpenSubItems(prev => ({ ...prev, [subItem.title]: isOpen }))}
+                                suppressHydrationWarning
                               >
                                 <CollapsibleTrigger asChild>
                                   <div className="px-3 py-1.5 text-[12px] font-medium text-muted-foreground cursor-pointer select-none flex items-center gap-2">
