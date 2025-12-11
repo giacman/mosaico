@@ -33,12 +33,12 @@ async def generate_project_content(
     ai_client: VertexAIClient = Depends(get_client)
 ):
     """
-    Generate AI content for all components in a project
+    Generate AI content for all components in a project with section-level briefs.
     
-    - Uses project's brief, structure, and tone
-    - Generates content for each component type (subject, body, cta, etc.)
-    - Optionally uses uploaded images as context
-    - Saves all generated content to database
+    - Supports section-specific briefs (falls back to project.brief_text)
+    - Supports section-specific images
+    - Generates content per section with appropriate context
+    - Saves all generated content to database with section_key tracking
     """
     
     # Get project with all relationships
@@ -49,91 +49,116 @@ async def generate_project_content(
             detail="Project not found"
         )
     
-    # Build the generation prompt
-    prompt = f"{project.brief_text or 'Create email content'}"
+    # Create image lookup by ID
+    image_by_id = {img.id: img for img in project.images}
     
-    # Prepare structure for generation
-    structure = []
-    for item in project.structure:
-        structure.append({
-            "component": item["component"],
-            "count": item["count"]
-        })
-    
-    # Determine image URL (use first uploaded image if available, or from request)
-    image_url = None
-    if project.images:
-        image_url = project.images[0].gcs_public_url
-    elif request.image_urls:
-        image_url = request.image_urls[0]
+    all_components = []
     
     try:
-        # Call the AI generation endpoint
         from app.api.generate import build_generation_prompt
-        
-        ai_prompt = build_generation_prompt(
-            text=prompt,
-            count=request.count,
-            tone=project.tone or "professional",
-            content_type="newsletter",
-            structure=structure,
-            context=None
-        )
-        
-        # Generate content
-        response_text = await ai_client.generate_with_fixing(
-            prompt=ai_prompt,
-            expected_variations=request.count,
-            temperature=0.7,
-            max_tokens=2048,
-            image_url=image_url
-        )
-        
         import json
-        variations = json.loads(response_text).get("variations", [])
         
-        if not variations:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No content generated"
-            )
-        
-        # Take the first variation (for MVP, always generate 1)
-        generated_content = variations[0]
-        
-        # Save each component to database
-        components = []
-        for key, value in generated_content.items():
-            # Parse component type and index (e.g., "body_1" -> type="body", index=1)
-            if "_" in key:
-                parts = key.rsplit("_", 1)
-                component_type = parts[0]
-                component_index = int(parts[1])
-            else:
-                component_type = key
-                component_index = None
+        # Generate content for each section separately
+        for section_idx, section in enumerate(project.structure):
+            section_key = section.get("key", f"section_{section_idx}")
+            section_name = section.get("name", f"Section {section_idx + 1}")
             
-            # Create component in database
-            component = Component(
-                project_id=project_id,
-                component_type=component_type,
-                component_index=component_index,
-                generated_content=value
+            # Use section-specific brief or fallback to project brief
+            section_brief = section.get("brief") or project.brief_text or "Create content"
+            
+            # Use section-specific content type or default to newsletter
+            section_content_type = section.get("content_type", "newsletter")
+            
+            # Get section-specific images
+            section_image_ids = section.get("image_ids", [])
+            section_images = [image_by_id[img_id] for img_id in section_image_ids if img_id in image_by_id]
+            
+            # Determine image URL for this section
+            image_url = None
+            if section_images:
+                image_url = section_images[0].gcs_public_url
+            elif not section_image_ids and project.images:
+                # Fallback to project images if section has no specific images
+                image_url = project.images[0].gcs_public_url
+            
+            # Prepare structure for this section
+            section_structure = []
+            for comp_type in section.get("components", []):
+                section_structure.append({
+                    "component": comp_type,
+                    "count": 1  # Each component appears once per section
+                })
+            
+            # Build generation prompt for this section
+            ai_prompt = build_generation_prompt(
+                text=section_brief,
+                count=request.count,
+                tone=project.tone or "professional",
+                content_type=section_content_type,
+                structure=section_structure,
+                context=f"Section: {section_name}" if section_name else None
             )
-            db.add(component)
-            components.append(component)
+            
+            logger.info(
+                f"Generating content for section '{section_name}' (key: {section_key}) "
+                f"with {len(section_structure)} components"
+            )
+            
+            # Generate content for this section
+            response_text = await ai_client.generate_with_fixing(
+                prompt=ai_prompt,
+                expected_variations=request.count,
+                temperature=0.7,
+                max_tokens=2048,
+                image_url=image_url
+            )
+            
+            variations = json.loads(response_text).get("variations", [])
+            
+            if not variations:
+                logger.warning(f"No content generated for section {section_key}")
+                continue
+            
+            # Take the first variation
+            generated_content = variations[0]
+            
+            # Save each component with section_key
+            for comp_idx, (key, value) in enumerate(generated_content.items()):
+                # Parse component type and index
+                if "_" in key:
+                    parts = key.rsplit("_", 1)
+                    component_type = parts[0]
+                    component_index = int(parts[1])
+                else:
+                    component_type = key
+                    component_index = comp_idx
+                
+                # Create component with section tracking
+                component = Component(
+                    project_id=project_id,
+                    section_key=section_key,
+                    section_order=section_idx,
+                    component_type=component_type,
+                    component_index=component_index,
+                    generated_content=value
+                )
+                db.add(component)
+                all_components.append(component)
         
         db.commit()
         
         # Refresh to get IDs
-        for comp in components:
+        for comp in all_components:
             db.refresh(comp)
         
-        logger.info(f"Generated and saved {len(components)} components for project {project_id}")
+        logger.info(
+            f"Generated and saved {len(all_components)} components across "
+            f"{len(project.structure)} sections for project {project_id}"
+        )
         
         return GenerateProjectContentResponse(
             project_id=project_id,
-            components=[ComponentResponse.from_orm(c) for c in components]
+            components=[ComponentResponse.from_orm(c) for c in all_components]
         )
         
     except Exception as e:
