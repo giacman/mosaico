@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 from enum import Enum
 from typing import List, Optional
+from app.models.schemas import ContentType
 
 
 # ===== Project Schemas =====
@@ -14,9 +15,14 @@ class ProjectStatus(str, Enum):
     approved = "approved"
 
 class SectionStructureCreate(BaseModel):
-    """A section in the email structure"""
+    """
+    A section in the email/content structure.
+    Each section can have its own brief and content type for multi-topic campaigns.
+    """
     key: str = Field(..., description="Unique identifier for the section (e.g., 'section_1')")
-    name: str = Field(..., description="Display name for the section (e.g., 'Hero Section')")
+    name: str = Field(..., description="Display name for the section (e.g., 'Lancio Collezione', 'Categoria Casa')")
+    brief: Optional[str] = Field(None, description="Section-specific creative brief/instructions. If not provided, falls back to project-level brief_text")
+    content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Content type for this section (newsletter, social_post, etc.)")
     components: List[str] = Field(..., description="List of component types in this section (e.g., ['image', 'title', 'cta'])")
 
 
@@ -56,6 +62,8 @@ class ProjectCreate(BaseModel):
             data["structure"] = [{
                 "key": "main",
                 "name": "Main Section",
+                "brief": None,  # Will fallback to project-level brief_text
+                "content_type": "newsletter",
                 "components": components
             }]
         return data
@@ -90,6 +98,8 @@ class ProjectUpdate(BaseModel):
             data["structure"] = [{
                 "key": "main",
                 "name": "Main Section",
+                "brief": None,  # Will fallback to project-level brief_text
+                "content_type": "newsletter",
                 "components": components
             }]
         return data
