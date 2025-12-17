@@ -26,18 +26,61 @@ import { Loader2 } from "lucide-react"
 import { generate } from "@/actions/generate"
 import { handlebarsGenerate } from "@/actions/export"
 import { batchTranslate } from "@/actions/translate"
-
-type Section = {
-  key: string
-  name: string
-  components: string[]
-}
+import {
+  ensureSectionKeys,
+  findComponentForSection,
+  findImageForSection,
+  type Section,
+  type SectionComponent,
+} from "@/lib/section-utils"
 
 type UploadedImage = {
   id: string
   url: string
   filename: string
   uploading?: boolean
+}
+
+/**
+ * Input component with local state to prevent focus loss on parent re-render
+ * Propagates changes only on blur, not on every keystroke
+ */
+function SectionNameInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  className?: string
+}) {
+  const [localValue, setLocalValue] = useState(value)
+
+  // Sync local state when prop changes (e.g., from external updates)
+  useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
+  return (
+    <input
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={() => {
+        if (localValue !== value) {
+          onChange(localValue)
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.currentTarget.blur()
+        }
+      }}
+      placeholder={placeholder}
+      className={className}
+    />
+  )
 }
 
 export function SectionBuilder({
@@ -58,14 +101,14 @@ export function SectionBuilder({
   onChange: (next: Section[]) => void
   projectId: number
   onImagesChange?: (images: UploadedImage[]) => void
-  components?: Array<{ id?: number, component_type: string; component_index?: number; generated_content: string; translations?: Record<string,string>, image_id?: number, image?: UploadedImage }>
+  components?: SectionComponent[]
   projectImages?: UploadedImage[]
   brief?: string
   tone?: string
   onUpdateComponent?: (type: string, index: number, content: string, imageId?: number) => void
   currentLanguage?: string
   targetLanguages?: string[]
-  onUpdateComponents?: (list: Array<{ id?: number, component_type: string; component_index?: number; generated_content: string; translations?: Record<string,string>, image_id?: number, image?: UploadedImage }>) => void
+  onUpdateComponents?: (list: SectionComponent[]) => void
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -73,14 +116,6 @@ export function SectionBuilder({
     { id: "cta", label: "CTA" },
     { id: "image", label: "Image" },
   ]
-
-  const ensureKeys = (sections: Section[]): Section[] => {
-    return sections.map((s, idx) => ({
-      key: s.key || `section_${idx + 1}`,
-      name: s.name || `Section ${idx + 1}`,
-      components: Array.isArray(s.components) ? s.components : [],
-    }))
-  }
 
   // Derive imagesBySection from props (no state to avoid race conditions)
   const imagesBySection = useMemo<Record<string, UploadedImage[][]>>(() => {
@@ -90,15 +125,15 @@ export function SectionBuilder({
 
     const result: Record<string, UploadedImage[][]> = {}
     const counters: Record<string, number> = {}
-    
+
     for (const section of value) {
       result[section.key] = []
       for (const compType of section.components) {
         const idx = (counters[compType] = (counters[compType] || 0) + 1)
         const comp = components.find(c => c.component_type === compType && (c.component_index || 1) === idx)
-        
+
         let image: UploadedImage | undefined = (comp as any)?.image
-        
+
         if (!image && comp?.image_id && projectImages) {
           const foundImage = projectImages.find(img => Number(img.id) === comp.image_id)
           if (foundImage) {
@@ -123,7 +158,7 @@ export function SectionBuilder({
 
 
   const addSection = () => {
-    const next: Section[] = ensureKeys([
+    const next: Section[] = ensureSectionKeys([
       ...value,
       {
         key: "",
@@ -137,13 +172,13 @@ export function SectionBuilder({
   const renameSection = (idx: number, name: string) => {
     const next = value.slice()
     next[idx] = { ...next[idx], name }
-    onChange(ensureKeys(next))
+    onChange(ensureSectionKeys(next))
   }
 
   const removeSection = (idx: number) => {
     const next = value.slice()
     const removed = next.splice(idx, 1)[0]
-    onChange(ensureKeys(next))
+    onChange(ensureSectionKeys(next))
   }
 
   const addComponent = (idx: number, comp: string) => {
@@ -151,7 +186,7 @@ export function SectionBuilder({
     const next = value.slice()
     const section = next[idx]
     next[idx] = { ...section, components: [...section.components, comp] }
-    onChange(ensureKeys(next))
+    onChange(ensureSectionKeys(next))
   }
 
   const removeComponentAt = (idx: number, compIdx: number) => {
@@ -160,11 +195,11 @@ export function SectionBuilder({
     const comps = section.components.slice()
     comps.splice(compIdx, 1)
     next[idx] = { ...section, components: comps }
-    onChange(ensureKeys(next))
+    onChange(ensureSectionKeys(next))
   }
 
   // ---- Drag and Drop (Sections) ----
-  const sectionIds = useMemo(() => ensureKeys(value).map((s) => `section:${s.key}`), [value])
+  const sectionIds = useMemo(() => ensureSectionKeys(value).map((s) => `section:${s.key}`), [value])
   const sensors = useSensors(useSensor(PointerSensor))
 
   const onSectionsDragEnd = (event: DragEndEvent) => {
@@ -173,7 +208,7 @@ export function SectionBuilder({
     const from = sectionIds.indexOf(String(active.id))
     const to = sectionIds.indexOf(String(over.id))
     if (from === -1 || to === -1 || from === to) return
-    const next = arrayMove(ensureKeys(value), from, to)
+    const next = arrayMove(ensureSectionKeys(value), from, to)
     onChange(next)
   }
 
@@ -238,7 +273,7 @@ export function SectionBuilder({
       const compressed = await compressImage(file)
       const res = await uploadImage(projectId, compressed)
       if (!res.success || !res.data) throw new Error(res.error || "Upload failed")
-      
+
       const uploaded: UploadedImage = {
         id: String(res.data.id),
         url: res.data.gcs_public_url || res.data.gcs_path,
@@ -275,7 +310,7 @@ export function SectionBuilder({
       if (targetType && targetIndex > -1 && onUpdateComponents) {
         const list = (components || []).slice()
         const existingIndex = list.findIndex(c => c.component_type === targetType && (c.component_index || 1) === targetIndex)
-        
+
         if (existingIndex > -1) {
           list[existingIndex] = { ...list[existingIndex], image_id: Number(uploaded.id), image: uploaded }
         } else {
@@ -322,11 +357,11 @@ export function SectionBuilder({
       }
       if (targetType) break
     }
-    
+
     if (targetType && targetIndex > -1 && onUpdateComponents) {
       const list = (components || []).slice()
       const existingIndex = list.findIndex(c => c.component_type === targetType && (c.component_index || 1) === targetIndex)
-      
+
       if (existingIndex > -1) {
         list[existingIndex] = { ...list[existingIndex], image_id: undefined, image: undefined }
         onUpdateComponents(list as any)
@@ -355,12 +390,23 @@ export function SectionBuilder({
     })
   }
 
-  const renderPreview = (type: string, displayIndex: number) => {
-    // Try to resolve generated or translated content for this component type/index
+  const renderPreview = (type: string, displayIndex: number, sectionKey?: string, sectionOrder?: number) => {
+    // Try to resolve generated or translated content for this component type/index/section
     const idx = displayIndex <= 0 ? 1 : displayIndex
-    const found = components?.find(
-      (c) => c.component_type === type && (c.component_index || 1) === idx
-    )
+
+    // Find component matching type, index, and optionally section
+    const found = components?.find((c) => {
+      const typeMatch = c.component_type === type
+      const indexMatch = (c.component_index || 1) === idx
+
+      // If section info provided, also match by section
+      if (sectionKey) {
+        const sectionMatch = c.section_key === sectionKey || c.section_order === sectionOrder
+        return typeMatch && indexMatch && sectionMatch
+      }
+
+      return typeMatch && indexMatch
+    })
 
     const text = (() => {
       if (!found) return ""
@@ -423,7 +469,7 @@ export function SectionBuilder({
   const [regenBusy, setRegenBusy] = useState<Record<string, boolean>>({})
 
   const handleCopy = async (text: string) => {
-    try { await navigator.clipboard.writeText(text) } catch {}
+    try { await navigator.clipboard.writeText(text) } catch { }
   }
 
   const handleCopyHandlebar = async (
@@ -463,488 +509,494 @@ export function SectionBuilder({
       </CardHeader>
       <CardContent className="px-6 sm:px-8 md:px-10 py-8">
 
-      {/* Fixed header components (visual only) */}
-      <div className="mb-4 rounded-md border p-3 bg-muted/30">
-        <div className="text-xs font-medium text-muted-foreground">Header (always included)</div>
-        <div className="mt-3 space-y-3">
-          {(() => {
-            const headerItems: Array<{ label: string; type: "subject" | "pre_header" }> = [
-              { label: "Subject", type: "subject" },
-              { label: "Pre-header", type: "pre_header" },
-            ]
-            return headerItems.map(({ label, type }) => {
-              const displayIndex = 1
-              const found = components?.find(
-                (c) => c.component_type === type && (c.component_index || 1) === 1
-              )
-              const currentText = found?.generated_content || ""
-              const compKey = `header:${type}:${displayIndex}`
-              const isEditing = !!editing[compKey]
-              const editText = editValues[compKey] ?? currentText
-              return (
-                <div key={type} className="rounded-xl border bg-card p-4 space-y-2 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs px-2 py-0.5">{label}</Badge>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                        disabled={!!regenBusy[compKey] || !brief}
-                        onClick={async () => {
-                          if (!brief) return
-                          setRegenBusy(v => ({ ...v, [compKey]: true }))
-                          try {
-                            const result = await generate({
-                              project_id: projectId,
-                              text: brief!,
-                              count: 1,
-                              tone: tone || "professional",
-                              content_type: "newsletter",
-                              structure: [{ component: type as any, count: 1 }],
-                              temperature: 0.7,
-                              use_few_shot: true,
-                              use_flash: true,
-                            })
-                            if (result.success && result.data) {
-                              const val = String(result.data.variations[0][type] || "")
-                              
-                              if (val && onUpdateComponents) {
-                                // Check if this component had existing translations
-                                const existingComp = (components || []).find((c) => c.component_type === type && (c.component_index || 1) === 1)
-                                const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
-                                
-                                // If component had translations and target languages are set, retranslate
-                                if (hadTranslations && (targetLanguages || []).length > 0) {
-                                  try {
-                                    const texts = [{ key: type, content: val }]
-                                    const langs = targetLanguages || []
-                                    const res = await batchTranslate(texts, langs)
-                                    
-                                    if (res.success && res.data) {
-                                      const key = type
-                                      const t = (res.data[key] || {}) as Record<string, string>
-                                      
-                                      const merged = (components || []).map((c) => {
-                                        if (c.component_type === type && (c.component_index || 1) === 1) {
-                                          return { ...c, generated_content: val, translations: t }
-                                        }
-                                        return c
-                                      })
-                                      onUpdateComponents(merged as any)
+        {/* Fixed header components (visual only) */}
+        <div className="mb-4 rounded-md border p-3 bg-muted/30">
+          <div className="text-xs font-medium text-muted-foreground">Header (always included)</div>
+          <div className="mt-3 space-y-3">
+            {(() => {
+              const headerItems: Array<{ label: string; type: "subject" | "pre_header" }> = [
+                { label: "Subject", type: "subject" },
+                { label: "Pre-header", type: "pre_header" },
+              ]
+              return headerItems.map(({ label, type }) => {
+                const displayIndex = 1
+                const found = components?.find(
+                  (c) => c.component_type === type && (c.component_index || 1) === 1
+                )
+                const currentText = found?.generated_content || ""
+                const compKey = `header:${type}:${displayIndex}`
+                const isEditing = !!editing[compKey]
+                const editText = editValues[compKey] ?? currentText
+                return (
+                  <div key={type} className="rounded-xl border bg-card p-4 space-y-2 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs px-2 py-0.5">{label}</Badge>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                          disabled={!!regenBusy[compKey] || !brief}
+                          onClick={async () => {
+                            if (!brief) return
+                            setRegenBusy(v => ({ ...v, [compKey]: true }))
+                            try {
+                              const result = await generate({
+                                project_id: projectId,
+                                text: brief!,
+                                count: 1,
+                                tone: tone || "professional",
+                                content_type: "newsletter",
+                                structure: [{ component: type as any, count: 1 }],
+                                temperature: 0.7,
+                                use_few_shot: true,
+                                use_flash: true,
+                              })
+                              if (result.success && result.data) {
+                                const val = String(result.data.variations[0][type] || "")
+
+                                if (val && onUpdateComponents) {
+                                  // Check if this component had existing translations
+                                  const existingComp = (components || []).find((c) => c.component_type === type && (c.component_index || 1) === 1)
+                                  const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
+
+                                  // If component had translations and target languages are set, retranslate
+                                  if (hadTranslations && (targetLanguages || []).length > 0) {
+                                    try {
+                                      const texts = [{ key: type, content: val }]
+                                      const langs = targetLanguages || []
+                                      const res = await batchTranslate(texts, langs)
+
+                                      if (res.success && res.data) {
+                                        const key = type
+                                        const t = (res.data[key] || {}) as Record<string, string>
+
+                                        const merged = (components || []).map((c) => {
+                                          if (c.component_type === type && (c.component_index || 1) === 1) {
+                                            return { ...c, generated_content: val, translations: t }
+                                          }
+                                          return c
+                                        })
+                                        onUpdateComponents(merged as any)
+                                      }
+                                    } catch (err) {
+                                      console.error(`Error retranslating ${type}:`, err)
                                     }
-                                  } catch (err) {
-                                    console.error(`Error retranslating ${type}:`, err)
+                                  } else {
+                                    // No translations to regenerate, just update English content
+                                    const merged = (components || []).map((c) => {
+                                      if (c.component_type === type && (c.component_index || 1) === 1) {
+                                        return { ...c, generated_content: val }
+                                      }
+                                      return c
+                                    })
+                                    onUpdateComponents(merged as any)
                                   }
-                                } else {
-                                  // No translations to regenerate, just update English content
-                                  const merged = (components || []).map((c) => {
-                                    if (c.component_type === type && (c.component_index || 1) === 1) {
-                                      return { ...c, generated_content: val }
-                                    }
-                                    return c
-                                  })
-                                  onUpdateComponents(merged as any)
                                 }
                               }
+                            } finally {
+                              setRegenBusy(v => ({ ...v, [compKey]: false }))
                             }
-                          } finally {
-                            setRegenBusy(v => ({ ...v, [compKey]: false }))
-                          }
-                        }}
-                      >
-                        {regenBusy[compKey] ? (
-                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                        )}
-                        Regenerate
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                        onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
-                      >
-                        <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                        onClick={() => {
-                          const textToCopy = (() => {
-                            if (!found) return ""
-                            if (currentLanguage && currentLanguage !== "en") {
-                              const t = (found as any).translations?.[currentLanguage]
-                              if (t && String(t).trim()) return String(t)
-                            }
-                            return currentText
-                          })()
-                          handleCopy(textToCopy)
-                        }}
-                        disabled={!currentText && !(found && (found as any).translations && (found as any).translations[currentLanguage || ""]) }
-                      >
-                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                        onClick={() => {
-                          const en = (found?.generated_content || "")
-                          const trAny = (found as any)?.translations
-                          const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
-                          const allowed = new Set((targetLanguages || []).map(l => String(l).toLowerCase()))
-                          const tr = Object.fromEntries(
-                            Object.entries(trRaw)
-                              .filter(([k]) => allowed.has(String(k).toLowerCase()))
-                              .map(([k, v]) => [k, String(v ?? "")])
-                          ) as Record<string, string>
-                          handleCopyHandlebar(type, en, tr)
-                        }}
-                        disabled={!((found?.generated_content || "").trim())}
-                      >
-                        <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
-                      </button>
+                          }}
+                        >
+                          {regenBusy[compKey] ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                          )}
+                          Regenerate
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                          onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
+                        >
+                          <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                          onClick={() => {
+                            const textToCopy = (() => {
+                              if (!found) return ""
+                              if (currentLanguage && currentLanguage !== "en") {
+                                const t = (found as any).translations?.[currentLanguage]
+                                if (t && String(t).trim()) return String(t)
+                              }
+                              return currentText
+                            })()
+                            handleCopy(textToCopy)
+                          }}
+                          disabled={!currentText && !(found && (found as any).translations && (found as any).translations[currentLanguage || ""])}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                          onClick={() => {
+                            const en = (found?.generated_content || "")
+                            const trAny = (found as any)?.translations
+                            const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
+                            const allowed = new Set((targetLanguages || []).map(l => String(l).toLowerCase()))
+                            const tr = Object.fromEntries(
+                              Object.entries(trRaw)
+                                .filter(([k]) => allowed.has(String(k).toLowerCase()))
+                                .map(([k, v]) => [k, String(v ?? "")])
+                            ) as Record<string, string>
+                            handleCopyHandlebar(type, en, tr)
+                          }}
+                          disabled={!((found?.generated_content || "").trim())}
+                        >
+                          <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {isEditing ? (
-                    <>
-                      <textarea
-                        className="w-full rounded-md border bg-background p-2 text-sm"
-                        rows={4}
-                        value={editText}
-                        onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          className="w-full rounded-md border bg-background p-2 text-sm"
+                          rows={4}
+                          value={editText}
+                          onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
+                          onClick={() => {
+                            setEditing(v => ({ ...v, [compKey]: false }))
+                            onUpdateComponent && onUpdateComponent(type, 1, editText)
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1" /> Save
+                        </button>
+                      </>
+                    ) : (
+                      <div>{renderPreview(type, 1)}</div>
+                    )}
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </div>
+
+        {/* Sections DnD */}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSectionsDragEnd}>
+          <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {(() => {
+                // Global per-type counters across ALL sections to map to generated components correctly
+                const globalTypeCounters: Record<string, number> = {}
+                return ensureSectionKeys(value).map((section, idx) => (
+                  <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`}>
+                    <div className="flex items-center gap-2">
+                      <SectionNameInput
+                        value={section.name}
+                        onChange={(name) => renameSection(idx, name)}
+                        placeholder={`Section ${idx + 1} name`}
+                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
                       />
                       <button
                         type="button"
-                        className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
-                        onClick={() => {
-                          setEditing(v => ({ ...v, [compKey]: false }))
-                          onUpdateComponent && onUpdateComponent(type, 1, editText)
-                        }}
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                        onClick={() => removeSection(idx)}
+                        aria-label="Remove section"
                       >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Save
+                        Remove
                       </button>
-                    </>
-                  ) : (
-                    <div>{renderPreview(type, 1)}</div>
-                  )}
-                </div>
-              )
-            })
-          })()}
-        </div>
-      </div>
+                    </div>
 
-      {/* Sections DnD */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSectionsDragEnd}>
-        <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
-          <div className="space-y-3">
-            {(() => {
-              // Global per-type counters across ALL sections to map to generated components correctly
-              const globalTypeCounters: Record<string, number> = {}
-              return ensureKeys(value).map((section, idx) => (
-                <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={section.name}
-                      onChange={(e) => renameSection(idx, e.target.value)}
-                      placeholder={`Section ${idx + 1} name`}
-                      className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-                    />
-                    <button
-                      type="button"
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                      onClick={() => removeSection(idx)}
-                      aria-label="Remove section"
+                    {/* Components DnD within section (no cross-section moves) */}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={({ active, over }) => {
+                        if (!active?.id || !over?.id) return
+                        const prefix = `comp:${section.key}::`
+                        const aId = String(active.id)
+                        const oId = String(over.id)
+                        if (!aId.startsWith(prefix) || !oId.startsWith(prefix)) return
+                        const comps = section.components
+                        const ids = comps.map((_, i) => `${prefix}${i}`)
+                        const from = ids.indexOf(aId)
+                        const to = ids.indexOf(oId)
+                        if (from === -1 || to === -1 || from === to) return
+                        const reordered = arrayMove(comps, from, to)
+                        const next = value.slice()
+                        next[idx] = { ...section, components: reordered }
+                        onChange(ensureSectionKeys(next))
+                      }}
                     >
-                      Remove
-                    </button>
-                  </div>
-
-                  {/* Components DnD within section (no cross-section moves) */}
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={({ active, over }) => {
-                      if (!active?.id || !over?.id) return
-                      const prefix = `comp:${section.key}::`
-                      const aId = String(active.id)
-                      const oId = String(over.id)
-                      if (!aId.startsWith(prefix) || !oId.startsWith(prefix)) return
-                      const comps = section.components
-                      const ids = comps.map((_, i) => `${prefix}${i}`)
-                      const from = ids.indexOf(aId)
-                      const to = ids.indexOf(oId)
-                      if (from === -1 || to === -1 || from === to) return
-                      const reordered = arrayMove(comps, from, to)
-                      const next = value.slice()
-                      next[idx] = { ...section, components: reordered }
-                      onChange(ensureKeys(next))
-                    }}
-                  >
-                    <SortableContext
-                      items={section.components.map((_, i) => `comp:${section.key}::${i}`)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <div className="mt-3 flex flex-col gap-2">
-                        {section.components.length === 0 && (
-                          <span className="text-xs text-muted-foreground">No components yet</span>
-                        )}
-                        {section.components.map((c, compIdx) => {
-                          const imgs = (imagesBySection[section.key]?.[compIdx]) || []
-                          // Global display index: increment per type across all sections
-                          const displayIndex = (globalTypeCounters[c] = (globalTypeCounters[c] || 0) + 1)
-                          const contentObj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
-                          const currentText = (() => {
-                            if (!contentObj) return ""
-                            if (currentLanguage && currentLanguage !== "en") {
-                              const t = (contentObj as any).translations?.[currentLanguage]
-                              if (t && String(t).trim()) return String(t)
-                            }
-                            return contentObj.generated_content || ""
-                          })()
-                          const compKey = `${section.key}:${c}:${displayIndex}`
-                          const isEditing = !!editing[compKey]
-                          const editText = editValues[compKey] ?? currentText
-                          return (
-                            <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`}>
-                              {({ attributes, listeners }) => (
-                              <div className="rounded-xl border bg-white p-5 space-y-3 shadow-sm">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs px-2 py-0.5">{c === 'pre_header' ? 'Pre Header' : c.charAt(0).toUpperCase() + c.slice(1)}</Badge>
-                                    <span
-                                      {...attributes}
-                                      {...listeners}
-                                      className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground text-xs"
-                                    >
-                                      ⋮⋮ Drag
-                                    </span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className="rounded border px-2 py-0.5 text-xs hover:bg-accent"
-                                    onClick={() => removeComponentAt(idx, compIdx)}
-                                    aria-label="Remove component"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-
-                                {c === "image" ? (
-                                  imgs.length > 0 ? (
-                                    <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border">
-                                      <img src={imgs[0].url} alt={imgs[0].filename} className="h-full w-full object-cover" />
+                      <SortableContext
+                        items={section.components.map((_, i) => `comp:${section.key}::${i}`)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="mt-3 flex flex-col gap-2">
+                          {section.components.length === 0 && (
+                            <span className="text-xs text-muted-foreground">No components yet</span>
+                          )}
+                          {section.components.map((c, compIdx) => {
+                            const imgs = (imagesBySection[section.key]?.[compIdx]) || []
+                            // Global display index: increment per type across all sections
+                            const displayIndex = (globalTypeCounters[c] = (globalTypeCounters[c] || 0) + 1)
+                            // Find component matching type, index, and section
+                            const contentObj = components?.find(x => {
+                              const typeMatch = x.component_type === c
+                              const indexMatch = (x.component_index || 1) === displayIndex
+                              const sectionMatch = x.section_key === section.key || x.section_order === idx
+                              return typeMatch && indexMatch && sectionMatch
+                            })
+                            const currentText = (() => {
+                              if (!contentObj) return ""
+                              if (currentLanguage && currentLanguage !== "en") {
+                                const t = (contentObj as any).translations?.[currentLanguage]
+                                if (t && String(t).trim()) return String(t)
+                              }
+                              return contentObj.generated_content || ""
+                            })()
+                            const compKey = `${section.key}:${c}:${displayIndex}`
+                            const isEditing = !!editing[compKey]
+                            const editText = editValues[compKey] ?? currentText
+                            return (
+                              <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`}>
+                                {({ attributes, listeners }) => (
+                                  <div className="rounded-xl border bg-white p-5 space-y-3 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs px-2 py-0.5">{c === 'pre_header' ? 'Pre Header' : c.charAt(0).toUpperCase() + c.slice(1)}</Badge>
+                                        <span
+                                          {...attributes}
+                                          {...listeners}
+                                          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground text-xs"
+                                        >
+                                          ⋮⋮ Drag
+                                        </span>
+                                      </div>
                                       <button
                                         type="button"
-                                        className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white"
-                                        onClick={() => removeImageFromComponent(section.key, compIdx, imgs[0].id)}
-                                        aria-label="Remove image"
+                                        className="rounded border px-2 py-0.5 text-xs hover:bg-accent"
+                                        onClick={() => removeComponentAt(idx, compIdx)}
+                                        aria-label="Remove component"
                                       >
-                                        ×
+                                        Remove
                                       </button>
                                     </div>
-                                  ) : (
-                                    <label
-                                      className="flex h-24 items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground cursor-pointer"
-                                      onDragOver={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                      }}
-                                      onDrop={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith("image/"))
-                                        if (files.length) handleUploadToComponent(section.key, compIdx, files)
-                                      }}
-                                    >
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        className="sr-only"
-                                        onChange={(e) => {
-                                          const files = e.target.files ? Array.from(e.target.files) : []
-                                          if (files.length) handleUploadToComponent(section.key, compIdx, files)
-                                        }}
-                                      />
-                                      Click to upload or drop images here
-                                    </label>
-                                  )
-                                ) : (
-                                  <div className="space-y-3">
-                                    {isEditing ? (
-                                      <>
-                                        <textarea
-                                          className="w-full rounded-md border bg-background p-2 text-sm"
-                                          rows={6}
-                                          value={editText}
-                                          onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
-                                        />
-                                        <button
-                                          type="button"
-                                          className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
-                                          onClick={() => {
-                                            setEditing(v => ({ ...v, [compKey]: false }))
-                                            onUpdateComponent && onUpdateComponent(c, displayIndex, editText)
+
+                                    {c === "image" ? (
+                                      imgs.length > 0 ? (
+                                        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border">
+                                          <img src={imgs[0].url} alt={imgs[0].filename} className="h-full w-full object-cover" />
+                                          <button
+                                            type="button"
+                                            className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white"
+                                            onClick={() => removeImageFromComponent(section.key, compIdx, imgs[0].id)}
+                                            aria-label="Remove image"
+                                          >
+                                            ×
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <label
+                                          className="flex h-24 items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground cursor-pointer"
+                                          onDragOver={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                          }}
+                                          onDrop={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith("image/"))
+                                            if (files.length) handleUploadToComponent(section.key, compIdx, files)
                                           }}
                                         >
-                                          <Check className="h-3.5 w-3.5 mr-1" /> Save
-                                        </button>
-                                      </>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            className="sr-only"
+                                            onChange={(e) => {
+                                              const files = e.target.files ? Array.from(e.target.files) : []
+                                              if (files.length) handleUploadToComponent(section.key, compIdx, files)
+                                            }}
+                                          />
+                                          Click to upload or drop images here
+                                        </label>
+                                      )
                                     ) : (
-                                      <>{renderPreview(c, displayIndex)}</>
-                                    )}
+                                      <div className="space-y-3">
+                                        {isEditing ? (
+                                          <>
+                                            <textarea
+                                              className="w-full rounded-md border bg-background p-2 text-sm"
+                                              rows={6}
+                                              value={editText}
+                                              onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
+                                            />
+                                            <button
+                                              type="button"
+                                              className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
+                                              onClick={() => {
+                                                setEditing(v => ({ ...v, [compKey]: false }))
+                                                onUpdateComponent && onUpdateComponent(c, displayIndex, editText)
+                                              }}
+                                            >
+                                              <Check className="h-3.5 w-3.5 mr-1" /> Save
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <>{renderPreview(c, displayIndex, section.key, idx)}</>
+                                        )}
 
-                                    {/* Actions toolbar */}
-                                    <div className="flex items-center gap-1 pt-1">
-                                      <button
-                                        type="button"
-                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                                        disabled={!!regenBusy[compKey]}
-                                        onClick={async () => {
-                                          if (!brief) return
-                                          setRegenBusy(v => ({ ...v, [compKey]: true }))
-                                          try {
-                                            const result = await generate({
-                                              project_id: projectId,
-                                              text: brief,
-                                              count: 1,
-                                              tone: tone || "professional",
-                                              content_type: "newsletter",
-                                              structure: [{ component: c as any, count: 1 }],
-                                              temperature: 0.8,
-                                              use_few_shot: true,
-                                              use_flash: c === "cta",
-                                            })
-                                            if (result.success && result.data) {
-                                              const val = String(result.data.variations[0][c] || "")
-                                              const finalVal = c === "cta" ? val.toUpperCase() : val
-                                              if (finalVal && onUpdateComponents) {
-                                                // Check if this component had existing translations
-                                                const existingComp = (components || []).find((item) => item.component_type === c && (item.component_index || 1) === displayIndex)
-                                                const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
-                                                
-                                                // If component had translations and target languages are set, retranslate
-                                                if (hadTranslations && (targetLanguages || []).length > 0) {
-                                                  try {
-                                                    const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
-                                                    const langs = targetLanguages || []
-                                                    const res = await batchTranslate(texts, langs)
-                                                    if (res.success && res.data) {
-                                                      const key = `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`
-                                                      const newTranslations = res.data[key]
+                                        {/* Actions toolbar */}
+                                        <div className="flex items-center gap-1 pt-1">
+                                          <button
+                                            type="button"
+                                            className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                            disabled={!!regenBusy[compKey]}
+                                            onClick={async () => {
+                                              if (!brief) return
+                                              setRegenBusy(v => ({ ...v, [compKey]: true }))
+                                              try {
+                                                const result = await generate({
+                                                  project_id: projectId,
+                                                  text: brief,
+                                                  count: 1,
+                                                  tone: tone || "professional",
+                                                  content_type: "newsletter",
+                                                  structure: [{ component: c as any, count: 1 }],
+                                                  temperature: 0.8,
+                                                  use_few_shot: true,
+                                                  use_flash: c === "cta",
+                                                })
+                                                if (result.success && result.data) {
+                                                  const val = String(result.data.variations[0][c] || "")
+                                                  const finalVal = c === "cta" ? val.toUpperCase() : val
+                                                  if (finalVal && onUpdateComponents) {
+                                                    // Check if this component had existing translations
+                                                    const existingComp = (components || []).find((item) => item.component_type === c && (item.component_index || 1) === displayIndex)
+                                                    const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
+
+                                                    // If component had translations and target languages are set, retranslate
+                                                    if (hadTranslations && (targetLanguages || []).length > 0) {
+                                                      try {
+                                                        const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
+                                                        const langs = targetLanguages || []
+                                                        const res = await batchTranslate(texts, langs)
+                                                        if (res.success && res.data) {
+                                                          const key = `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`
+                                                          const newTranslations = res.data[key]
+                                                          const merged = (components || []).map((item) => {
+                                                            if (item.component_type === c && (item.component_index || 1) === displayIndex) {
+                                                              return { ...item, generated_content: finalVal, translations: newTranslations }
+                                                            }
+                                                            return item
+                                                          })
+                                                          onUpdateComponents(merged as any)
+                                                        }
+                                                      } catch { }
+                                                    } else {
+                                                      // No translations to regenerate, just update English content
                                                       const merged = (components || []).map((item) => {
                                                         if (item.component_type === c && (item.component_index || 1) === displayIndex) {
-                                                          return { ...item, generated_content: finalVal, translations: newTranslations }
+                                                          return { ...item, generated_content: finalVal }
                                                         }
                                                         return item
                                                       })
                                                       onUpdateComponents(merged as any)
                                                     }
-                                                  } catch {}
-                                                } else {
-                                                  // No translations to regenerate, just update English content
-                                                  const merged = (components || []).map((item) => {
-                                                    if (item.component_type === c && (item.component_index || 1) === displayIndex) {
-                                                      return { ...item, generated_content: finalVal }
-                                                    }
-                                                    return item
-                                                  })
-                                                  onUpdateComponents(merged as any)
+                                                  }
                                                 }
+                                              } finally {
+                                                setRegenBusy(v => ({ ...v, [compKey]: false }))
                                               }
-                                            }
-                                          } finally {
-                                            setRegenBusy(v => ({ ...v, [compKey]: false }))
-                                          }
-                                        }}
-                                      >
-                                        {regenBusy[compKey] ? (
-                                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                                        ) : (
-                                          <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                                        )}
-                                        Regenerate
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                                        onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                                        onClick={() => handleCopy(currentText)}
-                                        disabled={!currentText}
-                                      >
-                                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                                        onClick={() => {
-                                          const obj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
-                                          const en = (obj?.generated_content) || ""
-                                          const trAny = (obj as any)?.translations
-                                          const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
-                                          const allowed = new Set((targetLanguages || []).map(l => String(l).toLowerCase()))
-                                          const tr = Object.fromEntries(
-                                            Object.entries(trRaw)
-                                              .filter(([k]) => allowed.has(String(k).toLowerCase()))
-                                              .map(([k, v]) => [k, String(v ?? "")])
-                                          ) as Record<string, string>
-                                          handleCopyHandlebar(`${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, en, tr)
-                                        }}
-                                        disabled={!((components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)?.generated_content || "").trim())}
-                                      >
-                                        <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
-                                      </button>
-                                    </div>
+                                            }}
+                                          >
+                                            {regenBusy[compKey] ? (
+                                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                            ) : (
+                                              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                            )}
+                                            Regenerate
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                            onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
+                                          >
+                                            <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                            onClick={() => handleCopy(currentText)}
+                                            disabled={!currentText}
+                                          >
+                                            <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                            onClick={() => {
+                                              const obj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
+                                              const en = (obj?.generated_content) || ""
+                                              const trAny = (obj as any)?.translations
+                                              const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
+                                              const allowed = new Set((targetLanguages || []).map(l => String(l).toLowerCase()))
+                                              const tr = Object.fromEntries(
+                                                Object.entries(trRaw)
+                                                  .filter(([k]) => allowed.has(String(k).toLowerCase()))
+                                                  .map(([k, v]) => [k, String(v ?? "")])
+                                              ) as Record<string, string>
+                                              handleCopyHandlebar(`${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, en, tr)
+                                            }}
+                                            disabled={!((components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)?.generated_content || "").trim())}
+                                          >
+                                            <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
-                              </div>
-                              )}
-                            </SortableComponentItem>
-                          )
-                        })}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
+                              </SortableComponentItem>
+                            )
+                          })}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Add component:</span>
-                    {componentsPalette.map((cp) => (
-                      <button
-                        key={cp.id}
-                        type="button"
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                        onClick={() => addComponent(idx, cp.id)}
-                      >
-                        {cp.label}
-                      </button>
-                    ))}
-                  </div>
-                </SortableSectionItem>
-              ))
-            })()}
-          </div>
-        </SortableContext>
-      </DndContext>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Add component:</span>
+                      {componentsPalette.map((cp) => (
+                        <button
+                          key={cp.id}
+                          type="button"
+                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                          onClick={() => addComponent(idx, cp.id)}
+                        >
+                          {cp.label}
+                        </button>
+                      ))}
+                    </div>
+                  </SortableSectionItem>
+                ))
+              })()}
+            </div>
+          </SortableContext>
+        </DndContext>
 
-      <div className="mt-3">
-        <button
-          type="button"
-          className="rounded-md border px-3 py-1 text-sm hover:bg-accent"
-          onClick={addSection}
-        >
-          + Add Section
-        </button>
-      </div>
+        <div className="mt-3">
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1 text-sm hover:bg-accent"
+            onClick={addSection}
+          >
+            + Add Section
+          </button>
+        </div>
       </CardContent>
     </Card>
   )
