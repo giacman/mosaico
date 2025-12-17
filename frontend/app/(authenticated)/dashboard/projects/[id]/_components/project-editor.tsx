@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -26,12 +25,13 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
-import { EmailStructure } from "./email-structure" // Import the new component
+import { EmailStructure } from "./email-structure"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { getLabelColor } from "../../../_components/create-project-dialog"
+import { useProject } from "@/hooks/use-project"
 
 interface ProjectEditorProps {
-  initialProject: Project
+  projectId: number
 }
 
 interface UploadedImage {
@@ -62,49 +62,60 @@ const LANGUAGES = [
   { value: "nl", label: "Dutch" }
 ]
 
-export function ProjectEditor({ initialProject }: ProjectEditorProps) {
-  const router = useRouter()
+export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const { user } = useUser()
-  const [mounted, setMounted] = useState(false)
-  const [project, setProject] = useState(initialProject)
+  
+  // SWR hook for project data - single source of truth
+  const { project: serverProject, isLoading, error, refresh } = useProject(projectId)
+  
+  // Local state for editing (allows optimistic updates)
+  const [editedProject, setEditedProject] = useState<Project | null>(null)
   const [images, setImages] = useState<UploadedImage[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [showPromptAssistant, setShowPromptAssistant] = useState(false)
   const [savingStatus, setSavingStatus] = useState(false)
 
-  // Fix hydration by only rendering after mount
+  // Sync local state when server data changes (but preserve local edits)
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    if (serverProject && !hasChanges) {
+      setEditedProject(serverProject)
+    }
+  }, [serverProject, hasChanges])
 
-  if (!mounted) {
-    // Show loading skeleton while hydrating
+  // Loading state
+  if (isLoading || !editedProject) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="h-10 w-10 rounded-md bg-muted animate-pulse" />
-            <div className="space-y-2">
-              <div className="h-8 w-64 rounded bg-muted animate-pulse" />
-              <div className="h-4 w-32 rounded bg-muted animate-pulse" />
-            </div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Loading project...</p>
           </div>
-          <div className="flex gap-2">
-            <div className="h-10 w-24 rounded-md bg-muted animate-pulse" />
-            <div className="h-10 w-40 rounded-md bg-muted animate-pulse" />
-          </div>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-6">
-            <div className="h-96 rounded-lg bg-muted animate-pulse" />
-            <div className="h-96 rounded-lg bg-muted animate-pulse" />
-          </div>
-          <div className="h-96 rounded-lg bg-muted animate-pulse" />
         </div>
       </div>
     )
   }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-destructive font-medium">Failed to load project</p>
+            <p className="text-muted-foreground text-sm mt-2">{error.message}</p>
+            <Button variant="outline" className="mt-4" onClick={() => refresh()}>
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Use editedProject for all rendering (local state with optimistic updates)
+  const project = editedProject
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -121,7 +132,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
       if (result.success) {
         toast.success("Project saved successfully!")
         setHasChanges(false)
-        router.refresh()
+        await refresh() // SWR refresh - re-fetch from server
       } else {
         toast.error(result.error || "Failed to save project")
       }
@@ -138,9 +149,9 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
     try {
       const result = await updateProject(project.id, { status: value })
       if (result.success && result.data) {
-        setProject(result.data)
+        setEditedProject(result.data)
         toast.success(`Status updated to ${value.replace("_", " ")}`)
-        router.refresh()
+        await refresh() // SWR refresh
       } else {
         toast.error(result.error || "Failed to update status")
       }
@@ -150,7 +161,7 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
   }
 
   const updateField = <K extends keyof Project>(field: K, value: any) => {
-    setProject((prev) => ({ ...prev, [field]: value }))
+    setEditedProject((prev) => prev ? { ...prev, [field]: value } : prev)
     setHasChanges(true)
   }
 
@@ -168,8 +179,8 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
       ? currentLabels.filter(l => l !== label)
       : [...currentLabels, label]
     
-    // Update local state immediately for UI feedback
-    setProject((prev) => ({ ...prev, labels: newLabels }))
+    // Update local state immediately for UI feedback (optimistic update)
+    setEditedProject((prev) => prev ? { ...prev, labels: newLabels } : prev)
     
     // Auto-save to backend
     try {
@@ -179,15 +190,15 @@ export function ProjectEditor({ initialProject }: ProjectEditorProps) {
 
       if (result.success) {
         toast.success(`Label ${currentLabels.includes(label) ? "removed" : "added"}`)
-        router.refresh()
+        await refresh() // SWR refresh
       } else {
         // Revert on failure
-        setProject((prev) => ({ ...prev, labels: currentLabels }))
+        setEditedProject((prev) => prev ? { ...prev, labels: currentLabels } : prev)
         toast.error("Failed to update label")
       }
     } catch (error) {
       // Revert on error
-      setProject((prev) => ({ ...prev, labels: currentLabels }))
+      setEditedProject((prev) => prev ? { ...prev, labels: currentLabels } : prev)
       toast.error("Failed to update label")
     }
   }
