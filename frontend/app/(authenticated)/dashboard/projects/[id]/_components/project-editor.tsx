@@ -121,6 +121,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // Use editedProject for all rendering (local state with optimistic updates)
   const project = editedProject
+  const isReadOnly = (project as any).status === "approved"
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -226,7 +227,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+              {isReadOnly && (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400">
+                  Read-only
+                </Badge>
+              )}
+            </div>
             {hasChanges && (
               <p className="text-sm text-muted-foreground mt-1">Unsaved changes</p>
             )}
@@ -249,7 +257,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <Button
             variant="outline"
             onClick={handleSave}
-            disabled={!hasChanges || isSaving}
+            disabled={!hasChanges || isSaving || isReadOnly}
           >
             <Save className="mr-2 h-4 w-4" />
             {isSaving ? "Saving..." : "Save"}
@@ -268,6 +276,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           }
           onImagesChange={(imgs) => setImages(imgs)}
           userName={user?.fullName || user?.firstName || "Unknown user"}
+          isReadOnly={isReadOnly}
         />
       </div>
 

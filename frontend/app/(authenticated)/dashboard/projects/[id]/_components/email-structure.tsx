@@ -34,6 +34,7 @@ import { batchTranslate } from "@/actions/translate"
 import { saveGeneratedComponents } from "@/actions/components"
 import { useNotifications } from "../../../_components/notifications-provider"
 import { normalizeComponentList, normalizeTranslationsMap, ensureSectionKeys } from "@/lib/section-utils"
+import { ImageUploadGuard } from "./image-upload-guard"
 
 const LANGUAGES = [
   { value: "it", label: "Italian", flag: "🇮🇹" },
@@ -67,6 +68,7 @@ interface EmailStructureProps {
   ) => void
   onImagesChange: (images: UploadedImage[]) => void
   userName: string
+  isReadOnly?: boolean
 }
 
 export function EmailStructure({
@@ -74,13 +76,20 @@ export function EmailStructure({
   onProjectChange,
   onStructureChange,
   onImagesChange,
-  userName
+  userName,
+  isReadOnly = false
 }: EmailStructureProps) {
   const [temperature, setTemperature] = useState(0.5)
-  const [tone, setTone] = useState(project.tone ?? "professional")
+  const [tone] = useState("professional")
 
 
   const [isGenerating, setIsGenerating] = useState(false)
+
+  // Phase 2: Safety Guards State
+  const [showImageGuard, setShowImageGuard] = useState(false)
+  const [pendingGeneration, setPendingGeneration] = useState<{ type: 'all' | 'section', idx?: number } | null>(null)
+  const [missingImagesCount, setMissingImagesCount] = useState(0)
+
   const [sections, setSections] = useState(() => {
     const initialStructure = Array.isArray(project.structure)
       ? (project.structure as Array<any>)
@@ -136,6 +145,33 @@ export function EmailStructure({
   }
 
   const handleGenerate = async () => {
+    // Check for missing images
+    const sectionsArr = sections || []
+    let missing = 0;
+    sectionsArr.forEach((s: any) => {
+      (s.components || []).forEach((c: string, cIdx: number) => {
+        if (c === 'image') {
+          const hasImg = (project.images || []).some((img: any) =>
+            img.section_key === s.key && img.component_index === (cIdx + 1) // index in images is 1-based usually
+          ) || (project.components || []).some((comp: any) =>
+            comp.component_type === 'image' && comp.section_key === s.key && comp.generated_content?.startsWith('http')
+          )
+          if (!hasImg) missing++
+        }
+      })
+    })
+
+    if (missing > 0) {
+      setMissingImagesCount(missing)
+      setPendingGeneration({ type: 'all' })
+      setShowImageGuard(true)
+      return
+    }
+
+    await executeGenerate()
+  }
+
+  const executeGenerate = async () => {
     if (!project.brief_text?.trim()) {
       toast.error("Please enter a creative brief first")
       return
@@ -293,7 +329,34 @@ export function EmailStructure({
     }
   }
 
-  const handleGenerateSection = async (sectionIdx: number) => {
+  const handleGenerateSection = async (idx: number) => {
+    // Check for missing images in this specific section
+    const section = sections[idx]
+    if (!section) return
+
+    let missing = 0;
+    (section.components || []).forEach((c: string, cIdx: number) => {
+      if (c === 'image') {
+        const hasImg = (project.images || []).some((img: any) =>
+          img.section_key === section.key && img.component_index === (cIdx + 1)
+        ) || (project.components || []).some((comp: any) =>
+          comp.component_type === 'image' && comp.section_key === section.key && comp.generated_content?.startsWith('http')
+        )
+        if (!hasImg) missing++
+      }
+    })
+
+    if (missing > 0) {
+      setMissingImagesCount(missing)
+      setPendingGeneration({ type: 'section', idx })
+      setShowImageGuard(true)
+      return
+    }
+
+    await executeGenerateSection(idx)
+  }
+
+  const executeGenerateSection = async (sectionIdx: number) => {
     if (isGenerating) return
     setIsGenerating(true)
 
@@ -489,7 +552,7 @@ export function EmailStructure({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 min-h-screen bg-[var(--bg-editor)] transition-colors duration-500">
       {/* TOP SECTION: Project Details */}
       <Card>
         <CardHeader>
@@ -548,9 +611,9 @@ export function EmailStructure({
         {/* LEFT COLUMN: Content Generation */}
         <Card>
           <CardHeader>
-            <CardTitle>Content Generation</CardTitle>
+            <CardTitle>AI Generation & Strategy</CardTitle>
             <CardDescription>
-              Generate email content with AI
+              Generate premium email content using AI
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -566,74 +629,64 @@ export function EmailStructure({
                 }
                 placeholder="Describe the theme, target audience, key messages..."
                 rows={4}
+                disabled={isReadOnly}
+                className={isReadOnly ? "bg-muted/30 italic text-muted-foreground" : ""}
               />
             </div>
 
-            {/* Tone of Voice and Creativity Level - Side by Side */}
-            <div className="grid grid-cols-5 gap-4">
-              {/* Tone of Voice */}
-              <div className="space-y-2 col-span-2">
-                <Label>Tone of Voice</Label>
-                <Select value={tone} onValueChange={setTone}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select tone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="casual">Casual</SelectItem>
-                    <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
-                    <SelectItem value="elegant">Elegant</SelectItem>
-                    <SelectItem value="direct">Direct</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+            {/* Settings Row: Creativity, Optimize, and Generate */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               {/* Creativity Level */}
-              <div className="space-y-2 col-span-3">
+              <div className="space-y-2 md:col-span-4">
                 <Label>Creativity Level</Label>
-                <div className="pt-2">
+                <div className="pt-2 px-1">
                   <Slider
                     value={[temperature]}
                     onValueChange={(value) => setTemperature(value[0])}
                     min={0}
                     max={1}
                     step={0.1}
+                    disabled={isReadOnly}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <div className="flex justify-between text-[10px] text-muted-foreground mt-1 uppercase">
                     <span>Conservative</span>
-                    <span>Balanced</span>
                     <span>Creative</span>
                   </div>
                 </div>
               </div>
+
+              {/* Optimize Prompt Button */}
+              <div className="md:col-span-3 pb-0.5">
+                <Button
+                  type="button"
+                  size="default"
+                  variant="outline"
+                  className="w-full gap-2 btn-ai-outline-coral shadow-sm h-10"
+                  onClick={() => setShowPromptAssistant(true)}
+                  disabled={!project.brief_text?.trim() || isReadOnly}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-xs">Optimize Prompt</span>
+                </Button>
+              </div>
+
+              {/* Generate / Regenerate Button */}
+              <div className="md:col-span-5 pb-0.5">
+                <Button
+                  size="default"
+                  className="w-full btn-ai-coral shadow-lg hover:scale-[1.01] transition-all h-10 gap-2"
+                  onClick={handleGenerate}
+                  disabled={isGenerating || isReadOnly}
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  <span>{hasComponents ? "Regenerate All Content" : "Generate Content"}</span>
+                </Button>
+              </div>
             </div>
-
-            {/* Optimize Prompt Button */}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => setShowPromptAssistant(true)}
-              disabled={!project.brief_text?.trim()}
-            >
-              <Sparkles className="h-4 w-4" />
-              Optimize Prompt
-            </Button>
-
-            {/* Generate / Regenerate Button */}
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={handleGenerate}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              {hasComponents ? "Regenerate All Content" : "Generate Content"}
-            </Button>
           </CardContent>
         </Card>
 
@@ -674,100 +727,75 @@ export function EmailStructure({
               </p>
             </div>
 
-            {/* Translate Selected Languages Button */}
-            {((project.target_languages || []).length > 0) && hasComponents && (
-              <Button
-                variant="default"
-                className="w-full"
-                disabled={isTranslating}
-                onClick={async () => {
-                  try {
-                    setIsTranslating(true)
-                    const texts = (project.components || [])
-                      .filter((c: any) => c.generated_content?.trim() && c.component_type !== "image")
-                      .map((c: any) => ({
-                        key: (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type,
-                        content: c.generated_content
-                      }))
-
-                    if (texts.length === 0) { toast.error("Generate content first"); return }
-                    const langs = project.target_languages || []
-                    const res = await batchTranslate(texts, langs)
-                    if (res.success && res.data) {
-                      const merged = (project.components || []).map((c: any) => {
-                        const key = (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type
-                        const rawT = (res.data as any)[key] || {}
-                        const t = c.component_type === "cta"
-                          ? Object.fromEntries(Object.entries(rawT).map(([k, v]) => [k, String(v || "").toUpperCase()]))
-                          : rawT
-                        const curr = normalizeTranslationsMap(c.translations)
-                        return { ...c, translations: { ...curr, ...t } }
-                      })
-                      const normalized = normalizeComponentList(merged as any)
-                      onProjectChange("components", normalized as any)
-                      const saveRes = await saveGeneratedComponents(project.id, normalized as any)
-
-                      if (saveRes.success && saveRes.components) {
-                        const fromBackend = normalizeComponentList(saveRes.components)
-                        onProjectChange("components", fromBackend as any)
-                      }
-
-                      // Mark languages as successfully translated
-                      setTranslatedLanguages(new Set(langs))
-
-                      toast.success(`Translated to ${langs.length} language(s)`)
-                      addNotification({
-                        type: "success",
-                        title: "Translation Completed",
-                        message: `Translated ${texts.length} component(s) to ${langs.length} language(s)`
-                      })
-                    } else {
-                      toast.error(res.error || "Translation failed")
-                    }
-                  } catch (e) { toast.error("Translation error") }
-                  finally { setIsTranslating(false) }
-                }}
-              >
-                {isTranslating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Translating...
-                  </>
-                ) : (
-                  "Translate Selected Languages"
-                )}
-              </Button>
-            )}
-
             <Separator />
 
-            {/* View Language Tabs */}
-            <div className="space-y-2">
-              <Label className="text-sm">View Language</Label>
-              <div className="flex flex-wrap gap-2">
-                {[{ value: "en", label: "English", flag: "🇬🇧" }, ...LANGUAGES.filter(l => (project.target_languages || []).includes(l.value))].map((l) => {
-                  const isTranslated = l.value === "en" || translatedLanguages.has(l.value)
-                  const showSpinner = isTranslating && l.value !== "en"
+            {/* Translate Selected Languages Button */}
+            {((project.target_languages || []).length > 0) && hasComponents && (
+              <div className="pt-2 flex justify-center">
+                <Button
+                  variant="outline"
+                  className="w-fit px-8 bg-green-50 text-green-700 border-green-200 hover:bg-green-100 flex items-center gap-1.5"
+                  disabled={isTranslating}
+                  onClick={async () => {
+                    try {
+                      setIsTranslating(true)
+                      const texts = (project.components || [])
+                        .filter((c: any) => c.generated_content?.trim() && c.component_type !== "image")
+                        .map((c: any) => ({
+                          key: (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type,
+                          content: c.generated_content
+                        }))
 
-                  return (
-                    <Badge
-                      key={l.value}
-                      variant={viewLang === l.value ? "default" : "outline"}
-                      className="cursor-pointer gap-1.5"
-                      onClick={() => setViewLang(l.value)}
-                    >
-                      <span className="text-base leading-none">{l.flag}</span>
-                      {l.label}
-                      {showSpinner && (
-                        <Loader2 className="h-3 w-3 animate-spin ml-1" />
-                      )}
-                      {isTranslated && !showSpinner && l.value !== "en" && (
-                        <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />
-                      )}
-                    </Badge>
-                  )
-                })}
+                      if (texts.length === 0) { toast.error("Generate content first"); return }
+                      const langs = project.target_languages || []
+                      const res = await batchTranslate(texts, langs)
+                      if (res.success && res.data) {
+                        const merged = (project.components || []).map((c: any) => {
+                          const key = (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type
+                          const rawT = (res.data as any)[key] || {}
+                          const t = c.component_type === "cta"
+                            ? Object.fromEntries(Object.entries(rawT).map(([k, v]) => [k, String(v || "").toUpperCase()]))
+                            : rawT
+                          const curr = normalizeTranslationsMap(c.translations)
+                          return { ...c, translations: { ...curr, ...t } }
+                        })
+                        const normalized = normalizeComponentList(merged as any)
+                        onProjectChange("components", normalized as any)
+                        const saveRes = await saveGeneratedComponents(project.id, normalized as any)
+
+                        if (saveRes.success && saveRes.components) {
+                          const fromBackend = normalizeComponentList(saveRes.components)
+                          onProjectChange("components", fromBackend as any)
+                        }
+
+                        // Mark languages as successfully translated
+                        setTranslatedLanguages(new Set(langs))
+
+                        toast.success(`Translated to ${langs.length} language(s)`)
+                        addNotification({
+                          type: "success",
+                          title: "Translation Completed",
+                          message: `Translated ${texts.length} component(s) to ${langs.length} language(s)`
+                        })
+                      } else {
+                        toast.error(res.error || "Translation failed")
+                      }
+                    } catch (e) { toast.error("Translation error") }
+                    finally { setIsTranslating(false) }
+                  }}
+                >
+                  {isTranslating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Translating...
+                    </>
+                  ) : (
+                    "Translate All"
+                  )}
+                </Button>
               </div>
-            </div>
+            )}
+
+
           </CardContent>
         </Card>
       </div>
@@ -829,6 +857,52 @@ export function EmailStructure({
         isGenerating={isGenerating}
         onTranslateSection={handleTranslateSection}
         isTranslating={isTranslating}
+        isReadOnly={isReadOnly}
+        languageFlags={
+          <div className="flex flex-wrap gap-2">
+            {[{ value: "en", label: "English", flag: "🇬🇧" }, ...LANGUAGES.filter(l => (project.target_languages || []).includes(l.value))].map((l) => {
+              const isTranslated = l.value === "en" || translatedLanguages.has(l.value)
+              const showSpinner = isTranslating && l.value !== "en"
+
+              return (
+                <Badge
+                  key={l.value}
+                  variant={viewLang === l.value ? "default" : "outline"}
+                  className={`cursor-pointer gap-1.5 px-3 py-1 text-xs transition-all ${viewLang === l.value ? 'ring-2 ring-primary/20 scale-105' : 'hover:bg-accent/50'}`}
+                  onClick={() => setViewLang(l.value)}
+                >
+                  <span className="text-base leading-none">{l.flag}</span>
+                  {l.label}
+                  {showSpinner && (
+                    <Loader2 className="h-3 w-3 animate-spin ml-1" />
+                  )}
+                  {isTranslated && !showSpinner && l.value !== "en" && (
+                    <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />
+                  )}
+                </Badge>
+              )
+            })}
+          </div>
+        }
+      />
+
+      {/* Phase 2: Image Upload Guard */}
+      <ImageUploadGuard
+        isOpen={showImageGuard}
+        missingCount={missingImagesCount}
+        onClose={() => {
+          setShowImageGuard(false)
+          setPendingGeneration(null)
+        }}
+        onConfirm={async () => {
+          setShowImageGuard(false)
+          if (pendingGeneration?.type === 'all') {
+            await executeGenerate()
+          } else if (pendingGeneration?.type === 'section' && pendingGeneration.idx !== undefined) {
+            await executeGenerateSection(pendingGeneration.idx)
+          }
+          setPendingGeneration(null)
+        }}
       />
 
       {/* Prompt Assistant Dialog */}
@@ -854,6 +928,6 @@ export function EmailStructure({
         })()}
         onApply={(optimized) => onProjectChange("brief_text", optimized)}
       />
-    </div>
+    </div >
   )
 }

@@ -168,7 +168,7 @@ export function NavMain({
                           <div className="flex-1 min-w-0 truncate">{subItem.title}</div>
                           {subItem.labels && subItem.labels.length > 0 && (
                             <div className="flex gap-1 flex-shrink-0">
-                              {subItem.labels.slice(0, 1).map((label) => {
+                              {subItem.labels.map((label) => {
                                 const colors = getLabelColor(label)
                                 return (
                                   <span
@@ -179,11 +179,6 @@ export function NavMain({
                                   </span>
                                 )
                               })}
-                              {subItem.labels.length > 1 && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                  +{subItem.labels.length - 1}
-                                </span>
-                              )}
                             </div>
                           )}
                         </Link>
@@ -229,25 +224,27 @@ export function NavMain({
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
                                   <div className="ml-3 border-l pl-3 space-y-1">
-                                    {subItem.children.map(child => (
-                                      <SidebarMenuSubButton key={child.title} asChild>
-                                        <a href={child.url}>
-                                          <div className="flex items-center justify-between gap-2 w-full">
-                                            <span className="truncate flex-1">{child.title}</span>
-                                            {child.labels && child.labels.length > 0 && (
-                                              <div className="flex gap-1 flex-shrink-0">
-                                                {child.labels.slice(0, 1).map((label) => {
-                                                  const colors = getLabelColor(label)
-                                                  return (
-                                                    <span key={label} className={`text-[9px] px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}>{label}</span>
-                                                  )
-                                                })}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </a>
-                                      </SidebarMenuSubButton>
-                                    ))}
+                                    {subItem.children.map(child => {
+                                      // Use the first label for the "colored dot" or default to gray/transparent
+                                      const primaryLabel = child.labels?.[0]
+                                      const dotColor = primaryLabel ? getLabelColor(primaryLabel).bg : "bg-transparent"
+
+                                      return (
+                                        <SidebarMenuSubButton key={child.title} asChild>
+                                          <a href={child.url}>
+                                            <div className="flex items-center justify-between gap-2 w-full">
+                                              <span className="truncate flex-1">{child.title}</span>
+                                              {primaryLabel && (
+                                                <div
+                                                  className={`h-2 w-2 rounded-full flex-shrink-0 ${dotColor} ring-1 ring-inset ring-black/5 dark:ring-white/10`}
+                                                  title={child.labels?.join(", ")}
+                                                />
+                                              )}
+                                            </div>
+                                          </a>
+                                        </SidebarMenuSubButton>
+                                      )
+                                    })}
                                   </div>
                                 </CollapsibleContent>
                               </Collapsible>

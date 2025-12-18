@@ -52,11 +52,13 @@ function SectionNameInput({
   onChange,
   placeholder,
   className,
+  disabled = false,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }) {
   const [localValue, setLocalValue] = useState(value)
 
@@ -81,6 +83,7 @@ function SectionNameInput({
       }}
       placeholder={placeholder}
       className={className}
+      disabled={disabled}
     />
   )
 }
@@ -94,11 +97,13 @@ function SectionBriefInput({
   onChange,
   placeholder,
   className,
+  disabled = false,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }) {
   const [localValue, setLocalValue] = useState(value)
 
@@ -118,6 +123,7 @@ function SectionBriefInput({
       placeholder={placeholder}
       className={className}
       rows={2}
+      disabled={disabled}
     />
   )
 }
@@ -139,6 +145,8 @@ export function SectionBuilder({
   isGenerating = false,
   onTranslateSection,
   isTranslating = false,
+  languageFlags,
+  isReadOnly = false,
 }: {
   value: Section[]
   onChange: (next: Section[]) => void
@@ -156,6 +164,8 @@ export function SectionBuilder({
   isGenerating?: boolean
   onTranslateSection?: (sectionIdx: number) => Promise<void>
   isTranslating?: boolean
+  languageFlags?: React.ReactNode
+  isReadOnly?: boolean
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -277,17 +287,20 @@ export function SectionBuilder({
   }
 
   function SortableSectionItem({ id, children }: { id: string; children: React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+      id,
+      disabled: isReadOnly
+    })
     const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
     }
     return (
-      <div ref={setNodeRef} style={style} className="rounded-md border p-3 bg-card/50">
+      <div ref={setNodeRef} style={style} className="rounded-md border border-border p-3 bg-card/50">
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing touch-none -mt-1 -mb-1 mb-2 text-xs text-muted-foreground"
+          className="cursor-grab active:cursor-grabbing touch-none -mt-1 -mb-1 mb-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Drag to reorder
         </div>
@@ -297,7 +310,10 @@ export function SectionBuilder({
   }
 
   function SortableComponentItem({ id, children }: { id: string; children: (p: { attributes: any; listeners: any }) => React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+      id,
+      disabled: isReadOnly
+    })
     const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
@@ -552,16 +568,25 @@ export function SectionBuilder({
   }
 
   return (
-    <Card className="mx-auto max-w-[840px] bg-white shadow-xl ring-1 ring-black/5">
-      <CardHeader>
-        <CardTitle>Email Structure Input</CardTitle>
-        <CardDescription>Arrange sections and components. Mock preview mirrors the output style.</CardDescription>
+    <Card className="mx-auto max-w-[840px] bg-card shadow-xl ring-1 ring-border/5 transition-colors">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3">
+          <div>
+            <CardTitle className="text-2xl">Email Structure</CardTitle>
+            <CardDescription>Arrange sections and components. Preview mirrors the output style.</CardDescription>
+          </div>
+          {languageFlags && (
+            <div className="flex flex-wrap gap-2 pt-1 border-t mt-1">
+              {languageFlags}
+            </div>
+          )}
+        </div>
       </CardHeader>
-      <CardContent className="px-6 sm:px-8 md:px-10 py-8">
+      <CardContent className="px-6 sm:px-8 md:px-10 py-8 bg-background transition-colors">
 
         {/* Fixed header components (visual only) */}
-        <div className="mb-4 rounded-md border p-3 bg-muted/30">
-          <div className="text-xs font-medium text-muted-foreground">Header (always included)</div>
+        <div className="mb-4 rounded-md border border-border p-3 bg-muted/40">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Header (always included)</div>
           <div className="mt-3 space-y-3">
             {(() => {
               const headerItems: Array<{ label: string; type: "subject" | "pre_header" }> = [
@@ -590,7 +615,7 @@ export function SectionBuilder({
                 const isEditing = !!editing[compKey]
                 const editText = editValues[compKey] ?? currentText
                 return (
-                  <div key={type} className="rounded-xl border bg-card p-4 space-y-2 shadow-sm">
+                  <div key={type} className="rounded-xl border border-border bg-card p-4 space-y-2 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs px-2 py-0.5">{label}</Badge>
@@ -715,29 +740,6 @@ export function SectionBuilder({
                         </button>
                       </div>
                     </div>
-
-                    {isEditing ? (
-                      <>
-                        <textarea
-                          className="w-full rounded-md border bg-background p-2 text-sm"
-                          rows={4}
-                          value={editText}
-                          onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
-                        />
-                        <button
-                          type="button"
-                          className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
-                          onClick={() => {
-                            setEditing(v => ({ ...v, [compKey]: false }))
-                            onUpdateComponent && onUpdateComponent(type, 1, editText)
-                          }}
-                        >
-                          <Check className="h-3.5 w-3.5 mr-1" /> Save
-                        </button>
-                      </>
-                    ) : (
-                      <div>{renderPreview(type, 1)}</div>
-                    )}
                   </div>
                 )
               })
@@ -765,12 +767,13 @@ export function SectionBuilder({
                           value={section.name}
                           onChange={(name) => renameSection(idx, name)}
                           placeholder={`Section ${idx + 1} name`}
-                          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                          className={`w-full rounded-md border bg-background px-2 py-1 text-sm ${isMainSection(section) ? 'opacity-70 cursor-not-allowed select-none italic font-medium bg-muted/50' : ''}`}
+                          disabled={isMainSection(section)}
                         />
                         <button
                           type="button"
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-primary/5 text-primary border-primary/20"
-                          disabled={isGenerating || generatingSections[idx]}
+                          className="rounded-md px-2 py-1 text-xs flex items-center gap-1 btn-ai-coral shadow-sm hover:scale-[1.02] transition-all"
+                          disabled={isGenerating || generatingSections[idx] || isReadOnly}
                           onClick={async () => {
                             if (!onGenerateSection) return
                             setGeneratingSections(prev => ({ ...prev, [idx]: true }))
@@ -786,12 +789,19 @@ export function SectionBuilder({
                           ) : (
                             <Sparkles className="h-3 w-3" />
                           )}
-                          Generate
+                          {(() => {
+                            // Check if this specific section has ANY generated content
+                            const hasSectionContent = section.components.some(type => {
+                              const globalIdx = (globalTypeCounters[type] || 0) + 1
+                              return !!components?.some(x => x.component_type === type && (x.component_index || 1) === globalIdx)
+                            })
+                            return hasSectionContent ? "Regenerate" : "Generate"
+                          })()}
                         </button>
                         <button
                           type="button"
                           className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-green-50 text-green-700 border-green-200"
-                          disabled={isTranslating || translatingSections[idx] || section.components.length === 0}
+                          disabled={isTranslating || translatingSections[idx] || section.components.length === 0 || isReadOnly}
                           onClick={async () => {
                             if (!onTranslateSection) return
                             setTranslatingSections(prev => ({ ...prev, [idx]: true }))
@@ -809,24 +819,57 @@ export function SectionBuilder({
                           )}
                           Translate
                         </button>
-                        <button
-                          type="button"
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                          onClick={() => removeSection(idx)}
-                          aria-label="Remove section"
-                        >
-                          Remove
-                        </button>
+                        {!isMainSection(section) && (
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                            onClick={() => removeSection(idx)}
+                            aria-label="Remove section"
+                            disabled={isReadOnly}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
 
                       {!isMainSection(section) && (
-                        <div className="mt-2">
-                          <SectionBriefInput
-                            value={section.brief || ''}
-                            onChange={(brief) => updateSectionBrief(idx, brief)}
-                            placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
-                            className="w-full rounded-md border bg-background px-2 py-1 text-sm resize-none"
-                          />
+                        <div className="mt-2 group">
+                          {(() => {
+                            const hasSectionContent = section.components.some(type => {
+                              const globalIdx = (globalTypeCounters[type] || 0) + 1
+                              return !!components?.some(x => x.component_type === type && (x.component_index || 1) === globalIdx)
+                            })
+
+                            if (hasSectionContent) {
+                              return (
+                                <details className="cursor-pointer">
+                                  <summary className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold hover:text-foreground transition-colors py-1 flex items-center gap-1">
+                                    <span>Brief for this section</span>
+                                    <Edit2 className="h-2.5 w-2.5" />
+                                  </summary>
+                                  <div className="pt-2">
+                                    <SectionBriefInput
+                                      value={section.brief || ''}
+                                      onChange={(brief) => updateSectionBrief(idx, brief)}
+                                      placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
+                                      className={`w-full rounded-md border bg-background px-2 py-1 text-sm resize-none ${isReadOnly ? 'bg-muted/30 italic text-muted-foreground' : ''}`}
+                                      disabled={isReadOnly}
+                                    />
+                                  </div>
+                                </details>
+                              )
+                            }
+
+                            return (
+                              <SectionBriefInput
+                                value={section.brief || ''}
+                                onChange={(brief) => updateSectionBrief(idx, brief)}
+                                placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
+                                className={`w-full rounded-md border bg-background px-2 py-1 text-sm resize-none ${isReadOnly ? 'bg-muted/30 italic text-muted-foreground' : ''}`}
+                                disabled={isReadOnly}
+                              />
+                            )
+                          })()}
                         </div>
                       )}
 
@@ -893,7 +936,7 @@ export function SectionBuilder({
                               return (
                                 <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`}>
                                   {({ attributes, listeners }) => (
-                                    <div className="rounded-xl border bg-white p-5 space-y-3 shadow-sm">
+                                    <div className="rounded-xl border border-border bg-card p-5 space-y-3 shadow-sm">
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                           <Badge variant="outline" className="text-xs px-2 py-0.5">{c === 'pre_header' ? 'Pre Header' : c.charAt(0).toUpperCase() + c.slice(1)}</Badge>
@@ -907,9 +950,10 @@ export function SectionBuilder({
                                         </div>
                                         <button
                                           type="button"
-                                          className="rounded border px-2 py-0.5 text-xs hover:bg-accent"
+                                          className="rounded border px-2 py-0.5 text-xs hover:bg-accent disabled:opacity-30 disabled:pointer-events-none"
                                           onClick={() => removeComponentAt(idx, compIdx)}
                                           aria-label="Remove component"
+                                          disabled={isReadOnly}
                                         >
                                           Remove
                                         </button>
@@ -984,7 +1028,7 @@ export function SectionBuilder({
                                           <div className="flex items-center gap-1 pt-1">
                                             <button
                                               type="button"
-                                              className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                              className="rounded px-2 py-0.5 text-xs hover:bg-accent inline-flex items-center border"
                                               disabled={!!regenBusy[compKey] || (!section.brief && !brief)}
                                               onClick={async () => {
                                                 // Use section brief if available, fallback to main brief
@@ -1011,8 +1055,8 @@ export function SectionBuilder({
                                                       const existingComp = (components || []).find((item) => item.component_type === c && (item.component_index || 1) === displayIndex)
                                                       const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
 
-                                                      // If component had translations and target languages are set, retranslate
-                                                      if (hadTranslations && (targetLanguages || []).length > 0) {
+                                                      // Always retranslate if target languages are set
+                                                      if ((targetLanguages || []).length > 0) {
                                                         try {
                                                           const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
                                                           const langs = targetLanguages || []
@@ -1055,22 +1099,22 @@ export function SectionBuilder({
                                             </button>
                                             <button
                                               type="button"
-                                              className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                              className="rounded px-2 py-0.5 text-xs hover:bg-accent inline-flex items-center border"
                                               onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
                                             >
-                                              <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                                              <Edit2 className="h-3 w-3 mr-1" /> Edit
                                             </button>
                                             <button
                                               type="button"
-                                              className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                              className="rounded px-2 py-0.5 text-xs hover:bg-accent inline-flex items-center border"
                                               onClick={() => handleCopy(currentText)}
                                               disabled={!currentText}
                                             >
-                                              <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                                              <Copy className="h-3 w-3 mr-1" /> Copy
                                             </button>
                                             <button
                                               type="button"
-                                              className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                                              className="rounded px-1.5 py-0.5 text-[10px] hover:bg-accent inline-flex items-center border"
                                               onClick={() => {
                                                 const obj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
                                                 const en = (obj?.generated_content) || ""
@@ -1100,19 +1144,21 @@ export function SectionBuilder({
                         </SortableContext>
                       </DndContext>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Add component:</span>
-                        {componentsPalette.map((cp) => (
-                          <button
-                            key={cp.id}
-                            type="button"
-                            className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                            onClick={() => addComponent(idx, cp.id)}
-                          >
-                            {cp.label}
-                          </button>
-                        ))}
-                      </div>
+                      {!isReadOnly && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Add component:</span>
+                          {componentsPalette.map((cp) => (
+                            <button
+                              key={cp.id}
+                              type="button"
+                              className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                              onClick={() => addComponent(idx, cp.id)}
+                            >
+                              {cp.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </SortableSectionItem>
                   )
                 })
@@ -1121,17 +1167,21 @@ export function SectionBuilder({
           </SortableContext>
         </DndContext>
 
-        <div className="mt-3">
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1 text-sm hover:bg-accent"
-            onClick={addSection}
-          >
-            + Add Section
-          </button>
-        </div>
-      </CardContent>
-    </Card>
+        {
+          !isReadOnly && (
+            <div className="mt-3">
+              <button
+                type="button"
+                className="rounded-md border px-3 py-1 text-sm hover:bg-accent"
+                onClick={addSection}
+              >
+                + Add Section
+              </button>
+            </div>
+          )
+        }
+      </CardContent >
+    </Card >
   )
 }
 
