@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
 import { EmailStructure } from "./email-structure"
+import { normalizeComponentList } from "@/lib/section-utils"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { getLabelColor } from "../../../_components/create-project-dialog"
 import { useProject } from "@/hooks/use-project"
@@ -64,10 +65,10 @@ const LANGUAGES = [
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const { user } = useUser()
-  
+
   // SWR hook for project data - single source of truth
-  const { project: serverProject, isLoading, error, refresh } = useProject(projectId)
-  
+  const { project: serverProject, isLoading, error, refresh, mutate } = useProject(projectId)
+
   // Local state for editing (allows optimistic updates)
   const [editedProject, setEditedProject] = useState<Project | null>(null)
   const [images, setImages] = useState<UploadedImage[]>([])
@@ -78,10 +79,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // Sync local state when server data changes (but preserve local edits)
   useEffect(() => {
-    if (serverProject && !hasChanges) {
-      setEditedProject(serverProject)
+    if (serverProject && !editedProject) {
+      const normalized = {
+        ...serverProject,
+        components: normalizeComponentList(serverProject.components)
+      }
+      setEditedProject(normalized as any)
     }
-  }, [serverProject, hasChanges])
+  }, [serverProject, editedProject])
 
   // Loading state
   if (isLoading || !editedProject) {
@@ -126,13 +131,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         structure: project.structure,
         tone: project.tone ?? undefined,
         target_languages: project.target_languages,
-        labels: project.labels
+        labels: project.labels,
+        status: (project as any).status
       })
 
-      if (result.success) {
-        toast.success("Project saved successfully!")
+      if (result.success && result.data) {
+        const normalized = {
+          ...result.data,
+          components: normalizeComponentList(result.data.components)
+        }
+        setEditedProject(normalized as any)
         setHasChanges(false)
-        await refresh() // SWR refresh - re-fetch from server
+        // Update SWR cache immediately with the new data
+        mutate(normalized as any, false)
+        toast.success("Project saved successfully!")
       } else {
         toast.error(result.error || "Failed to save project")
       }
@@ -178,10 +190,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const newLabels = currentLabels.includes(label)
       ? currentLabels.filter(l => l !== label)
       : [...currentLabels, label]
-    
+
     // Update local state immediately for UI feedback (optimistic update)
     setEditedProject((prev) => prev ? { ...prev, labels: newLabels } : prev)
-    
+
     // Auto-save to backend
     try {
       const result = await updateProject(project.id, {
@@ -274,4 +286,3 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </div>
   )
 }
-

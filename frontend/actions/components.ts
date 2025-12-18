@@ -11,6 +11,8 @@ export interface SavedComponent {
   generated_content: string
   component_url?: string
   image_id?: number
+  section_key?: string
+  section_order?: number
   translations: Record<string, string> // language_code -> translated_content
 }
 

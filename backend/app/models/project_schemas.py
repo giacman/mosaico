@@ -132,6 +132,8 @@ class ComponentCreate(BaseModel):
     generated_content: Optional[str] = None
     component_url: Optional[str] = None
     image_id: Optional[int] = None
+    section_key: Optional[str] = None
+    section_order: Optional[int] = None
 
 
 class ComponentUpdate(BaseModel):
@@ -237,6 +239,8 @@ class SavedComponentCreate(BaseModel):
     generated_content: str
     component_url: Optional[str] = None
     image_id: Optional[int] = None
+    section_key: Optional[str] = None
+    section_order: Optional[int] = None
     translations: dict = Field(default_factory=dict, description="Dict of language_code -> translated_content")
 
 

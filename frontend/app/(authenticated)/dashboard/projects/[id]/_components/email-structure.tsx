@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sparkles, Loader2, CheckCircle2 } from "lucide-react"
 import { type Project } from "@/actions/projects"
-import { RenderedComponent } from "../../../_components/rendered-component" // Import the new component
+import { RenderedComponent } from "../../../_components/rendered-component"
 import {
   Select,
   SelectContent,
@@ -33,8 +33,7 @@ import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dia
 import { batchTranslate } from "@/actions/translate"
 import { saveGeneratedComponents } from "@/actions/components"
 import { useNotifications } from "../../../_components/notifications-provider"
-// ... imports ...
-import { ensureSectionKeys } from "@/lib/section-utils"
+import { normalizeComponentList, normalizeTranslationsMap, ensureSectionKeys } from "@/lib/section-utils"
 
 const LANGUAGES = [
   { value: "it", label: "Italian", flag: "🇮🇹" },
@@ -117,69 +116,16 @@ export function EmailStructure({
 
   // Check which languages already have translations on mount/update
   useEffect(() => {
-    if (hasComponents && project.components) {
-      const langsWithTranslations = new Set<string>()
-      project.components.forEach((comp: any) => {
-        if (comp.translations && typeof comp.translations === 'object') {
-          Object.keys(comp.translations).forEach(lang => {
-            if (comp.translations[lang]) langsWithTranslations.add(lang.toLowerCase())
-          })
-        }
+    if (project.components) {
+      const langs = new Set<string>()
+      project.components.forEach((c: any) => {
+        const trans = normalizeTranslationsMap(c.translations)
+        Object.keys(trans).forEach((l) => langs.add(l.toLowerCase()))
       })
-      setTranslatedLanguages(langsWithTranslations)
+      setTranslatedLanguages(langs)
     }
-  }, [hasComponents, project.components])
+  }, [project.components])
 
-  // Normalize translations into a plain { lang: text } map and filter to current target languages
-  const normalizeTranslationsMap = (input: any): Record<string, string> => {
-    if (!input) return {}
-    if (typeof input === "object" && !Array.isArray(input)) {
-      const out: Record<string, string> = {}
-      Object.entries(input).forEach(([k, v]) => {
-        if (v == null) return
-        if (typeof v === "string") {
-          out[String(k).toLowerCase()] = v
-        } else if (typeof v === "object") {
-          const lang = (v as any).language_code || k
-          const text = (v as any).translated_content || (v as any).content || String(v)
-          out[String(lang).toLowerCase()] = String(text)
-        }
-      })
-      return out
-    }
-    if (Array.isArray(input)) {
-      const out: Record<string, string> = {}
-      input.forEach((it) => {
-        if (it && typeof it === "object") {
-          const lang = (it as any).language_code || (it as any).lang || (it as any).code
-          const text = (it as any).translated_content || (it as any).content || (it as any).text
-          if (lang && text) out[String(lang).toLowerCase()] = String(text)
-        }
-      })
-      return out
-    }
-    return {}
-  }
-
-  const normalizeComponentList = (list: any[]): any[] => {
-    const allowed = new Set((project.target_languages || []).map((l) => String(l).toLowerCase()))
-    return (list || []).map((c: any) => {
-      const raw = normalizeTranslationsMap(c.translations)
-      const filtered = Object.fromEntries(Object.entries(raw).filter(([k]) => allowed.has(String(k).toLowerCase())))
-      // Keep section_key and section_order for multi-section support
-      // Only remove 'image' as it's a frontend-only field
-      const { image, ...rest } = c
-      // Ensure generated_content is never null (backend requires string)
-      return {
-        ...rest,
-        generated_content: rest.generated_content ?? "",
-        translations: filtered,
-        // Ensure section fields have defaults if not set
-        section_key: rest.section_key || 'default',
-        section_order: rest.section_order ?? 0
-      }
-    })
-  }
 
   const toggleLabel = (label: string) => {
     const currentLabels = project.labels || []
@@ -250,7 +196,7 @@ export function EmailStructure({
         if (variation.subject) {
           newTextComponents.push({
             component_type: "subject",
-            component_index: 0,
+            component_index: 1, // Changed to 1 for consistency
             generated_content: variation.subject,
             translations: {},
             section_key: "header",
@@ -318,7 +264,24 @@ export function EmailStructure({
           onProjectChange("structure", newSections as any)
         }
 
-        onProjectChange("components", allComponents)
+        const normalized = normalizeComponentList(allComponents)
+        onProjectChange("components", normalized as any)
+
+        // Save to database immediately
+        const saveRes = await saveGeneratedComponents(project.id, normalized as any)
+        if (saveRes.success && saveRes.components) {
+          const fromBackend = (saveRes.components || []).map((comp: any) => {
+            if (Array.isArray(comp.translations)) {
+              const obj: Record<string, string> = {}
+              comp.translations.forEach((t: any) => {
+                if (t.language_code && t.translated_content) obj[t.language_code] = t.translated_content
+              })
+              return { ...comp, translations: obj }
+            }
+            return comp
+          })
+          onProjectChange("components", fromBackend as any)
+        }
       } else {
         toast.error(result.error || "Failed to generate content")
       }
@@ -525,13 +488,19 @@ export function EmailStructure({
                 onClick={async () => {
                   try {
                     setIsTranslating(true)
-                    const texts = (project.components || []).map((c: any) => ({ key: `${c.component_type}${c.component_index ? `_${c.component_index}` : ""}`, content: c.generated_content || "" }))
+                    const texts = (project.components || [])
+                      .filter((c: any) => c.generated_content?.trim() && c.component_type !== "image")
+                      .map((c: any) => ({
+                        key: (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type,
+                        content: c.generated_content
+                      }))
+
                     if (texts.length === 0) { toast.error("Generate content first"); return }
                     const langs = project.target_languages || []
                     const res = await batchTranslate(texts, langs)
                     if (res.success && res.data) {
                       const merged = (project.components || []).map((c: any) => {
-                        const key = `${c.component_type}${c.component_index ? `_${c.component_index}` : ""}`
+                        const key = (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type
                         const rawT = (res.data as any)[key] || {}
                         const t = c.component_type === "cta"
                           ? Object.fromEntries(Object.entries(rawT).map(([k, v]) => [k, String(v || "").toUpperCase()]))
@@ -541,7 +510,12 @@ export function EmailStructure({
                       })
                       const normalized = normalizeComponentList(merged as any)
                       onProjectChange("components", normalized as any)
-                      await saveGeneratedComponents(project.id, normalized as any)
+                      const saveRes = await saveGeneratedComponents(project.id, normalized as any)
+
+                      if (saveRes.success && saveRes.components) {
+                        const fromBackend = normalizeComponentList(saveRes.components)
+                        onProjectChange("components", fromBackend as any)
+                      }
 
                       // Mark languages as successfully translated
                       setTranslatedLanguages(new Set(langs))
@@ -639,22 +613,7 @@ export function EmailStructure({
           const result = await saveGeneratedComponents(project.id, normalized as any)
 
           if (result.success && result.components) {
-            // Backend returns translations as array, convert to object format
-            const normalizedFromBackend = (result.components || []).map((comp: any) => {
-              if (Array.isArray(comp.translations)) {
-                // Convert array format to object format
-                const translationsObj: Record<string, string> = {}
-                comp.translations.forEach((t: any) => {
-                  if (t.language_code && t.translated_content) {
-                    translationsObj[t.language_code] = t.translated_content
-                  }
-                })
-                return { ...comp, translations: translationsObj }
-              }
-              return comp
-            })
-
-            // Sync the UI with the backend's source of truth
+            const normalizedFromBackend = normalizeComponentList(result.components)
             onProjectChange("components", normalizedFromBackend as any)
             // Also update images if the backend returned them
             if (result.images) {

@@ -438,7 +438,9 @@ class ProjectService:
                 component_index=comp_data.get("component_index"),
                 generated_content=comp_data["generated_content"],
                 component_url=comp_data.get("component_url"),
-                image_id=comp_data.get("image_id")
+                image_id=comp_data.get("image_id"),
+                section_key=comp_data.get("section_key", "default"),
+                section_order=comp_data.get("section_order", 0)
             )
             
             db.add(component)

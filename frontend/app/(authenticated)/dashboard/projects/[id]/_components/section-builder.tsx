@@ -31,6 +31,7 @@ import {
   findComponentForSection,
   findImageForSection,
   isMainSection,
+  normalizeTranslationsMap,
   type Section,
   type SectionComponent,
 } from "@/lib/section-utils"
@@ -449,7 +450,8 @@ export function SectionBuilder({
     const text = (() => {
       if (!found) return ""
       if (currentLanguage && currentLanguage !== "en") {
-        const t = found.translations?.[currentLanguage]
+        const transMap = normalizeTranslationsMap(found.translations)
+        const t = transMap[currentLanguage.toLowerCase()]
         if (t && t.trim()) return t
       }
       return found.generated_content || ""
@@ -800,7 +802,9 @@ export function SectionBuilder({
 
                               const contentObj = components?.find(x => {
                                 const typeMatch = x.component_type === c
-                                const indexMatch = (x.component_index || 1) === displayIndex
+                                const compIdx = x.component_index ?? 1
+                                const normalizedIdx = compIdx === 0 ? 1 : compIdx
+                                const indexMatch = normalizedIdx === displayIndex
                                 // We rely on global index uniqueness for text components
                                 return typeMatch && indexMatch
                               })
@@ -808,7 +812,9 @@ export function SectionBuilder({
                               const currentText = (() => {
                                 if (!contentObj) return ""
                                 if (currentLanguage && currentLanguage !== "en") {
-                                  const t = (contentObj as any).translations?.[currentLanguage]
+                                  // Re-normalize to be safe, handling both Map and Array formats case-insensitively
+                                  const transMap = normalizeTranslationsMap((contentObj as any).translations)
+                                  const t = transMap[currentLanguage.toLowerCase()]
                                   if (t && String(t).trim()) return String(t)
                                 }
                                 return contentObj.generated_content || ""

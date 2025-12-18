@@ -40,16 +40,16 @@ export function NavMain({
     isActive?: boolean
     items?: {
       title: string
-    url?: string
-    isHeading?: boolean
-    separator?: boolean
-    indent?: boolean
+      url?: string
+      isHeading?: boolean
+      separator?: boolean
+      indent?: boolean
       labels?: string[]
-    children?: {
-      title: string
-      url: string
-      labels?: string[]
-    }[]
+      children?: {
+        title: string
+        url: string
+        labels?: string[]
+      }[]
     }[]
   }[]
 }) {
@@ -82,7 +82,7 @@ export function NavMain({
   // Load from localStorage only on client side after mount
   useEffect(() => {
     setMounted(true)
-    
+
     // Load saved state from localStorage (client-side only)
     if (typeof window !== "undefined") {
       try {
@@ -117,7 +117,9 @@ export function NavMain({
     setOpenItems(prev => ({ ...prev, [itemTitle]: isOpen }))
   }
 
-  // Use default state (all closed) until mounted
+  // CRITICAL: Ensure these are stable during hydration to prevent ID mismatch
+  // Default to false or a static state that matches the server's initial render
+  const stableIsCollapsed = mounted ? isCollapsed : false
   const currentOpenState = mounted ? openItems : defaultOpenState
   const currentSubOpenState = mounted ? openSubItems : defaultSubOpenState
 
@@ -127,7 +129,7 @@ export function NavMain({
       <SidebarMenu>
         {items.map(item => (
           <SidebarMenuItem key={item.title}>
-            {isCollapsed && item.items && item.items.length > 0 ? (
+            {stableIsCollapsed && item.items && item.items.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
@@ -169,7 +171,7 @@ export function NavMain({
                               {subItem.labels.slice(0, 1).map((label) => {
                                 const colors = getLabelColor(label)
                                 return (
-                                  <span 
+                                  <span
                                     key={label}
                                     className={`text-[9px] px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}
                                   >
