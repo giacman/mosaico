@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { getAuthToken } from "@/actions/generate"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export type OptimizePromptParams = {
   prompt: string

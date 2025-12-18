@@ -21,7 +21,7 @@ import { toast } from "sonner"
 import imageCompression from "browser-image-compression"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Edit2, Copy, FileCode, Check } from "lucide-react"
+import { RefreshCw, Edit2, Copy, FileCode, Check, Sparkles, Languages } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { generate } from "@/actions/generate"
 import { handlebarsGenerate } from "@/actions/export"
@@ -135,6 +135,10 @@ export function SectionBuilder({
   currentLanguage = "en",
   targetLanguages = [],
   onUpdateComponents,
+  onGenerateSection,
+  isGenerating = false,
+  onTranslateSection,
+  isTranslating = false,
 }: {
   value: Section[]
   onChange: (next: Section[]) => void
@@ -148,6 +152,10 @@ export function SectionBuilder({
   currentLanguage?: string
   targetLanguages?: string[]
   onUpdateComponents?: (list: SectionComponent[]) => void
+  onGenerateSection?: (sectionIdx: number) => Promise<void>
+  isGenerating?: boolean
+  onTranslateSection?: (sectionIdx: number) => Promise<void>
+  isTranslating?: boolean
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -507,6 +515,8 @@ export function SectionBuilder({
   const [editing, setEditing] = useState<Record<string, boolean>>({})
   const [editValues, setEditValues] = useState<Record<string, string>>({})
   const [regenBusy, setRegenBusy] = useState<Record<string, boolean>>({})
+  const [generatingSections, setGeneratingSections] = useState<Record<number, boolean>>({})
+  const [translatingSections, setTranslatingSections] = useState<Record<number, boolean>>({})
 
   const handleCopy = async (text: string) => {
     try { await navigator.clipboard.writeText(text) } catch { }
@@ -563,7 +573,19 @@ export function SectionBuilder({
                 const found = components?.find(
                   (c) => c.component_type === type && (c.component_index || 1) === 1
                 )
-                const currentText = found?.generated_content || ""
+                const currentText = (() => {
+                  if (!found) return ""
+                  if (currentLanguage && currentLanguage !== "en") {
+                    const transMap = normalizeTranslationsMap((found as any).translations)
+                    const t = transMap[currentLanguage.toLowerCase()]
+                    // Safe guard: check if translation exists and is not a failure marker
+                    if (t && String(t).trim() && !String(t).includes("__TRANSLATION_FAILED__")) {
+                      return String(t)
+                    }
+                    return `[Missing translation: ${currentLanguage.toUpperCase()}]`
+                  }
+                  return found.generated_content || ""
+                })()
                 const compKey = `header:${type}:${displayIndex}`
                 const isEditing = !!editing[compKey]
                 const editText = editValues[compKey] ?? currentText
@@ -747,6 +769,48 @@ export function SectionBuilder({
                         />
                         <button
                           type="button"
+                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-primary/5 text-primary border-primary/20"
+                          disabled={isGenerating || generatingSections[idx]}
+                          onClick={async () => {
+                            if (!onGenerateSection) return
+                            setGeneratingSections(prev => ({ ...prev, [idx]: true }))
+                            try {
+                              await onGenerateSection(idx)
+                            } finally {
+                              setGeneratingSections(prev => ({ ...prev, [idx]: false }))
+                            }
+                          }}
+                        >
+                          {generatingSections[idx] ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3" />
+                          )}
+                          Generate
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-green-50 text-green-700 border-green-200"
+                          disabled={isTranslating || translatingSections[idx] || section.components.length === 0}
+                          onClick={async () => {
+                            if (!onTranslateSection) return
+                            setTranslatingSections(prev => ({ ...prev, [idx]: true }))
+                            try {
+                              await onTranslateSection(idx)
+                            } finally {
+                              setTranslatingSections(prev => ({ ...prev, [idx]: false }))
+                            }
+                          }}
+                        >
+                          {translatingSections[idx] ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Languages className="h-3 w-3" />
+                          )}
+                          Translate
+                        </button>
+                        <button
+                          type="button"
                           className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
                           onClick={() => removeSection(idx)}
                           aria-label="Remove section"
@@ -815,7 +879,11 @@ export function SectionBuilder({
                                   // Re-normalize to be safe, handling both Map and Array formats case-insensitively
                                   const transMap = normalizeTranslationsMap((contentObj as any).translations)
                                   const t = transMap[currentLanguage.toLowerCase()]
-                                  if (t && String(t).trim()) return String(t)
+                                  // Safe guard: check if translation exists and is not a failure marker
+                                  if (t && String(t).trim() && !String(t).includes("__TRANSLATION_FAILED__")) {
+                                    return String(t)
+                                  }
+                                  return `[Missing translation: ${currentLanguage.toUpperCase()}]`
                                 }
                                 return contentObj.generated_content || ""
                               })()

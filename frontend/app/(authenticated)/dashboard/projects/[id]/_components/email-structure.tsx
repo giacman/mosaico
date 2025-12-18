@@ -293,6 +293,201 @@ export function EmailStructure({
     }
   }
 
+  const handleGenerateSection = async (sectionIdx: number) => {
+    if (isGenerating) return
+    setIsGenerating(true)
+
+    try {
+      const section = sections[sectionIdx]
+      if (!section) return
+
+      // 1. Calculate global offsets for this section's components
+      const typeOffsets: Record<string, number> = { title: 0, body: 0, cta: 0 }
+      for (let i = 0; i < sectionIdx; i++) {
+        const s = sections[i]
+          ; (s.components || []).forEach(c => {
+            if (c === "title" || c === "body" || c === "cta") {
+              typeOffsets[c] = (typeOffsets[c] || 0) + 1
+            }
+          })
+      }
+
+      // 2. Build local structure for the API call
+      const localStructure: Array<{ component: any; count: number }> = []
+      const counts: Record<string, number> = { title: 0, body: 0, cta: 0 }
+        ; (section.components || []).forEach(c => {
+          if (c === "title" || c === "body" || c === "cta") {
+            counts[c] = (counts[c] || 0) + 1
+          }
+        })
+      if (counts.title > 0) localStructure.push({ component: "title", count: counts.title })
+      if (counts.body > 0) localStructure.push({ component: "body", count: counts.body })
+      if (counts.cta > 0) localStructure.push({ component: "cta", count: counts.cta })
+
+      if (localStructure.length === 0) {
+        toast.info("No text components to generate in this section.")
+        return
+      }
+
+      // 3. Generate content using section brief (fallback to project brief)
+      const generationBrief = section.brief || project.brief_text || ""
+      const result = await generate({
+        project_id: project.id,
+        text: generationBrief,
+        count: 1,
+        tone: tone,
+        content_type: "newsletter",
+        structure: localStructure,
+        temperature: temperature,
+        image_url: images[0]?.url
+      })
+
+      if (result.success && result.data) {
+        toast.success(`Content for ${section.name} generated!`)
+        const variation = result.data.variations[0]
+
+        // 4. Create new components for this section with correct global indices
+        const updatedLocalCounters: Record<string, number> = { ...typeOffsets }
+        const newComponentsForSection: any[] = []
+
+          ; (section.components || []).forEach(compType => {
+            if (compType === "title" || compType === "body" || compType === "cta") {
+              updatedLocalCounters[compType]++
+              const currentGlobalIdx = updatedLocalCounters[compType]
+              const apiIdx = updatedLocalCounters[compType] - typeOffsets[compType]
+
+              let val = ""
+              if (apiIdx === 1) {
+                val = String(variation[compType] || variation[`${compType}_1`] || "")
+              } else {
+                val = String(variation[`${compType}_${apiIdx}`] || "")
+              }
+
+              newComponentsForSection.push({
+                component_type: compType,
+                component_index: currentGlobalIdx,
+                generated_content: compType === "cta" ? val.toUpperCase() : val,
+                translations: {},
+                section_key: section.key,
+                section_order: sectionIdx
+              })
+            }
+          })
+
+        // 5. Merge with existing components (replacing matches)
+        const currentComps = project.components || []
+        const sectionTypeIndices = new Set(newComponentsForSection.map(c => `${c.component_type}:${c.component_index}`))
+
+        const merged = [
+          ...currentComps.filter(c => !sectionTypeIndices.has(`${c.component_type}:${c.component_index}`)),
+          ...newComponentsForSection
+        ]
+
+        const normalized = normalizeComponentList(merged)
+        onProjectChange("components", normalized as any)
+
+        // 6. Persist to backend
+        const saveRes = await saveGeneratedComponents(project.id, normalized as any)
+        if (saveRes.success && saveRes.components) {
+          onProjectChange("components", normalizeComponentList(saveRes.components) as any)
+        }
+      } else {
+        toast.error(result.error || "Failed to generate section content")
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred.")
+      console.error(error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleTranslateSection = async (sectionIdx: number) => {
+    if (isTranslating) return
+    setIsTranslating(true)
+
+    try {
+      const section = sections[sectionIdx]
+      if (!section) return
+
+      // 1. Find components belonging to this section
+      const sectionComps = (project.components || []).filter((c: any) => c.section_key === section.key)
+      const textsToTranslate = sectionComps
+        .filter((c: any) => c.generated_content?.trim() && c.component_type !== "image")
+        .map((c: any) => ({
+          key: (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type,
+          content: c.generated_content
+        }))
+
+      if (textsToTranslate.length === 0) {
+        toast.info("No text components to translate in this section.")
+        return
+      }
+
+      // 2. Translate only the selected languages
+      const langs = project.target_languages || []
+      if (langs.length === 0) {
+        toast.error("Please select target languages first")
+        return
+      }
+
+      const res = await batchTranslate(textsToTranslate, langs)
+      if (res.success && res.data) {
+        // 3. Merge new translations with existing ones
+        let failedCount = 0
+        const merged = (project.components || []).map((c: any) => {
+          if (c.section_key !== section.key) return c
+
+          const key = (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type
+          const newTrans = (res.data as any)[key] || {}
+
+          // Check for failure markers
+          const filteredTrans = Object.fromEntries(
+            Object.entries(newTrans).filter(([lang, val]) => {
+              if (String(val).startsWith("__TRANSLATION_FAILED__")) {
+                failedCount++
+                return false
+              }
+              return true
+            })
+          )
+
+          // Handle upper-case for CTA buttons
+          const processedTrans = c.component_type === "cta"
+            ? Object.fromEntries(Object.entries(filteredTrans).map(([k, v]) => [k, String(v || "").toUpperCase()]))
+            : filteredTrans
+
+          const existingTrans = normalizeTranslationsMap(c.translations)
+          return { ...c, translations: { ...existingTrans, ...processedTrans } }
+        })
+
+        const normalized = normalizeComponentList(merged as any)
+        onProjectChange("components", normalized as any)
+
+        // 4. Persist to backend
+        const saveRes = await saveGeneratedComponents(project.id, normalized as any)
+        if (saveRes.success && saveRes.components) {
+          onProjectChange("components", normalizeComponentList(saveRes.components) as any)
+        }
+
+        if (failedCount > 0) {
+          toast.warning(`Section "${section.name}" translated, but ${failedCount} item(s) failed. Please retry those.`, {
+            duration: 5000
+          })
+        } else {
+          toast.success(`Section "${section.name}" translated to ${langs.length} language(s)`)
+        }
+      } else {
+        toast.error(res.error || "Translation failed")
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred during translation.")
+      console.error(error)
+    } finally {
+      setIsTranslating(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* TOP SECTION: Project Details */}
@@ -630,6 +825,10 @@ export function EmailStructure({
           const normalized = normalizeComponentList(list as any)
           onProjectChange("components", normalized as any)
         }}
+        onGenerateSection={handleGenerateSection}
+        isGenerating={isGenerating}
+        onTranslateSection={handleTranslateSection}
+        isTranslating={isTranslating}
       />
 
       {/* Prompt Assistant Dialog */}

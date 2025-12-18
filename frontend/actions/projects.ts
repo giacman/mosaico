@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export interface Translation {
   id: number
@@ -100,7 +100,7 @@ export async function listProjects(): Promise<{
 }> {
   try {
     const token = await getAuthToken()
-    
+
     const response = await fetch(`${API_URL}/api/v1/projects`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -191,10 +191,10 @@ export async function createProject(
     }
 
     const data = await response.json()
-    
+
     // Revalidate the dashboard to show the new project
     revalidatePath("/dashboard")
-    
+
     return { success: true, data }
   } catch (error) {
     console.error("Error creating project:", error)
@@ -237,11 +237,11 @@ export async function updateProject(
     }
 
     const data = await response.json()
-    
+
     // Revalidate both dashboard and project page
     revalidatePath("/dashboard")
     revalidatePath(`/dashboard/projects/${id}`)
-    
+
     return { success: true, data }
   } catch (error) {
     console.error("Error updating project:", error)
@@ -281,7 +281,7 @@ export async function duplicateProject(
     }
 
     const data = await response.json()
-    
+
     // Revalidate the dashboard to show the duplicated project
     revalidatePath("/dashboard")
 

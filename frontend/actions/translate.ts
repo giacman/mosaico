@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server"
 import { MosaicoFile } from "@/lib/mosaico-file"
 import { getAuthToken } from "@/actions/generate"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface TranslateContentInput {
   text: string
