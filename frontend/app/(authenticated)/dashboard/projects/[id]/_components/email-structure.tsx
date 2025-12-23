@@ -570,6 +570,8 @@ export function EmailStructure({
               value={project.name}
               onChange={(e) => onProjectChange("name", e.target.value)}
               placeholder="e.g., Spring Collection Launch"
+              disabled={isReadOnly}
+              className={isReadOnly ? "bg-muted/50 italic text-muted-foreground border-dashed opacity-100 disabled:opacity-100 dark:text-gray-400" : ""}
             />
           </div>
 
@@ -630,7 +632,7 @@ export function EmailStructure({
                 placeholder="Describe the theme, target audience, key messages..."
                 rows={4}
                 disabled={isReadOnly}
-                className={isReadOnly ? "bg-muted/30 italic text-muted-foreground" : ""}
+                className={isReadOnly ? "bg-muted/50 italic text-muted-foreground border-dashed opacity-100 disabled:opacity-100 dark:text-gray-400" : ""}
               />
             </div>
 
@@ -730,11 +732,11 @@ export function EmailStructure({
             <Separator />
 
             {/* Translate Selected Languages Button */}
-            {((project.target_languages || []).length > 0) && hasComponents && (
+            {((project.target_languages || []).length > 0) && hasComponents && !isReadOnly && (
               <div className="pt-2 flex justify-center">
                 <Button
                   variant="outline"
-                  className="w-fit px-8 bg-green-50 text-green-700 border-green-200 hover:bg-green-100 flex items-center gap-1.5"
+                  className="w-fit px-8 text-green-600 border-green-200 bg-green-50/50 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/40 flex items-center gap-1.5"
                   disabled={isTranslating}
                   onClick={async () => {
                     try {

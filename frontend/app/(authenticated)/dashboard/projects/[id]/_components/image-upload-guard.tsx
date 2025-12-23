@@ -28,29 +28,39 @@ export function ImageUploadGuard({
 }: ImageUploadGuardProps) {
     return (
         <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <AlertDialogContent className="max-w-[400px]">
+            <AlertDialogContent className="max-w-[450px]">
                 <AlertDialogHeader>
-                    <div className="flex items-center gap-2 mb-2 text-warning">
-                        <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                            <AlertTriangle className="h-6 w-6 text-amber-600" />
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="h-5 w-5 text-amber-600" />
                         </div>
-                        <AlertDialogTitle className="text-xl">Missing Images</AlertDialogTitle>
+                        <div>
+                            <AlertDialogTitle>Missing Component Images</AlertDialogTitle>
+                            <AlertDialogDescription className="mt-1">
+                                Action Required
+                            </AlertDialogDescription>
+                        </div>
                     </div>
-                    <AlertDialogDescription className="text-sm">
-                        You have <span className="font-bold text-foreground">{missingCount} image placeholder(s)</span> without an uploaded image.
-                        <br /><br />
-                        Generating content without images might result in less relevant context. Do you want to continue anyway?
-                    </AlertDialogDescription>
+                    <div className="py-2 text-sm text-muted-foreground">
+                        <p>
+                            You have <span className="font-semibold text-amber-600">{missingCount} component(s)</span> (e.g. Image or Header) that require an image but none was uploaded.
+                        </p>
+                        <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+                            <li>The AI context will be missing visual cues.</li>
+                            <li>The generated text might not match your visual content.</li>
+                        </ul>
+                    </div>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                    <AlertDialogCancel onClick={onClose} className="flex-1">
-                        Go Back & Upload
+                <AlertDialogFooter className="flex-col sm:flex-row gap-2 mt-2">
+                    <AlertDialogCancel onClick={onClose} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-primary">
+                        <ImageIcon className="mr-2 h-4 w-4" />
+                        Go Upload Images
                     </AlertDialogCancel>
                     <AlertDialogAction
                         onClick={onConfirm}
-                        className="flex-1 bg-amber-600 hover:bg-amber-700 text-white border-none"
+                        className="flex-1 bg-transparent text-muted-foreground hover:bg-destructive/10 hover:text-destructive border border-input shadow-none"
                     >
-                        Continue Generation
+                        Proceed without Images
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

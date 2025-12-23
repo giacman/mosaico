@@ -30,6 +30,7 @@ import { normalizeComponentList } from "@/lib/section-utils"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { getLabelColor } from "../../../_components/create-project-dialog"
 import { useProject } from "@/hooks/use-project"
+import { useDebounce } from "@/hooks/use-debounce"
 
 interface ProjectEditorProps {
   projectId: number
@@ -87,6 +88,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       setEditedProject(normalized as any)
     }
   }, [serverProject, editedProject])
+
+  // Autosave Logic
+  const debouncedProject = useDebounce(editedProject, 1000)
+
+  // Trigger save when debounced project changes and we have unsaved changes
+  useEffect(() => {
+    if (debouncedProject && hasChanges && !isSaving) {
+      handleSave()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedProject])
 
   // Loading state
   if (isLoading || !editedProject) {
@@ -257,10 +269,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <Button
             variant="outline"
             onClick={handleSave}
-            disabled={!hasChanges || isSaving || isReadOnly}
+            disabled={isSaving || isReadOnly}
+            className={`min-w-[100px] transition-all duration-300 ${!hasChanges && !isSaving ? "text-muted-foreground border-transparent bg-transparent shadow-none" : ""}`}
           >
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Saving..." : "Save"}
+            <Save className={`mr-2 h-4 w-4 ${isSaving ? "animate-spin" : ""}`} />
+            {isSaving ? "Saving..." : hasChanges ? "Save" : "Saved"}
           </Button>
         </div>
       </div>

@@ -148,6 +148,9 @@
   /* purple-300 */
   --brand-accent: oklch(0.717 0.23 349.761);
   /* pink-400 */
+
+  --bg-editor: oklch(0.12 0 0);
+  /* Darker background for editor in dark mode */
 }
 
 @layer base {
@@ -192,6 +195,11 @@
     background-clip: padding-box, border-box;
     background-size: 100% 100%, 300% 300%;
     animation: aurora-flow 8s ease infinite;
+  }
+
+  .dark .btn-ai-outline-coral {
+    background-image: linear-gradient(var(--card), var(--card)), var(--aurora-iridescent);
+    color: white;
   }
 
   .btn-ai-outline-coral:hover {

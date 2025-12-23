@@ -35,6 +35,8 @@ import {
   type Section,
   type SectionComponent,
 } from "@/lib/section-utils"
+import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
+import { Button } from "@/components/ui/button"
 
 type UploadedImage = {
   id: string
@@ -533,6 +535,7 @@ export function SectionBuilder({
   const [regenBusy, setRegenBusy] = useState<Record<string, boolean>>({})
   const [generatingSections, setGeneratingSections] = useState<Record<number, boolean>>({})
   const [translatingSections, setTranslatingSections] = useState<Record<number, boolean>>({})
+  const [optimizationSectionIdx, setOptimizationSectionIdx] = useState<number | null>(null)
 
   const handleCopy = async (text: string) => {
     try { await navigator.clipboard.writeText(text) } catch { }
@@ -585,7 +588,7 @@ export function SectionBuilder({
       <CardContent className="px-6 sm:px-8 md:px-10 py-8 bg-background transition-colors">
 
         {/* Fixed header components (visual only) */}
-        <div className="mb-4 rounded-md border border-border p-3 bg-muted/40">
+        <div className="mb-6 rounded-lg border border-primary/10 bg-accent/30 p-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Header (always included)</div>
           <div className="mt-3 space-y-3">
             {(() => {
@@ -624,7 +627,7 @@ export function SectionBuilder({
                         <button
                           type="button"
                           className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                          disabled={!!regenBusy[compKey] || !brief}
+                          disabled={!!regenBusy[compKey] || !brief || isReadOnly}
                           onClick={async () => {
                             if (!brief) return
                             setRegenBusy(v => ({ ...v, [compKey]: true }))
@@ -694,13 +697,15 @@ export function SectionBuilder({
                           )}
                           Regenerate
                         </button>
-                        <button
-                          type="button"
-                          className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                          onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
-                        >
-                          <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
-                        </button>
+                        {!isReadOnly && (
+                          <button
+                            type="button"
+                            className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
+                            onClick={() => setEditing(v => ({ ...v, [compKey]: !v[compKey] }))}
+                          >
+                            <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
@@ -740,6 +745,43 @@ export function SectionBuilder({
                         </button>
                       </div>
                     </div>
+
+                    {/* Content Display */}
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditValues(v => ({ ...v, [compKey]: e.target.value }))}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          rows={2}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            className="text-xs px-3 py-1.5 rounded hover:bg-muted font-medium text-muted-foreground"
+                            onClick={() => setEditing(v => ({ ...v, [compKey]: false }))}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90"
+                            onClick={() => {
+                              if (onUpdateComponent) {
+                                onUpdateComponent(type, 1, editText)
+                              }
+                              setEditing(v => ({ ...v, [compKey]: false }))
+                            }}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`rounded-md border p-3 text-sm ${currentText ? 'bg-background border-border/40' : 'bg-muted/10 border-transparent text-muted-foreground italic'}`}>
+                        {currentText || "No content generated yet."}
+                      </div>
+                    )}
                   </div>
                 )
               })
@@ -768,7 +810,7 @@ export function SectionBuilder({
                           onChange={(name) => renameSection(idx, name)}
                           placeholder={`Section ${idx + 1} name`}
                           className={`w-full rounded-md border bg-background px-2 py-1 text-sm ${isMainSection(section) ? 'opacity-70 cursor-not-allowed select-none italic font-medium bg-muted/50' : ''}`}
-                          disabled={isMainSection(section)}
+                          disabled={isMainSection(section) || isReadOnly}
                         />
                         <button
                           type="button"
@@ -848,26 +890,52 @@ export function SectionBuilder({
                                     <Edit2 className="h-2.5 w-2.5" />
                                   </summary>
                                   <div className="pt-2">
-                                    <SectionBriefInput
-                                      value={section.brief || ''}
-                                      onChange={(brief) => updateSectionBrief(idx, brief)}
-                                      placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
-                                      className={`w-full rounded-md border bg-background px-2 py-1 text-sm resize-none ${isReadOnly ? 'bg-muted/30 italic text-muted-foreground' : ''}`}
-                                      disabled={isReadOnly}
-                                    />
+                                    <div className="flex gap-2 items-start">
+                                      <SectionBriefInput
+                                        value={section.brief || ''}
+                                        onChange={(brief) => updateSectionBrief(idx, brief)}
+                                        placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
+                                        className={`w-full rounded-md border bg-background px-2 py-1 text-sm resize-none ${isReadOnly ? 'bg-muted/50 italic text-muted-foreground opacity-100 disabled:opacity-100 dark:text-gray-400' : ''}`}
+                                        disabled={isReadOnly}
+                                      />
+                                      {!isReadOnly && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                                          onClick={() => setOptimizationSectionIdx(idx)}
+                                          title="Optimize with AI"
+                                        >
+                                          <Sparkles className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
                                 </details>
                               )
                             }
 
                             return (
-                              <SectionBriefInput
-                                value={section.brief || ''}
-                                onChange={(brief) => updateSectionBrief(idx, brief)}
-                                placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
-                                className={`w-full rounded-md border bg-background px-2 py-1 text-sm resize-none ${isReadOnly ? 'bg-muted/30 italic text-muted-foreground' : ''}`}
-                                disabled={isReadOnly}
-                              />
+                              <div className="flex gap-2 items-start">
+                                <SectionBriefInput
+                                  value={section.brief || ''}
+                                  onChange={(brief) => updateSectionBrief(idx, brief)}
+                                  placeholder={`Brief for ${section.name || 'this section'}... (optional - will use main brief if empty)`}
+                                  className={`w-full rounded-md border bg-background px-2 py-1 text-sm resize-none ${isReadOnly ? 'bg-muted/50 italic text-muted-foreground opacity-100 disabled:opacity-100 dark:text-gray-400' : ''}`}
+                                  disabled={isReadOnly}
+                                />
+                                {!isReadOnly && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                                    onClick={() => setOptimizationSectionIdx(idx)}
+                                    title="Optimize with AI"
+                                  >
+                                    <Sparkles className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             )
                           })()}
                         </div>
@@ -1180,8 +1248,23 @@ export function SectionBuilder({
             </div>
           )
         }
-      </CardContent >
-    </Card >
+      </CardContent>
+
+      <PromptAssistantDialog
+        open={optimizationSectionIdx !== null}
+        onOpenChange={(open) => !open && setOptimizationSectionIdx(null)}
+        originalBrief={optimizationSectionIdx !== null ? value[optimizationSectionIdx]?.brief || value[optimizationSectionIdx]?.name || "" : ""}
+        contentType="newsletter"
+        tone={tone || "professional"}
+        structure={[]} // Section optimization is plain text usually
+        onApply={(optimized) => {
+          if (optimizationSectionIdx !== null) {
+            updateSectionBrief(optimizationSectionIdx, optimized)
+            setOptimizationSectionIdx(null)
+          }
+        }}
+      />
+    </Card>
   )
 }
 
