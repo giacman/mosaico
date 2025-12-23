@@ -2,6 +2,15 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [0.9.4] - 2025-12-23
+- **implement Multi Section Brief**:  Implemented generation and translation logic at section level.
+  - UI improvements
+  - implement autosave
+  - image guard
+  - dark mode
+  - Removed translations from approved State
+
+  
 ## [0.9.3] - 2025-12-09
 
 ### Added
