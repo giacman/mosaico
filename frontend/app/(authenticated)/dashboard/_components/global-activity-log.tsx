@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { getGlobalActivityLog, GlobalActivityLog } from "@/actions/projects"
+import { getGlobalActivityLog, type GlobalActivityLog as GlobalActivityLogType } from "@/actions/projects"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -46,7 +46,7 @@ function getActionConfig(action: string) {
   }
 }
 
-function ActivityLogItem({ log, showFullDate }: { log: GlobalActivityLog; showFullDate?: boolean }) {
+function ActivityLogItem({ log, showFullDate }: { log: GlobalActivityLogType; showFullDate?: boolean }) {
   const config = getActionConfig(log.action)
   const Icon = config.icon
   
@@ -102,7 +102,7 @@ function ActivityLogSkeleton() {
 const PAGE_SIZE = 25
 
 export function GlobalActivityLog() {
-  const [logs, setLogs] = useState<GlobalActivityLog[]>([])
+  const [logs, setLogs] = useState<GlobalActivityLogType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
