@@ -33,6 +33,15 @@ def upgrade() -> None:
     op.create_index(op.f('ix_labels_id'), 'labels', ['id'], unique=False)
     op.create_index(op.f('ix_labels_name'), 'labels', ['name'], unique=True)
     
+    # Create project_labels association table (many-to-many)
+    op.create_table('project_labels',
+        sa.Column('project_id', sa.Integer(), nullable=False),
+        sa.Column('label_id', sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(['label_id'], ['labels.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('project_id', 'label_id')
+    )
+    
     # Seed with default labels (migrated from hardcoded list)
     op.execute("""
         INSERT INTO labels (name, color, description, created_at, updated_at)
@@ -47,6 +56,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_table('project_labels')
     op.drop_index(op.f('ix_labels_name'), table_name='labels')
     op.drop_index(op.f('ix_labels_id'), table_name='labels')
     op.drop_table('labels')
