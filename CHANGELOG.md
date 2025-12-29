@@ -2,6 +2,30 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.0.0] - 2025-12-29 🎉
+
+### First Official Release
+
+Mosaico is now production-ready! This release marks the first stable version of the AI-powered multilingual content studio.
+
+### Added
+- **Activity Log on Homepage**: Real-time audit trail showing all team actions across projects
+  - Persistent history with "Load more" pagination
+  - Toggle between relative and full date display
+  - Direct links to projects from activity entries
+  - Global endpoint `/api/v1/activity` with offset/limit support
+- **Label Deletion**: Labels can now be deleted with confirmation dialog
+  - Hover on any label to reveal delete button
+  - Available in both Create Project dialog and Project Editor
+  - Warning about label removal from all projects
+
+### Technical
+- `GlobalActivityLog` component with pagination and type-safe imports
+- Backend `get_global_activity_log` service with project name JOIN
+- AlertDialog for delete confirmations
+
+---
+
 ## [0.9.5] - 2025-12-29
 
 ### Added
