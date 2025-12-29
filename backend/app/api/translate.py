@@ -128,9 +128,11 @@ Make sure your new translation fixes these specific issues while maintaining qua
         prompt = base_prompt
     
     # Use gemini-2.5-pro for higher quality transcreation
+    # Increase max_tokens to handle longer body text translations
     response_text = await ai_client.generate_content(
         prompt=prompt,
         temperature=0.5,  # Higher for more creative, natural transcreation
+        max_tokens=4096,  # Increased from default 2048 for longer translations
         response_mime_type="application/json",
         use_flash=False  # Use Pro model for better transcreation quality
     )

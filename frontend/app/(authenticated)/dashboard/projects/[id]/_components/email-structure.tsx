@@ -32,6 +32,7 @@ import { SectionBuilder } from "./section-builder"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { batchTranslate } from "@/actions/translate"
 import { saveGeneratedComponents } from "@/actions/components"
+import { generateProjectContent } from "@/actions/projects"
 import { useNotifications } from "../../../_components/notifications-provider"
 import { normalizeComponentList, normalizeTranslationsMap, ensureSectionKeys } from "@/lib/section-utils"
 import { ImageUploadGuard } from "./image-upload-guard"
@@ -58,7 +59,7 @@ interface UploadedImage {
 
 interface EmailStructureProps {
   project: Project
-  onProjectChange: (field: keyof Project, value: any) => void
+  onProjectChange: (field: keyof Project, value: any, silent?: boolean) => void
   onStructureChange: (
     structure: Array<{
       key: string
@@ -102,22 +103,30 @@ export function EmailStructure({
     ) {
       return ensureSectionKeys(initialStructure)
     } else {
-      // This is the old structure, let's convert it
-      const components = initialStructure
-        .flatMap((it: any) => {
-          const comp = it.component as string
-          const count = Number(it.count ?? 1) || 1
-          if (comp === "subject" || comp === "pre_header") return []
-          return Array.from({ length: count }, () => comp)
-        })
-        .filter(Boolean)
-
-      return ensureSectionKeys([{ key: "main", name: "Main Section", components }])
+      // Modern default structure for new/empty projects
+      return ensureSectionKeys([{ 
+        key: "main", 
+        name: "Main Section", 
+        components: ["image", "title", "body", "cta"] 
+      }])
     }
   })
+
+  // Sync sections state with project.structure updates (e.g. after SWR refetch or generation)
+  useEffect(() => {
+    if (project.structure && Array.isArray(project.structure) && project.structure.length > 0) {
+      // Only sync if the structure actually has components (modern format)
+      const firstSection = project.structure[0] as any
+      if (firstSection.components) {
+        setSections(ensureSectionKeys(project.structure as any))
+      }
+    }
+  }, [project.structure])
   const [images, setImages] = useState<UploadedImage[]>([])
   const [showPromptAssistant, setShowPromptAssistant] = useState(false)
-  const hasComponents = Array.isArray((project as any).components) && ((project as any).components.length > 0)
+  // Check if any component has generated content (not just if components exist - image components are always created)
+  const hasGeneratedContent = Array.isArray((project as any).components) && 
+    ((project as any).components as any[]).some(c => c.generated_content?.trim() && c.component_type !== 'image')
   const [isTranslating, setIsTranslating] = useState(false)
   const [translatedLanguages, setTranslatedLanguages] = useState<Set<string>>(new Set())
   const [viewLang, setViewLang] = useState<string>("en")
@@ -145,24 +154,45 @@ export function EmailStructure({
   }
 
   const handleGenerate = async () => {
-    // Check for missing images
-    const sectionsArr = sections || []
-    let missing = 0;
-    sectionsArr.forEach((s: any) => {
-      (s.components || []).forEach((c: string, cIdx: number) => {
+    if (!project.brief_text?.trim()) {
+      toast.error("Please enter a Main Brief first")
+      return
+    }
+
+    // Check that non-main sections have their own brief
+    const sectionsWithoutBrief = sections.filter(s => 
+      s.key !== "main" && (!s.brief || !s.brief.trim())
+    )
+    
+    if (sectionsWithoutBrief.length > 0) {
+      toast.error(
+        `Section briefs required: ${sectionsWithoutBrief.map(s => s.name || s.key).join(", ")}`
+      )
+      return
+    }
+
+    // Check for missing images across ALL sections
+    // Images are linked via image_id on the Component, not via section_key on Image
+    let totalMissing = 0
+    sections.forEach((section) => {
+      (section.components || []).forEach((c: string) => {
         if (c === 'image') {
-          const hasImg = (project.images || []).some((img: any) =>
-            img.section_key === s.key && img.component_index === (cIdx + 1) // index in images is 1-based usually
-          ) || (project.components || []).some((comp: any) =>
-            comp.component_type === 'image' && comp.section_key === s.key && comp.generated_content?.startsWith('http')
+          // Check if there's an image component for this section with either:
+          // - image_id (linked to Image table)
+          // - generated_content starting with http (URL)
+          // - component_url (alternative URL field)
+          const hasImg = (project.components || []).some((comp: any) =>
+            comp.component_type === 'image' && 
+            comp.section_key === section.key && 
+            (comp.image_id || comp.generated_content?.startsWith('http') || comp.component_url?.startsWith('http'))
           )
-          if (!hasImg) missing++
+          if (!hasImg) totalMissing++
         }
       })
     })
 
-    if (missing > 0) {
-      setMissingImagesCount(missing)
+    if (totalMissing > 0) {
+      setMissingImagesCount(totalMissing)
       setPendingGeneration({ type: 'all' })
       setShowImageGuard(true)
       return
@@ -172,44 +202,14 @@ export function EmailStructure({
   }
 
   const executeGenerate = async () => {
-    if (!project.brief_text?.trim()) {
-      toast.error("Please enter a creative brief first")
-      return
-    }
-
     setIsGenerating(true)
     try {
-      const legacyStructure: Array<{ component: string; count: number }> =
-        (() => {
-          const counts: Record<string, number> = { title: 0, body: 0, cta: 0 }
-          for (const sec of sections) {
-            for (const c of sec.components || []) {
-              if (c === "title" || c === "body" || c === "cta")
-                counts[c] = (counts[c] || 0) + 1
-            }
-          }
-          const result: Array<{ component: any; count: number }> = [
-            { component: "subject", count: 1 },
-            { component: "pre_header", count: 1 }
-          ]
-          if (counts.title > 0)
-            result.push({ component: "title", count: counts.title })
-          if (counts.body > 0)
-            result.push({ component: "body", count: counts.body })
-          if (counts.cta > 0)
-            result.push({ component: "cta", count: counts.cta })
-          return result
-        })()
-
-      const result = await generate({
-        project_id: project.id,
-        text: project.brief_text,
+      // Use the project-specific generation endpoint that handles multiple sections
+      // Send the current sections state so the backend has the latest briefs
+      const result = await generateProjectContent(project.id, {
         count: 1,
-        tone: tone,
-        content_type: "newsletter",
-        structure: legacyStructure,
-        temperature: temperature,
-        image_url: images[0]?.url
+        image_urls: images.map(img => img.url),
+        structure: sections
       })
 
       if (result.success && result.data) {
@@ -220,109 +220,20 @@ export function EmailStructure({
         addNotification({
           type: "success",
           title: "Generation Completed",
-          message: `Generated ${Object.keys(result.data.variations?.[0] || {}).length} components`
+          message: `Generated content for all sections`
         })
 
-        // Extract the components from the first variation
-        const variation = result.data.variations[0]
-        const globalCounters: Record<string, number> = { title: 0, body: 0, cta: 0 }
-        const newTextComponents: any[] = []
-
-        // 1. Add Header Components (Subject/Pre-header) - always present
-        if (variation.subject) {
-          newTextComponents.push({
-            component_type: "subject",
-            component_index: 1, // Changed to 1 for consistency
-            generated_content: variation.subject,
-            translations: {},
-            section_key: "header",
-            section_order: -1
-          })
-        }
-        if (variation.pre_header) {
-          newTextComponents.push({
-            component_type: "pre_header",
-            component_index: 1,
-            generated_content: variation.pre_header,
-            translations: {},
-            section_key: "header",
-            section_order: -1
-          })
-        }
-
-        // 2. Map generated content to existing sections
-        sections.forEach((section, sectionIdx) => {
-          const sectionLocalCounters: Record<string, number> = {};
-
-          (section.components || []).forEach((compType: string) => {
-            if (compType === "title" || compType === "body" || compType === "cta") {
-              // Increment global counter to fetch correct key from flat API response
-              globalCounters[compType] = (globalCounters[compType] || 0) + 1
-              const globalIdx = globalCounters[compType]
-
-              // API keys are like 'body', 'body_2', 'body_3' OR potentially 'body_1', 'body_2'
-              let val = ""
-              if (globalIdx === 1) {
-                // Try 'body' then 'body_1'
-                val = String(variation[compType] || variation[`${compType}_1`] || "")
-              } else {
-                val = String(variation[`${compType}_${globalIdx}`] || "")
-              }
-              const content = val
-
-              newTextComponents.push({
-                component_type: compType,
-                component_index: globalIdx, // Use Global Index for uniqueness across sections
-                generated_content: compType === "cta" ? content.toUpperCase() : content,
-                translations: {},
-                section_key: section.key,
-                section_order: sectionIdx
-              })
-            }
-          })
-        })
-
-        // Preserve existing image components
-        const existingImages = (project.components || []).filter((c: any) => c.component_type === "image")
-        const allComponents = [...newTextComponents, ...existingImages]
-
-        // If current sections are empty, create a default Main Section from the requested counts
-        const hasAnyComponents = sections.some(sec => (sec.components || []).length > 0)
-        if (!hasAnyComponents) {
-          const defaultComponents: string[] = []
-          legacyStructure.forEach(it => {
-            if (it.component === "title" || it.component === "body" || it.component === "cta") {
-              for (let i = 0; i < (it.count || 0); i++) defaultComponents.push(it.component)
-            }
-          })
-          const newSections = [{ key: "main", name: "Main Section", components: defaultComponents }]
-          setSections(newSections)
-          onProjectChange("structure", newSections as any)
-        }
-
-        const normalized = normalizeComponentList(allComponents)
-        onProjectChange("components", normalized as any)
-
-        // Save to database immediately
-        const saveRes = await saveGeneratedComponents(project.id, normalized as any)
-        if (saveRes.success && saveRes.components) {
-          const fromBackend = (saveRes.components || []).map((comp: any) => {
-            if (Array.isArray(comp.translations)) {
-              const obj: Record<string, string> = {}
-              comp.translations.forEach((t: any) => {
-                if (t.language_code && t.translated_content) obj[t.language_code] = t.translated_content
-              })
-              return { ...comp, translations: obj }
-            }
-            return comp
-          })
-          onProjectChange("components", fromBackend as any)
+        // Update components from backend response
+        if (result.data.components) {
+          // Use common normalization utility
+          const formattedComponents = normalizeComponentList(result.data.components)
+          onProjectChange("components", formattedComponents as any)
         }
       } else {
         toast.error(result.error || "Failed to generate content")
       }
     } catch (error) {
-      toast.error("An unexpected error occurred.")
+      toast.error("An unexpected error occurred during generation.")
       console.error(error)
     } finally {
       setIsGenerating(false)
@@ -335,12 +246,16 @@ export function EmailStructure({
     if (!section) return
 
     let missing = 0;
-    (section.components || []).forEach((c: string, cIdx: number) => {
+    (section.components || []).forEach((c: string) => {
       if (c === 'image') {
-        const hasImg = (project.images || []).some((img: any) =>
-          img.section_key === section.key && img.component_index === (cIdx + 1)
-        ) || (project.components || []).some((comp: any) =>
-          comp.component_type === 'image' && comp.section_key === section.key && comp.generated_content?.startsWith('http')
+        // Check if there's an image component for this section with either:
+        // - image_id (linked to Image table)
+        // - generated_content starting with http (URL)
+        // - component_url (alternative URL field)
+        const hasImg = (project.components || []).some((comp: any) =>
+          comp.component_type === 'image' && 
+          comp.section_key === section.key && 
+          (comp.image_id || comp.generated_content?.startsWith('http') || comp.component_url?.startsWith('http'))
         )
         if (!hasImg) missing++
       }
@@ -364,101 +279,28 @@ export function EmailStructure({
       const section = sections[sectionIdx]
       if (!section) return
 
-      // 1. Calculate global offsets for this section's components
-      const typeOffsets: Record<string, number> = { title: 0, body: 0, cta: 0 }
-      for (let i = 0; i < sectionIdx; i++) {
-        const s = sections[i]
-          ; (s.components || []).forEach(c => {
-            if (c === "title" || c === "body" || c === "cta") {
-              typeOffsets[c] = (typeOffsets[c] || 0) + 1
-            }
-          })
-      }
-
-      // 2. Build local structure for the API call
-      const localStructure: Array<{ component: any; count: number }> = []
-      const counts: Record<string, number> = { title: 0, body: 0, cta: 0 }
-        ; (section.components || []).forEach(c => {
-          if (c === "title" || c === "body" || c === "cta") {
-            counts[c] = (counts[c] || 0) + 1
-          }
-        })
-      if (counts.title > 0) localStructure.push({ component: "title", count: counts.title })
-      if (counts.body > 0) localStructure.push({ component: "body", count: counts.body })
-      if (counts.cta > 0) localStructure.push({ component: "cta", count: counts.cta })
-
-      if (localStructure.length === 0) {
-        toast.info("No text components to generate in this section.")
-        return
-      }
-
-      // 3. Generate content using section brief (fallback to project brief)
-      const generationBrief = section.brief || project.brief_text || ""
-      const result = await generate({
-        project_id: project.id,
-        text: generationBrief,
+      // Use the project-specific generation endpoint but ONLY for this section
+      // We pass a structure containing only this section
+      const result = await generateProjectContent(project.id, {
         count: 1,
-        tone: tone,
-        content_type: "newsletter",
-        structure: localStructure,
-        temperature: temperature,
-        image_url: images[0]?.url
+        image_urls: images.map(img => img.url),
+        structure: [section]
       })
 
       if (result.success && result.data) {
         toast.success(`Content for ${section.name} generated!`)
-        const variation = result.data.variations[0]
-
-        // 4. Create new components for this section with correct global indices
-        const updatedLocalCounters: Record<string, number> = { ...typeOffsets }
-        const newComponentsForSection: any[] = []
-
-          ; (section.components || []).forEach(compType => {
-            if (compType === "title" || compType === "body" || compType === "cta") {
-              updatedLocalCounters[compType]++
-              const currentGlobalIdx = updatedLocalCounters[compType]
-              const apiIdx = updatedLocalCounters[compType] - typeOffsets[compType]
-
-              let val = ""
-              if (apiIdx === 1) {
-                val = String(variation[compType] || variation[`${compType}_1`] || "")
-              } else {
-                val = String(variation[`${compType}_${apiIdx}`] || "")
-              }
-
-              newComponentsForSection.push({
-                component_type: compType,
-                component_index: currentGlobalIdx,
-                generated_content: compType === "cta" ? val.toUpperCase() : val,
-                translations: {},
-                section_key: section.key,
-                section_order: sectionIdx
-              })
-            }
-          })
-
-        // 5. Merge with existing components (replacing matches)
-        const currentComps = project.components || []
-        const sectionTypeIndices = new Set(newComponentsForSection.map(c => `${c.component_type}:${c.component_index}`))
-
-        const merged = [
-          ...currentComps.filter(c => !sectionTypeIndices.has(`${c.component_type}:${c.component_index}`)),
-          ...newComponentsForSection
-        ]
-
-        const normalized = normalizeComponentList(merged)
-        onProjectChange("components", normalized as any)
-
-        // 6. Persist to backend
-        const saveRes = await saveGeneratedComponents(project.id, normalized as any)
-        if (saveRes.success && saveRes.components) {
-          onProjectChange("components", normalizeComponentList(saveRes.components) as any)
+        
+        // Update components from backend response
+        if (result.data.components) {
+          // Use common normalization utility
+          const formattedComponents = normalizeComponentList(result.data.components)
+          onProjectChange("components", formattedComponents as any)
         }
       } else {
         toast.error(result.error || "Failed to generate section content")
       }
     } catch (error) {
-      toast.error("An unexpected error occurred.")
+      toast.error("An unexpected error occurred during section generation.")
       console.error(error)
     } finally {
       setIsGenerating(false)
@@ -478,7 +320,8 @@ export function EmailStructure({
       const textsToTranslate = sectionComps
         .filter((c: any) => c.generated_content?.trim() && c.component_type !== "image")
         .map((c: any) => ({
-          key: (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type,
+          // Include section_key in the key to prevent cross-section contamination
+          key: `${c.section_key}:${c.component_type}${(c.component_index || 1) > 1 ? '_' + c.component_index : ''}`,
           content: c.generated_content
         }))
 
@@ -501,7 +344,8 @@ export function EmailStructure({
         const merged = (project.components || []).map((c: any) => {
           if (c.section_key !== section.key) return c
 
-          const key = (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type
+          // Use same key format as when sending to translate
+          const key = `${c.section_key}:${c.component_type}${(c.component_index || 1) > 1 ? '_' + c.component_index : ''}`
           const newTrans = (res.data as any)[key] || {}
 
           // Check for failure markers
@@ -685,7 +529,7 @@ export function EmailStructure({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  <span>{hasComponents ? "Regenerate All Content" : "Generate Content"}</span>
+                  <span>{hasGeneratedContent ? "Regenerate All Content" : "Generate Content"}</span>
                 </Button>
               </div>
             </div>
@@ -732,7 +576,7 @@ export function EmailStructure({
             <Separator />
 
             {/* Translate Selected Languages Button */}
-            {((project.target_languages || []).length > 0) && hasComponents && !isReadOnly && (
+            {((project.target_languages || []).length > 0) && hasGeneratedContent && !isReadOnly && (
               <div className="pt-2 flex justify-center">
                 <Button
                   variant="outline"
@@ -741,10 +585,11 @@ export function EmailStructure({
                   onClick={async () => {
                     try {
                       setIsTranslating(true)
+                      // Include section_key in keys to prevent cross-section contamination
                       const texts = (project.components || [])
                         .filter((c: any) => c.generated_content?.trim() && c.component_type !== "image")
                         .map((c: any) => ({
-                          key: (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type,
+                          key: `${c.section_key}:${c.component_type}${(c.component_index || 1) > 1 ? '_' + c.component_index : ''}`,
                           content: c.generated_content
                         }))
 
@@ -753,7 +598,7 @@ export function EmailStructure({
                       const res = await batchTranslate(texts, langs)
                       if (res.success && res.data) {
                         const merged = (project.components || []).map((c: any) => {
-                          const key = (c.component_index > 1) ? `${c.component_type}_${c.component_index}` : c.component_type
+                          const key = `${c.section_key}:${c.component_type}${(c.component_index || 1) > 1 ? '_' + c.component_index : ''}`
                           const rawT = (res.data as any)[key] || {}
                           const t = c.component_type === "cta"
                             ? Object.fromEntries(Object.entries(rawT).map(([k, v]) => [k, String(v || "").toUpperCase()]))
@@ -820,8 +665,8 @@ export function EmailStructure({
         onUpdateComponents={async (list) => {
           const normalized = normalizeComponentList(list as any)
 
-          // Optimistically update the UI for responsiveness
-          onProjectChange("components", normalized as any)
+          // Optimistically update the UI for responsiveness (silent: true to avoid triggering autosave loop)
+          onProjectChange("components", normalized as any, true)
 
           // Update translation status based on new components
           const langsWithTranslations = new Set<string>()
@@ -839,19 +684,33 @@ export function EmailStructure({
 
           if (result.success && result.components) {
             const normalizedFromBackend = normalizeComponentList(result.components)
-            onProjectChange("components", normalizedFromBackend as any)
+            // DEFINITIVE UPDATE: silent: true because we just saved them
+            onProjectChange("components", normalizedFromBackend as any, true)
             // Also update images if the backend returned them
             if (result.images) {
-              onProjectChange("images", result.images as any)
+              onProjectChange("images", result.images as any, true)
             }
           }
         }}
-        onUpdateComponent={(type, index, content) => {
+        onUpdateComponent={(type, index, content, sectionKey) => {
           const list: any[] = [...((project.components as any) || [])]
-          const idx = list.findIndex((c: any) => c.component_type === type && (c.component_index || 1) === index)
+          const idx = list.findIndex((c: any) => 
+            c.component_type === type && 
+            (c.component_index || 1) === index &&
+            (!sectionKey || c.section_key === sectionKey)
+          )
           const finalContent = type === "cta" ? (content || "").toUpperCase() : content
-          if (idx >= 0) list[idx] = { ...list[idx], generated_content: finalContent }
-          else list.push({ component_type: type, component_index: index, generated_content: finalContent, translations: {} })
+          if (idx >= 0) {
+            list[idx] = { ...list[idx], generated_content: finalContent }
+          } else {
+            list.push({ 
+              component_type: type, 
+              component_index: index, 
+              generated_content: finalContent, 
+              translations: {},
+              section_key: sectionKey || "default"
+            })
+          }
           const normalized = normalizeComponentList(list as any)
           onProjectChange("components", normalized as any)
         }}
@@ -886,6 +745,7 @@ export function EmailStructure({
             })}
           </div>
         }
+        onProjectChange={onProjectChange}
       />
 
       {/* Phase 2: Image Upload Guard */}

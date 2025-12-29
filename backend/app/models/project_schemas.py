@@ -17,6 +17,8 @@ class SectionStructureCreate(BaseModel):
     """A section in the email structure"""
     key: str = Field(..., description="Unique identifier for the section (e.g., 'section_1')")
     name: str = Field(..., description="Display name for the section (e.g., 'Hero Section')")
+    brief: Optional[str] = Field(None, description="Section-specific brief")
+    content_type: Optional[str] = Field(None, description="Section-specific content type")
     components: List[str] = Field(..., description="List of component types in this section (e.g., ['image', 'title', 'cta'])")
 
 
@@ -52,7 +54,7 @@ class ProjectCreate(BaseModel):
                     continue
                 components.extend([comp] * max(1, count))
             if not components:
-                components = ["title", "body", "cta"]
+                components = ["image", "title", "body", "cta"]
             data["structure"] = [{
                 "key": "main",
                 "name": "Main Section",
@@ -86,7 +88,7 @@ class ProjectUpdate(BaseModel):
                     continue
                 components.extend([comp] * max(1, count))
             if not components:
-                components = ["title", "body", "cta"]
+                components = ["image", "title", "body", "cta"]
             data["structure"] = [{
                 "key": "main",
                 "name": "Main Section",
@@ -193,6 +195,7 @@ class GenerateProjectContentRequest(BaseModel):
     """Request to generate content for a project"""
     count: int = Field(1, ge=1, le=5, description="Number of variations")
     image_urls: Optional[List[str]] = Field(default_factory=list, description="Optional image URLs to use as context")
+    structure: Optional[List[dict]] = Field(None, description="Optional structure override (uses project structure if None)")
 
 
 class GenerateProjectContentResponse(BaseModel):

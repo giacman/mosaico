@@ -100,7 +100,7 @@ export async function listProjects(): Promise<{
 }> {
   try {
     const token = await getAuthToken()
-
+    
     const response = await fetch(`${API_URL}/api/v1/projects`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -191,10 +191,10 @@ export async function createProject(
     }
 
     const data = await response.json()
-
+    
     // Revalidate the dashboard to show the new project
     revalidatePath("/dashboard")
-
+    
     return { success: true, data }
   } catch (error) {
     console.error("Error creating project:", error)
@@ -237,11 +237,11 @@ export async function updateProject(
     }
 
     const data = await response.json()
-
+    
     // Revalidate both dashboard and project page
     revalidatePath("/dashboard")
     revalidatePath(`/dashboard/projects/${id}`)
-
+    
     return { success: true, data }
   } catch (error) {
     console.error("Error updating project:", error)
@@ -281,7 +281,7 @@ export async function duplicateProject(
     }
 
     const data = await response.json()
-
+    
     // Revalidate the dashboard to show the duplicated project
     revalidatePath("/dashboard")
 
@@ -331,6 +331,55 @@ export async function deleteProject(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to delete project"
+    }
+  }
+}
+
+/**
+ * Generate content for all sections in a project
+ */
+export async function generateProjectContent(
+  projectId: number,
+  params: { count: number; image_urls?: string[]; structure?: any[] }
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const token = await getAuthToken()
+    if (!token) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const response = await fetch(
+      `${API_URL}/api/v1/projects/${projectId}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(params)
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Project generation error:", errorText)
+      return {
+        success: false,
+        error: `Failed to generate: ${response.status}`
+      }
+    }
+
+    const data = await response.json()
+    
+    // Revalidate project page
+    revalidatePath(`/dashboard/projects/${projectId}`)
+    
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error generating project content:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
     }
   }
 }

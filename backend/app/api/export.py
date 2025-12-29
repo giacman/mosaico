@@ -130,7 +130,7 @@ async def export_to_sheets(
     """
     
     # Get project with all data
-    project = ProjectService.get_project(db, project_id, user_id)
+    project = ProjectService.get_project(db, project_id)
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

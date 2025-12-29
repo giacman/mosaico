@@ -149,6 +149,7 @@ export function SectionBuilder({
   isTranslating = false,
   languageFlags,
   isReadOnly = false,
+  onProjectChange,
 }: {
   value: Section[]
   onChange: (next: Section[]) => void
@@ -158,7 +159,7 @@ export function SectionBuilder({
   projectImages?: UploadedImage[]
   brief?: string
   tone?: string
-  onUpdateComponent?: (type: string, index: number, content: string, imageId?: number) => void
+  onUpdateComponent?: (type: string, index: number, content: string, sectionKey?: string) => void
   currentLanguage?: string
   targetLanguages?: string[]
   onUpdateComponents?: (list: SectionComponent[]) => void
@@ -168,6 +169,7 @@ export function SectionBuilder({
   isTranslating?: boolean
   languageFlags?: React.ReactNode
   isReadOnly?: boolean
+  onProjectChange?: (field: any, value: any, silent?: boolean) => void
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -233,7 +235,7 @@ export function SectionBuilder({
       {
         key: "",
         name: "",
-        components: ["image", "body", "cta"],  // Default components for new sections
+        components: ["image", "title", "body", "cta"],  // Default components for new sections
       },
     ])
     onChange(next)
@@ -379,18 +381,21 @@ export function SectionBuilder({
           (c.section_key === sectionKey || c.section_order === sectionIdx)
         )
 
+        let updatedComponent: SectionComponent;
+
         if (existingIndex > -1) {
           // Update existing
-          list[existingIndex] = {
+          updatedComponent = {
             ...list[existingIndex],
             image_id: Number(uploaded.id),
             image: uploaded,
             section_key: sectionKey,
             section_order: sectionIdx
-          }
+          };
+          list[existingIndex] = updatedComponent as any;
         } else {
           // Create new
-          list.push({
+          updatedComponent = {
             component_type: targetType,
             component_index: 1,  // Per-section index, always 1 for single image per section
             generated_content: "",
@@ -399,9 +404,34 @@ export function SectionBuilder({
             translations: {},
             section_key: sectionKey,
             section_order: sectionIdx,
-          })
+          };
+          list.push(updatedComponent as any);
         }
+        
+        // 1. Optimistic UI update
         await onUpdateComponents(list as any)
+        
+        // 2. Immediate persist to backend for this specific component
+        const { saveGeneratedComponents } = await import("@/actions/components")
+        const saveResult = await saveGeneratedComponents(projectId, [
+          {
+            component_type: updatedComponent.component_type,
+            component_index: updatedComponent.component_index,
+            generated_content: updatedComponent.generated_content || "",
+            image_id: updatedComponent.image_id,
+            section_key: sectionKey,
+            section_order: sectionIdx,
+            translations: {}
+          }
+        ] as any)
+        
+        if (saveResult.success && saveResult.components) {
+          // 3. Silent update of the global state with backend data
+          if (onProjectChange) {
+            onProjectChange("components", saveResult.components, true)
+          }
+          toast.success("Image uploaded successfully")
+        }
       }
 
     } catch (e) {
@@ -409,7 +439,7 @@ export function SectionBuilder({
     }
   }
 
-  const removeImageFromComponent = (sectionKey: string, compIdx: number, imageId: string) => {
+  const removeImageFromComponent = async (sectionKey: string, compIdx: number, imageId: string) => {
     // Find section and component type
     const sectionIdx = value.findIndex(s => s.key === sectionKey)
     if (sectionIdx === -1) return
@@ -428,8 +458,25 @@ export function SectionBuilder({
       )
 
       if (existingIndex > -1) {
-        list[existingIndex] = { ...list[existingIndex], image_id: undefined, image: undefined }
+        const updatedComponent = { ...list[existingIndex], image_id: undefined, image: undefined };
+        list[existingIndex] = updatedComponent;
+        
+        // 1. Optimistic UI update
         onUpdateComponents(list as any)
+        
+        // 2. Persist removal to backend
+        const { saveGeneratedComponents } = await import("@/actions/components")
+        await saveGeneratedComponents(projectId, [
+          {
+            component_type: updatedComponent.component_type,
+            component_index: updatedComponent.component_index,
+            generated_content: updatedComponent.generated_content || "",
+            image_id: undefined,
+            section_key: sectionKey,
+            section_order: sectionIdx,
+            translations: {}
+          }
+        ] as any)
       }
     }
   }
@@ -538,7 +585,17 @@ export function SectionBuilder({
   const [optimizationSectionIdx, setOptimizationSectionIdx] = useState<number | null>(null)
 
   const handleCopy = async (text: string) => {
-    try { await navigator.clipboard.writeText(text) } catch { }
+    if (!text?.trim()) {
+      toast.error("Nothing to copy")
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("Copied to clipboard")
+    } catch (err) {
+      console.error("Copy failed:", err)
+      toast.error("Failed to copy - try selecting and copying manually")
+    }
   }
 
   const handleCopyHandlebar = async (
@@ -598,8 +655,11 @@ export function SectionBuilder({
               ]
               return headerItems.map(({ label, type }) => {
                 const displayIndex = 1
+                // Look specifically for components in the 'header' section
                 const found = components?.find(
-                  (c) => c.component_type === type && (c.component_index || 1) === 1
+                  (c) => c.component_type === type && 
+                         (c.component_index === 1 || (c.component_index || 1) === 1) &&
+                         ((c as any).section_key === "header" || (c as any).section_key === "default")
                 )
                 const currentText = (() => {
                   if (!found) return ""
@@ -648,23 +708,30 @@ export function SectionBuilder({
 
                                 if (val && onUpdateComponents) {
                                   // Check if this component had existing translations
-                                  const existingComp = (components || []).find((c) => c.component_type === type && (c.component_index || 1) === 1)
+                                  const existingComp = (components || []).find((c) => 
+                                    c.component_type === type && 
+                                    (c.component_index === 1 || (c.component_index || 1) === 1) &&
+                                    ((c as any).section_key === "header" || (c as any).section_key === "default")
+                                  )
                                   const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
 
                                   // If component had translations and target languages are set, retranslate
                                   if (hadTranslations && (targetLanguages || []).length > 0) {
                                     try {
-                                      const texts = [{ key: type, content: val }]
+                                      // Include section_key in key to match email-structure.tsx format
+                                      const translationKey = `header:${type}`
+                                      const texts = [{ key: translationKey, content: val }]
                                       const langs = targetLanguages || []
                                       const res = await batchTranslate(texts, langs)
 
                                       if (res.success && res.data) {
-                                        const key = type
-                                        const t = (res.data[key] || {}) as Record<string, string>
+                                        const t = (res.data[translationKey] || {}) as Record<string, string>
 
                                         const merged = (components || []).map((c) => {
-                                          if (c.component_type === type && (c.component_index || 1) === 1) {
-                                            return { ...c, generated_content: val, translations: t }
+                                          if (c.component_type === type && 
+                                              (c.component_index === 1 || (c.component_index || 1) === 1) &&
+                                              ((c as any).section_key === "header" || (c as any).section_key === "default")) {
+                                            return { ...c, generated_content: val, translations: t, section_key: "header" }
                                           }
                                           return c
                                         })
@@ -676,8 +743,10 @@ export function SectionBuilder({
                                   } else {
                                     // No translations to regenerate, just update English content
                                     const merged = (components || []).map((c) => {
-                                      if (c.component_type === type && (c.component_index || 1) === 1) {
-                                        return { ...c, generated_content: val }
+                                      if (c.component_type === type && 
+                                          (c.component_index === 1 || (c.component_index || 1) === 1) &&
+                                          ((c as any).section_key === "header" || (c as any).section_key === "default")) {
+                                        return { ...c, generated_content: val, section_key: "header" }
                                       }
                                       return c
                                     })
@@ -695,7 +764,7 @@ export function SectionBuilder({
                           ) : (
                             <RefreshCw className="h-3.5 w-3.5 mr-1" />
                           )}
-                          Regenerate
+                          {found?.generated_content?.trim() ? "Regenerate" : "Generate"}
                         </button>
                         {!isReadOnly && (
                           <button
@@ -768,7 +837,7 @@ export function SectionBuilder({
                             className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90"
                             onClick={() => {
                               if (onUpdateComponent) {
-                                onUpdateComponent(type, 1, editText)
+                                onUpdateComponent(type, 1, editText, "header")
                               }
                               setEditing(v => ({ ...v, [compKey]: false }))
                             }}
@@ -794,10 +863,10 @@ export function SectionBuilder({
           <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
               {(() => {
-                // Global per-type counters across ALL sections
-                const globalTypeCounters: Record<string, number> = {}
-
                 return ensureSectionKeys(value).map((section, idx) => {
+                  // Count components within THIS section only (for internal section indexing)
+                  const sectionTypeCounters: Record<string, number> = {}
+                  
                   return (
                     <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`}>
                       {/* ... content ... */}
@@ -834,8 +903,8 @@ export function SectionBuilder({
                           {(() => {
                             // Check if this specific section has ANY generated content
                             const hasSectionContent = section.components.some(type => {
-                              const globalIdx = (globalTypeCounters[type] || 0) + 1
-                              return !!components?.some(x => x.component_type === type && (x.component_index || 1) === globalIdx)
+                              const comp = findComponentForSection(components || [], section.key, idx, type)
+                              return !!comp?.generated_content
                             })
                             return hasSectionContent ? "Regenerate" : "Generate"
                           })()}
@@ -878,8 +947,8 @@ export function SectionBuilder({
                         <div className="mt-2 group">
                           {(() => {
                             const hasSectionContent = section.components.some(type => {
-                              const globalIdx = (globalTypeCounters[type] || 0) + 1
-                              return !!components?.some(x => x.component_type === type && (x.component_index || 1) === globalIdx)
+                              const comp = findComponentForSection(components || [], section.key, idx, type)
+                              return !!comp?.generated_content
                             })
 
                             if (hasSectionContent) {
@@ -971,18 +1040,18 @@ export function SectionBuilder({
                             )}
                             {section.components.map((c, compIdx) => {
                               const imgs = (imagesBySection[section.key]?.[compIdx]) || []
-                              // Global display index: increment per type across all sections
-                              // This matches the handleGenerate logic which uses global counters
-                              const displayIndex = (globalTypeCounters[c] = (globalTypeCounters[c] || 0) + 1)
-
-                              const contentObj = components?.find(x => {
-                                const typeMatch = x.component_type === c
-                                const compIdx = x.component_index ?? 1
-                                const normalizedIdx = compIdx === 0 ? 1 : compIdx
-                                const indexMatch = normalizedIdx === displayIndex
-                                // We rely on global index uniqueness for text components
-                                return typeMatch && indexMatch
-                              })
+                              
+                              // Local index: count how many components of this type are in this section up to this point
+                              const typeInSectionIdx = section.components.slice(0, compIdx + 1).filter(t => t === c).length;
+                              
+                              // Find component for THIS section specifically using Type + Section + Local Index
+                              const contentObj = findComponentForSection(
+                                components || [],
+                                section.key,
+                                idx,
+                                c,
+                                typeInSectionIdx
+                              )
 
                               const currentText = (() => {
                                 if (!contentObj) return ""
@@ -998,7 +1067,7 @@ export function SectionBuilder({
                                 }
                                 return contentObj.generated_content || ""
                               })()
-                              const compKey = `${section.key}:${c}:${displayIndex}`
+                              const compKey = `${section.key}:${c}:${typeInSectionIdx}`
                               const isEditing = !!editing[compKey]
                               const editText = editValues[compKey] ?? currentText
                               return (
@@ -1082,14 +1151,16 @@ export function SectionBuilder({
                                                 className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
                                                 onClick={() => {
                                                   setEditing(v => ({ ...v, [compKey]: false }))
-                                                  onUpdateComponent && onUpdateComponent(c, displayIndex, editText)
+                                                  if (onUpdateComponent) {
+                                                    onUpdateComponent(c, typeInSectionIdx, editText, section.key)
+                                                  }
                                                 }}
                                               >
                                                 <Check className="h-3.5 w-3.5 mr-1" /> Save
                                               </button>
                                             </>
                                           ) : (
-                                            <>{renderPreview(c, displayIndex, section.key, idx)}</>
+                                            <>{renderPreview(c, typeInSectionIdx, section.key, idx)}</>
                                           )}
 
                                           {/* Actions toolbar */}
@@ -1119,21 +1190,28 @@ export function SectionBuilder({
                                                     const val = String(result.data.variations[0][c] || "")
                                                     const finalVal = c === "cta" ? val.toUpperCase() : val
                                                     if (finalVal && onUpdateComponents) {
-                                                      // Check if this component had existing translations
-                                                      const existingComp = (components || []).find((item) => item.component_type === c && (item.component_index || 1) === displayIndex)
-                                                      const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
-
+                                                      // Find this component correctly using section context
+                                                      const existingComp = findComponentForSection(
+                                                        components || [],
+                                                        section.key,
+                                                        idx,
+                                                        c
+                                                      )
+                                                      
                                                       // Always retranslate if target languages are set
                                                       if ((targetLanguages || []).length > 0) {
                                                         try {
-                                                          const texts = [{ key: `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, content: finalVal }]
+                                                          // Include section.key in translation key to prevent cross-section contamination
+                                                          const translationKey = `${section.key}:${c}${typeInSectionIdx > 1 ? `_${typeInSectionIdx}` : ""}`
+                                                          const texts = [{ key: translationKey, content: finalVal }]
                                                           const langs = targetLanguages || []
                                                           const res = await batchTranslate(texts, langs)
                                                           if (res.success && res.data) {
-                                                            const key = `${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`
-                                                            const newTranslations = res.data[key]
+                                                            const newTranslations = res.data[translationKey]
                                                             const merged = (components || []).map((item) => {
-                                                              if (item.component_type === c && (item.component_index || 1) === displayIndex) {
+                                                              const typeMatch = item.component_type === c
+                                                              const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
+                                                              if (typeMatch && sectionMatch) {
                                                                 return { ...item, generated_content: finalVal, translations: newTranslations }
                                                               }
                                                               return item
@@ -1144,7 +1222,9 @@ export function SectionBuilder({
                                                       } else {
                                                         // No translations to regenerate, just update English content
                                                         const merged = (components || []).map((item) => {
-                                                          if (item.component_type === c && (item.component_index || 1) === displayIndex) {
+                                                          const typeMatch = item.component_type === c
+                                                          const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
+                                                          if (typeMatch && sectionMatch) {
                                                             return { ...item, generated_content: finalVal }
                                                           }
                                                           return item
@@ -1163,7 +1243,7 @@ export function SectionBuilder({
                                               ) : (
                                                 <RefreshCw className="h-3.5 w-3.5 mr-1" />
                                               )}
-                                              Regenerate
+                                              {contentObj?.generated_content?.trim() ? "Regenerate" : "Generate"}
                                             </button>
                                             <button
                                               type="button"
@@ -1184,7 +1264,13 @@ export function SectionBuilder({
                                               type="button"
                                               className="rounded px-1.5 py-0.5 text-[10px] hover:bg-accent inline-flex items-center border"
                                               onClick={() => {
-                                                const obj = components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)
+                                                const obj = findComponentForSection(
+                                                  components || [],
+                                                  section.key,
+                                                  idx,
+                                                  c,
+                                                  typeInSectionIdx
+                                                )
                                                 const en = (obj?.generated_content) || ""
                                                 const trAny = (obj as any)?.translations
                                                 const trRaw = (trAny && typeof trAny === "object" && !Array.isArray(trAny)) ? trAny : {}
@@ -1194,9 +1280,9 @@ export function SectionBuilder({
                                                     .filter(([k]) => allowed.has(String(k).toLowerCase()))
                                                     .map(([k, v]) => [k, String(v ?? "")])
                                                 ) as Record<string, string>
-                                                handleCopyHandlebar(`${c}${displayIndex > 1 ? `_${displayIndex}` : ""}`, en, tr)
+                                                handleCopyHandlebar(`${c}${typeInSectionIdx > 1 ? `_${typeInSectionIdx}` : ""}`, en, tr)
                                               }}
-                                              disabled={!((components?.find(x => x.component_type === c && (x.component_index || 1) === displayIndex)?.generated_content || "").trim())}
+                                              disabled={!((findComponentForSection(components || [], section.key, idx, c, typeInSectionIdx)?.generated_content || "").trim())}
                                             >
                                               <FileCode className="h-3.5 w-3.5 mr-1" /> Handlebar
                                             </button>

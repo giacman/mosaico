@@ -42,98 +42,213 @@ async def generate_project_content(
     """
     
     # Get project with all relationships
-    project = ProjectService.get_project(db, project_id, user_id)
+    project = ProjectService.get_project(db, project_id)
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found"
         )
     
-    # Build the generation prompt
-    prompt = f"{project.brief_text or 'Create email content'}"
+    # 1. Update project structure first if provided in the request
+    # This ensures that new sections are persisted before we generate components for them
+    if request.structure is not None:
+        project.structure = request.structure
+        db.add(project)
+        db.flush()
+        logger.info(f"Updated structure for project {project_id} before generation")
+
+    # Determine image mapping for sections
+    image_by_id = {img.id: img for img in project.images}
     
-    # Prepare structure for generation
-    structure = []
-    for item in project.structure:
-        structure.append({
-            "component": item["component"],
-            "count": item["count"]
-        })
+    # Use the current project structure (potentially updated above)
+    project_structure = project.structure
     
-    # Determine image URL (use first uploaded image if available, or from request)
-    image_url = None
-    if project.images:
-        image_url = project.images[0].gcs_public_url
-    elif request.image_urls:
-        image_url = request.image_urls[0]
+    all_generated_components = []
     
     try:
-        # Call the AI generation endpoint
         from app.api.generate import build_generation_prompt
+        from app.models.schemas import StructureComponent, ComponentType
+        import json
         
-        ai_prompt = build_generation_prompt(
-            text=prompt,
+        # 2. First generate Header components (Subject & Pre-header)
+        # These are usually project-wide, so we use the Main Brief
+        header_structure = [
+            StructureComponent(component=ComponentType.SUBJECT, count=1),
+            StructureComponent(component=ComponentType.PRE_HEADER, count=1)
+        ]
+        
+        header_prompt = build_generation_prompt(
+            text=project.brief_text or "Create content",
             count=request.count,
             tone=project.tone or "professional",
             content_type="newsletter",
-            structure=structure,
-            context=None
+            structure=header_structure,
+            context="Project Header"
         )
         
-        # Generate content
-        response_text = await ai_client.generate_with_fixing(
-            prompt=ai_prompt,
+        logger.info(f"--- GENERATING HEADER for project {project_id} ---")
+        header_response = await ai_client.generate_with_fixing(
+            prompt=header_prompt,
             expected_variations=request.count,
             temperature=0.7,
-            max_tokens=2048,
-            image_url=image_url
+            max_tokens=1024
         )
         
-        import json
-        variations = json.loads(response_text).get("variations", [])
-        
-        if not variations:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No content generated"
-            )
-        
-        # Take the first variation (for MVP, always generate 1)
-        generated_content = variations[0]
-        
-        # Save each component to database
-        components = []
-        for key, value in generated_content.items():
-            # Parse component type and index (e.g., "body_1" -> type="body", index=1)
-            if "_" in key:
-                parts = key.rsplit("_", 1)
-                component_type = parts[0]
-                component_index = int(parts[1])
+        try:
+            header_data = json.loads(header_response)
+            header_variations = header_data.get("variations", [])
+            if header_variations:
+                header_content = header_variations[0]
+                logger.info(f"Header AI keys received: {list(header_content.keys())}")
+                for key, value in header_content.items():
+                    # Normalize key: remove any numeric suffix and convert to lowercase
+                    # e.g., "Subject_1" -> "subject", "pre_header" -> "pre_header"
+                    clean_key = key.lower().split("_")[0]
+                    if key.lower().startswith("pre_header") or key.lower().startswith("preheader"):
+                        clean_key = "pre_header"
+                    
+                    if clean_key in ["subject", "pre_header"]:
+                        all_generated_components.append({
+                            "component_type": clean_key,
+                            "component_index": 1, # Headers always index 1
+                            "generated_content": value,
+                            "section_key": "header",
+                            "section_order": -1
+                        })
             else:
-                component_type = key
-                component_index = None
+                logger.warning("No Variations found in Header response")
+        except Exception as e:
+            logger.error(f"Failed to process Header response: {str(e)}")
+
+        # 3. Generate content for each section separately
+        for section_idx, section in enumerate(project_structure):
+            section_key = section.get("key", f"section_{section_idx}")
+            section_name = section.get("name", f"Section {section_idx + 1}")
             
-            # Create component in database
-            component = Component(
-                project_id=project_id,
-                component_type=component_type,
-                component_index=component_index,
-                generated_content=value
+            # Use section-specific brief or fallback to project brief
+            section_brief = section.get("brief")
+            if not section_brief or not section_brief.strip():
+                section_brief = project.brief_text or "Create content"
+            
+            # Use section-specific content type or default to newsletter
+            section_content_type = section.get("content_type", "newsletter")
+            
+            # Get section-specific images
+            section_image_ids = section.get("image_ids", [])
+            section_images = [image_by_id[img_id] for img_id in section_image_ids if img_id in image_by_id]
+            
+            # Determine image URL for this section
+            # STRICT: Only use images explicitly assigned to this section to avoid context contamination
+            image_url = section_images[0].gcs_public_url if section_images else None
+            
+            # Prepare structure for this section (exclude images from text generation)
+            # Group components by type to get correct counts for prompt
+            allowed_types = []
+            comp_counts = {}
+            for comp_type in section.get("components", []):
+                if comp_type == "image":
+                    continue
+                allowed_types.append(comp_type)
+                comp_counts[comp_type] = comp_counts.get(comp_type, 0) + 1
+            
+            section_structure = []
+            for comp_type, count in comp_counts.items():
+                try:
+                    comp_enum = ComponentType(comp_type)
+                    section_structure.append(StructureComponent(component=comp_enum, count=count))
+                except ValueError:
+                    logger.warning(f"Invalid component type: {comp_type}")
+                    continue
+            
+            if not section_structure:
+                logger.info(f"No text components to generate for section {section_key}")
+                continue
+
+            # Build generation prompt for this section
+            ai_prompt = build_generation_prompt(
+                text=section_brief,
+                count=request.count,
+                tone=project.tone or "professional",
+                content_type=section_content_type,
+                structure=section_structure,
+                context=f"Section: {section_name}" if section_name else None
             )
-            db.add(component)
-            components.append(component)
+            
+            logger.info(f"--- GENERATING SECTION: {section_name} (key: {section_key}) ---")
+            
+            # Generate content for this section
+            response_text = await ai_client.generate_with_fixing(
+                prompt=ai_prompt,
+                expected_variations=request.count,
+                temperature=0.7,
+                max_tokens=2048,
+                image_url=image_url
+            )
+            
+            try:
+                section_data = json.loads(response_text)
+                variations = section_data.get("variations", [])
+                
+                if variations:
+                    # Take the first variation
+                    generated_content = variations[0]
+                    logger.info(f"Section '{section_key}' AI keys received: {list(generated_content.keys())}")
+                    
+                    section_type_counters = {}
+                    # Sort keys to ensure deterministic processing (important for index assignment)
+                    sorted_keys = sorted(generated_content.keys())
+                    
+                    # Add each component to the list to be saved
+                    for key in sorted_keys:
+                        value = generated_content[key]
+                        
+                        # Handle base component type (e.g. "pre_header_1" -> "pre_header")
+                        # We use rsplit to only split at the last underscore if it's followed by a number
+                        base_type = None
+                        if "_" in key:
+                            parts = key.rsplit("_", 1)
+                            if parts[1].isdigit():
+                                base_type = parts[0]
+                            else:
+                                base_type = key
+                        else:
+                            base_type = key
+                        
+                        # STRICT FILTER: Only process components that were requested for this section
+                        if base_type not in allowed_types:
+                            continue
+                            
+                        # Increment local counter for this type in this section
+                        section_type_counters[base_type] = section_type_counters.get(base_type, 0) + 1
+                        current_index = section_type_counters[base_type]
+                        
+                        # Additional check: don't exceed requested count
+                        if current_index > comp_counts.get(base_type, 0):
+                            continue
+
+                        # Create component data
+                        all_generated_components.append({
+                            "component_type": base_type,
+                            "component_index": current_index,
+                            "generated_content": value,
+                            "section_key": section_key,
+                            "section_order": section_idx
+                        })
+                else:
+                    logger.warning(f"No variations returned for section {section_key}")
+            except Exception as e:
+                logger.error(f"Failed to parse section {section_key} response: {str(e)}")
         
-        db.commit()
+        # Save all generated components using the service (handles upsert/cleanup)
+        saved_components = ProjectService.save_generated_content(
+            db, project_id, user_id, None, all_generated_components
+        )
         
-        # Refresh to get IDs
-        for comp in components:
-            db.refresh(comp)
-        
-        logger.info(f"Generated and saved {len(components)} components for project {project_id}")
+        logger.info(f"Generated and saved {len(saved_components)} components across {len(project.structure)} sections for project {project_id}")
         
         return GenerateProjectContentResponse(
             project_id=project_id,
-            components=[ComponentResponse.from_orm(c) for c in components]
+            components=[ComponentResponse.from_orm(c) for c in saved_components]
         )
         
     except Exception as e:
@@ -161,7 +276,7 @@ async def translate_project_content(
     """
     
     # Get project
-    project = ProjectService.get_project(db, project_id, user_id)
+    project = ProjectService.get_project(db, project_id)
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

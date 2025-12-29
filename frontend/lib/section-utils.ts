@@ -58,13 +58,14 @@ export function normalizeTranslationsMap(input: any): Record<string, string> {
 export function normalizeComponentList(list: any[]): any[] {
   return (list || []).map((c: any) => {
     const translations = normalizeTranslationsMap(c.translations)
-    const { image, ...rest } = c
+    // Preserving the 'image' object if it exists for immediate UI preview
     return {
-      ...rest,
-      generated_content: rest.generated_content ?? "",
+      ...c,
+      generated_content: c.generated_content ?? "",
       translations,
-      section_key: rest.section_key || 'default',
-      section_order: rest.section_order ?? 0
+      section_key: c.section_key || 'default',
+      section_order: c.section_order ?? 0,
+      image: c.image || undefined
     }
   })
 }
@@ -77,41 +78,51 @@ export interface Section {
 }
 
 /**
- * Find a component for a specific section
+ * Find a component for a specific section with its index
  * Handles both section_key and section_order matching for backward compatibility
  */
 export function findComponentForSection(
   components: SectionComponent[],
   sectionKey: string,
   sectionOrder: number,
-  componentType: string
+  componentType: string,
+  componentIndex: number = 1
 ): SectionComponent | undefined {
-  // Prefer exact section_key match
-  const exactMatch = components.find(c =>
+  const idx = componentIndex <= 0 ? 1 : componentIndex
+
+  // 1. Try to find by section_key AND index
+  const byKey = components.find(c =>
     c.component_type === componentType &&
+    (c.component_index === idx || (c.component_index || 1) === idx) &&
     c.section_key === sectionKey
   )
+  if (byKey) return byKey
 
-  if (exactMatch) return exactMatch
-
-  // Fallback to section_order match (backward compatibility)
+  // 2. Try to find by section_order AND index (fallback)
   return components.find(c =>
     c.component_type === componentType &&
+    (c.component_index === idx || (c.component_index || 1) === idx) &&
     c.section_order === sectionOrder
   )
 }
 
 /**
- * Find all components for a specific section
+ * Ensure all sections have valid keys
  */
-export function findComponentsForSection(
-  components: SectionComponent[],
-  sectionKey: string,
-  sectionOrder: number
-): SectionComponent[] {
-  return components.filter(c =>
-    c.section_key === sectionKey || c.section_order === sectionOrder
-  )
+export function ensureSectionKeys(sections: Section[]): Section[] {
+  return sections.map((section, idx) => ({
+    ...section,
+    key: section.key || `section_${idx + 1}`,
+    name: section.name || `Section ${idx + 1}`,
+    components: Array.isArray(section.components) ? section.components : []
+  }))
+}
+
+/**
+ * Check if section is the main section (cannot be removed)
+ */
+export function isMainSection(section: Section): boolean {
+  return section.key === 'main' || section.name.toLowerCase() === 'main section'
 }
 
 /**
@@ -136,62 +147,3 @@ export function sectionHasImage(
   const imageComponent = findImageForSection(components, sectionKey, sectionOrder)
   return !!(imageComponent?.image_id || imageComponent?.image)
 }
-
-/**
- * Get sections that are missing images
- */
-export function getSectionsMissingImages(
-  sections: Section[],
-  components: SectionComponent[]
-): Section[] {
-  return sections.filter((section, idx) => {
-    // Skip header section (no image required)
-    if (section.key === 'header') return false
-
-    // Check if section has image component in structure
-    const hasImageInStructure = section.components.includes('image')
-    if (!hasImageInStructure) return false
-
-    // Check if image is actually uploaded
-    return !sectionHasImage(components, section.key, idx)
-  })
-}
-
-/**
- * Ensure all sections have valid keys
- */
-export function ensureSectionKeys(sections: Section[]): Section[] {
-  return sections.map((section, idx) => ({
-    ...section,
-    key: section.key || `section_${idx + 1}`,
-    name: section.name || `Section ${idx + 1}`,
-    components: Array.isArray(section.components) ? section.components : []
-  }))
-}
-
-/**
- * Create a new section with default components
- */
-export function createNewSection(index: number, name?: string): Section {
-  return {
-    key: `section_${index}`,
-    name: name || `Section ${index}`,
-    components: ['image', 'title', 'body', 'cta'],
-    brief: ''
-  }
-}
-
-/**
- * Check if section is the main section (cannot be removed)
- */
-export function isMainSection(section: Section): boolean {
-  return section.key === 'main' || section.name.toLowerCase() === 'main section'
-}
-
-/**
- * Check if section is the header section (special handling)
- */
-export function isHeaderSection(section: Section): boolean {
-  return section.key === 'header'
-}
-

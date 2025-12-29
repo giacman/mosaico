@@ -66,6 +66,12 @@ const LANGUAGES = [
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const { user } = useUser()
+  const [mounted, setMounted] = useState(false)
+
+  // Sync mounted state
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // SWR hook for project data - single source of truth
   const { project: serverProject, isLoading, error, refresh, mutate } = useProject(projectId)
@@ -89,8 +95,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   }, [serverProject, editedProject])
 
-  // Autosave Logic
-  const debouncedProject = useDebounce(editedProject, 1000)
+  // Autosave Logic - Reduced frequency to avoid glitches (30 seconds)
+  const debouncedProject = useDebounce(editedProject, 30000)
 
   // Trigger save when debounced project changes and we have unsaved changes
   useEffect(() => {
@@ -101,7 +107,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   }, [debouncedProject])
 
   // Loading state
-  if (isLoading || !editedProject) {
+  if (!mounted || isLoading || !editedProject) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -185,9 +191,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   }
 
-  const updateField = <K extends keyof Project>(field: K, value: any) => {
+  const updateField = <K extends keyof Project>(field: K, value: any, silent: boolean = false) => {
     setEditedProject((prev) => prev ? { ...prev, [field]: value } : prev)
-    setHasChanges(true)
+    if (!silent) {
+      setHasChanges(true)
+    }
   }
 
   const toggleLanguage = (langCode: string) => {
