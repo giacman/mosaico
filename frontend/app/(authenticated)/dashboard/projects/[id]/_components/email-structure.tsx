@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Loader2, CheckCircle2 } from "lucide-react"
+import { Sparkles, Loader2, CheckCircle2, Plus, X } from "lucide-react"
 import { type Project } from "@/actions/projects"
 import { RenderedComponent } from "../../../_components/rendered-component"
 import {
@@ -36,6 +36,23 @@ import { generateProjectContent } from "@/actions/projects"
 import { useNotifications } from "../../../_components/notifications-provider"
 import { normalizeComponentList, normalizeTranslationsMap, ensureSectionKeys } from "@/lib/section-utils"
 import { ImageUploadGuard } from "./image-upload-guard"
+import { useLabels } from "@/hooks/use-labels"
+import { createLabel, deleteLabel } from "@/actions/labels"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 const LANGUAGES = [
   { value: "it", label: "Italian", flag: "🇮🇹" },
@@ -70,6 +87,206 @@ interface EmailStructureProps {
   onImagesChange: (images: UploadedImage[]) => void
   userName: string
   isReadOnly?: boolean
+}
+
+// Color mapping for labels based on their color property
+const LABEL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  red: { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
+  blue: { bg: "bg-blue-500/20", text: "text-blue-700 dark:text-blue-300", border: "border-blue-500/30" },
+  green: { bg: "bg-green-500/20", text: "text-green-700 dark:text-green-300", border: "border-green-500/30" },
+  purple: { bg: "bg-purple-500/20", text: "text-purple-700 dark:text-purple-300", border: "border-purple-500/30" },
+  orange: { bg: "bg-orange-500/20", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/30" },
+  yellow: { bg: "bg-yellow-500/20", text: "text-yellow-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  pink: { bg: "bg-pink-500/20", text: "text-pink-700 dark:text-pink-300", border: "border-pink-500/30" },
+  cyan: { bg: "bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-500/30" },
+  gray: { bg: "bg-gray-500/20", text: "text-gray-700 dark:text-gray-300", border: "border-gray-500/30" },
+}
+
+function DynamicLabelsSection({ 
+  projectLabels, 
+  onToggleLabel, 
+  isReadOnly 
+}: { 
+  projectLabels: string[]
+  onToggleLabel: (label: string) => void
+  isReadOnly?: boolean
+}) {
+  const { labels, isLoading, refresh } = useLabels()
+  const [newLabelName, setNewLabelName] = useState("")
+  const [newLabelColor, setNewLabelColor] = useState("gray")
+  const [isCreating, setIsCreating] = useState(false)
+  const [popoverOpen, setPopoverOpen] = useState(false)
+  
+  // Delete label state
+  const [labelToDelete, setLabelToDelete] = useState<{ id: number; name: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleCreateLabel = async () => {
+    if (!newLabelName.trim()) return
+    
+    setIsCreating(true)
+    try {
+      const result = await createLabel({ 
+        name: newLabelName.trim().toLowerCase(),
+        color: newLabelColor
+      })
+      
+      if (result.success) {
+        toast.success(`Label "${newLabelName}" created`)
+        setNewLabelName("")
+        setNewLabelColor("gray")
+        setPopoverOpen(false)
+        refresh()
+      } else {
+        toast.error(result.error || "Failed to create label")
+      }
+    } catch (error) {
+      toast.error("Failed to create label")
+    } finally {
+      setIsCreating(false)
+    }
+  }
+  
+  const handleDeleteLabel = async () => {
+    if (!labelToDelete) return
+    
+    setIsDeleting(true)
+    try {
+      const result = await deleteLabel(labelToDelete.id)
+      
+      if (result.success) {
+        toast.success(`Label "${labelToDelete.name}" deleted`)
+        refresh()
+      } else {
+        toast.error(result.error || "Failed to delete label")
+      }
+    } catch (error) {
+      toast.error("Failed to delete label")
+    } finally {
+      setIsDeleting(false)
+      setLabelToDelete(null)
+    }
+  }
+
+  return (
+    <>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Project Labels</Label>
+        {!isReadOnly && (
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                <Plus className="h-3 w-3 mr-1" />
+                New Label
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="end">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Label Name</Label>
+                  <Input
+                    placeholder="e.g., spring 2026"
+                    value={newLabelName}
+                    onChange={(e) => setNewLabelName(e.target.value)}
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateLabel()
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Color</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.keys(LABEL_COLORS).map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`w-6 h-6 rounded-full ${LABEL_COLORS[color].bg} ${
+                          newLabelColor === color ? "ring-2 ring-offset-1 ring-primary" : ""
+                        }`}
+                        onClick={() => setNewLabelColor(color)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="w-full h-7 text-xs"
+                  onClick={handleCreateLabel}
+                  disabled={isCreating || !newLabelName.trim()}
+                >
+                  {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create Label"}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {isLoading ? (
+          <span className="text-sm text-muted-foreground">Loading labels...</span>
+        ) : labels.length === 0 ? (
+          <span className="text-sm text-muted-foreground">No labels available. Create one!</span>
+        ) : (
+          labels.map((label) => {
+            const isSelected = projectLabels.includes(label.name)
+            const colors = LABEL_COLORS[label.color] || LABEL_COLORS.gray
+            return (
+              <div key={label.id} className="group relative inline-flex">
+                <Badge
+                  variant={isSelected ? "default" : "outline"}
+                  className={`cursor-pointer hover:opacity-80 transition-opacity pr-6 ${
+                    isSelected ? `${colors.bg} ${colors.text} ${colors.border} border` : ""
+                  } ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
+                  onClick={() => !isReadOnly && onToggleLabel(label.name)}
+                >
+                  {label.name}
+                </Badge>
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/20"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLabelToDelete({ id: label.id, name: label.name })
+                    }}
+                    title={`Delete "${label.name}" label`}
+                  >
+                    <X className="h-3 w-3 text-destructive" />
+                  </button>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+    
+    {/* Delete Label Confirmation */}
+    <AlertDialog open={!!labelToDelete} onOpenChange={(open) => !open && setLabelToDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Label</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete the label &quot;{labelToDelete?.name}&quot;? 
+            This will remove it from all projects. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteLabel}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? "Deleting..." : "Delete Label"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
+  )
 }
 
 export function EmailStructure({
@@ -420,35 +637,11 @@ export function EmailStructure({
           </div>
 
           {/* Project Labels */}
-          <div className="space-y-2">
-            <Label>Project Labels</Label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                "promo",
-                "category",
-                "design",
-                "october 2025",
-                "november 2025",
-                "december 2025"
-              ].map((label) => {
-                const isSelected = project.labels?.includes(label) || false
-                const colors = getLabelColor(label)
-                return (
-                  <Badge
-                    key={label}
-                    variant={isSelected ? "default" : "outline"}
-                    className={`cursor-pointer hover:opacity-80 transition-opacity ${isSelected
-                      ? `${colors.bg} ${colors.text} ${colors.border} border`
-                      : ""
-                      }`}
-                    onClick={() => toggleLabel(label)}
-                  >
-                    {label}
-                  </Badge>
-                )
-              })}
-            </div>
-          </div>
+          <DynamicLabelsSection 
+            projectLabels={project.labels || []}
+            onToggleLabel={toggleLabel}
+            isReadOnly={isReadOnly}
+          />
         </CardContent>
       </Card>
 

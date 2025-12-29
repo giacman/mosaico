@@ -5,10 +5,18 @@ import { Project } from "@/actions/projects"
 import { ProjectCard } from "./project-card"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { FolderKanban } from "lucide-react"
+import { useLabels } from "@/hooks/use-labels"
 
 export function ProjectsGrid({ projects }: { projects: Project[] }) {
   const params = useSearchParams()
   const status = (params.get("status") || "in_progress") as "in_progress" | "approved" | "all"
+  const { labels } = useLabels()
+  
+  // Create a map of label name -> color for quick lookup
+  const labelColorMap = labels.reduce((acc, label) => {
+    acc[label.name] = label.color
+    return acc
+  }, {} as Record<string, string>)
 
   const filtered = projects.filter(p => {
     if (status === "all") return true
@@ -35,7 +43,11 @@ export function ProjectsGrid({ projects }: { projects: Project[] }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {filtered.map(project => (
-        <ProjectCard key={`${project.id}-${project.updated_at}`} project={project} />
+        <ProjectCard 
+          key={`${project.id}-${project.updated_at}`} 
+          project={project} 
+          labelColorMap={labelColorMap}
+        />
       ))}
     </div>
   )

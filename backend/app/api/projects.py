@@ -18,7 +18,7 @@ from app.models.project_schemas import (
     SaveGeneratedContentRequest
 )
 from app.services.project_service import ProjectService
-from app.utils.notifications import notify_project_created
+from app.utils.notifications import notify_project_created, notify_content_ready_for_approval
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +123,14 @@ async def update_project(
             detail="Project not found"
         )
     
-    # NOTE: Project update notifications removed to reduce noise
-    # Only significant events (create, generate, translate, approve) trigger notifications
+    # Send Slack notification when project is approved
+    if project_data.status and str(project_data.status.value if hasattr(project_data.status, 'value') else project_data.status) == "approved":
+        asyncio.create_task(
+            notify_content_ready_for_approval(
+                project_name=project.name,
+                user_email=getattr(user, 'email', None) or user.name
+            )
+        )
     
     return project
 
@@ -175,6 +181,23 @@ async def delete_project(
         )
     
     return None
+
+
+@router.get("/activity", response_model=List[dict])
+async def get_global_activity(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get global activity log across all projects
+    Shows actions by all users for team transparency and audit purposes.
+    Supports pagination via limit/offset for loading full history.
+    """
+    logs = ProjectService.get_global_activity_log(db, limit, offset)
+    return logs
 
 
 @router.get("/projects/{project_id}/activity", response_model=List[ActivityLogResponse])

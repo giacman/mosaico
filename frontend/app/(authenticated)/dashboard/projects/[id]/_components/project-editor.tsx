@@ -288,7 +288,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       {/* Main Content */}
       <div className="space-y-6">
-        {/* This is where the new, single-column layout will go. */}
         <EmailStructure
           project={project}
           onProjectChange={updateField}

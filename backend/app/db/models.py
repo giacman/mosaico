@@ -128,3 +128,20 @@ class ActivityLog(Base):
     # Relationships
     project = relationship("Project", back_populates="activity_logs")
 
+
+class Label(Base):
+    """
+    Dynamic labels for categorizing projects
+    Labels are shared across all projects (organizational taxonomy)
+    """
+    __tablename__ = "labels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)  # e.g., "promo", "Q1 2025"
+    color = Column(String(50), default="gray")  # e.g., "blue", "green", "purple"
+    description = Column(String(255))  # Optional description
+    created_by_user_id = Column(String(255))
+    created_by_user_name = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+

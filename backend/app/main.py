@@ -22,6 +22,7 @@ from app.api import upload
 from app.api import project_generation
 from app.api import export
 from app.api import optimize_prompt
+from app.api import labels
 # from app.api import generate_from_image
 
 # Configure logging
@@ -111,6 +112,7 @@ app.include_router(projects.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(upload.router, prefix="/api/v1", tags=["Upload"])
 app.include_router(project_generation.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(export.router, prefix="/api/v1", tags=["Export"])
+app.include_router(labels.router, prefix="/api/v1", tags=["Labels"])
 # app.include_router(generate_from_image.router, prefix="/api/v1", tags=["Generate"])
 
 
