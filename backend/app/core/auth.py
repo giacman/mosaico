@@ -104,11 +104,24 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # The name is not directly available in the session token by default.
-        # We will use the user_id as a placeholder for the name.
-        # A more advanced implementation might fetch user details from Clerk's User API
-        # using the user_id, but for now, this will suffice.
-        user_name = f"User {user_id}"
+        # Fetch user details from Clerk to get email/name
+        user_name = None
+        try:
+            user_details = clerk_client.users.get(user_id=user_id)
+            if user_details:
+                # Prefer email, fallback to first_name + last_name, then username
+                if user_details.email_addresses and len(user_details.email_addresses) > 0:
+                    user_name = user_details.email_addresses[0].email_address
+                elif user_details.first_name:
+                    user_name = f"{user_details.first_name} {user_details.last_name or ''}".strip()
+                elif user_details.username:
+                    user_name = user_details.username
+        except Exception as e:
+            logger.warning(f"Could not fetch user details from Clerk: {e}")
+        
+        # Fallback if we couldn't get name
+        if not user_name:
+            user_name = f"User {user_id[:8]}..."
         
         return User(id=user_id, name=user_name)
         
