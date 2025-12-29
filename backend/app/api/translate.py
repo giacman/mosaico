@@ -19,6 +19,8 @@ from app.utils.notifications import notify_translation_completed
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
+# Limit concurrent Vertex AI requests to avoid rate limits
+translate_semaphore = asyncio.Semaphore(10)
 
 
 class ValidationResult(BaseModel):
@@ -126,15 +128,21 @@ Make sure your new translation fixes these specific issues while maintaining qua
         prompt = base_prompt
     
     # Use gemini-2.5-pro for higher quality transcreation
+    # Increase max_tokens to handle longer body text translations
     response_text = await ai_client.generate_content(
         prompt=prompt,
         temperature=0.5,  # Higher for more creative, natural transcreation
+        max_tokens=4096,  # Increased from default 2048 for longer translations
         response_mime_type="application/json",
         use_flash=False  # Use Pro model for better transcreation quality
     )
     
-    response_data = json.loads(response_text)
-    return response_data.get("translated_text", text)
+    try:
+        response_data = json.loads(response_text)
+        return response_data.get("translated_text", text)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode failed in translate_with_retry: {str(e)} | Response: {response_text}")
+        raise  # Re-raise to be handled by caller
 
 
 async def translate_text_content(
@@ -412,13 +420,17 @@ Before translating, ask yourself:
 "{text}"
 
 === OUTPUT REQUIREMENTS ===
-Return ONLY valid JSON (no markdown, no explanations):
+Return ONLY valid JSON. 
+IMPORTANT: Ensure all special characters like newlines (\\n) and double quotes (\\") within the translated text are properly escaped.
+The output MUST be a single JSON object with NO markdown formatting and NO explanations.
+
+Structure:
 {{
   "translated_text": "your transcreated text here",
   "detected_source_language": "ISO language code"
 }}
 
-Think step-by-step: understand intent → find natural expression → verify it sounds native."""
+Think step-by-step: understand intent → find natural expression → verify it sounds native. Return JSON object."""
     
     return prompt
 
@@ -496,25 +508,26 @@ async def translate_single_with_retry(
         Translated text
     """
     try:
-        # Use the new translate_text_content with validation
-        translation = await translate_text_content(
-            text=text,
-            target_language=target_language,
-            source_language="auto",
-            ai_client=vertex_client,
-            use_validation=use_validation,
-            max_retries=1 if use_validation else 0  # Validation has its own retry logic
-        )
-        return translation
+        async with translate_semaphore:
+            # Use the new translate_text_content with validation
+            translation = await translate_text_content(
+                text=text,
+                target_language=target_language,
+                source_language="auto",
+                ai_client=vertex_client,
+                use_validation=use_validation,
+                max_retries=1 if use_validation else 0  # Validation has its own retry logic
+            )
+            return translation
     
     except json.JSONDecodeError as e:
-        # Fallback for JSON parsing errors
+        # Strict failure: do not return original text
         logger.error(f"JSON decode failed for {target_language}: {str(e)}")
-        return f"[Translation failed: {text[:50]}...]"
+        return f"__TRANSLATION_FAILED__:{text[:50]}"
     
     except Exception as e:
         logger.error(f"Error translating to {target_language}: {str(e)}")
-        return f"[Translation error: {text[:50]}...]"
+        return f"__TRANSLATION_FAILED__:{str(e)[:50]}"
 
 
 @router.post("/translate/batch", response_model=BatchTranslateResponse)
@@ -550,11 +563,15 @@ async def batch_translate(
         # Execute all translations in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
+        # Create a lookup for original texts
+        text_lookup = {item.key: item.content for item in req.texts}
+        
         # Map results back to structure
         for (key, lang), result in zip(task_metadata, results):
             if isinstance(result, Exception):
                 logger.error(f"Exception translating {key} to {lang}: {str(result)}")
-                translations[key][lang] = f"[Error: {str(result)[:50]}]"
+                # Strict failure: return marker
+                translations[key][lang] = f"__TRANSLATION_FAILED__:{str(result)[:50]}"
             else:
                 translations[key][lang] = result
         

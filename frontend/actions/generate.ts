@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export type GenerateParams = {
   project_id: number,

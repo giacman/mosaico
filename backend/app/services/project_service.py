@@ -53,8 +53,17 @@ class ProjectService:
     ) -> Project:
         """Create a new project"""
         try:
-            # Convert structure to dict format for JSON storage
-            structure_dict = [item.model_dump() for item in project_data.structure]
+            # If structure is in old format, convert or use a default modern structure
+            # A modern project should have a main section with at least an image
+            if project_data.structure and len(project_data.structure) > 0 and "component" in project_data.structure[0]:
+                # Old format detection, we'll let the frontend convert it usually,
+                # but for new projects we want the modern format immediately.
+                structure_dict = [
+                    {"key": "main", "name": "Main Section", "components": ["image", "title", "body", "cta"]}
+                ]
+            else:
+                # Convert structure to dict format for JSON storage
+                structure_dict = [item.model_dump() for item in project_data.structure]
             
             # Handle status value (enum or string)
             status_val = getattr(project_data.status, "value", None) or getattr(project_data, "status", None) or "in_progress"
@@ -75,8 +84,9 @@ class ProjectService:
             db.flush()  # Get ID before logging
 
             # Create default Subject and Pre-header components
-            subject_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="subject", component_index=0)
-            preheader_comp = Component(project_id=project.id, section_key="header", section_order=0, component_type="pre_header", component_index=1)
+            # Using index 1 for both as they are the primary components of the 'header' section
+            subject_comp = Component(project_id=project.id, section_key="header", section_order=-1, component_type="subject", component_index=1)
+            preheader_comp = Component(project_id=project.id, section_key="header", section_order=-1, component_type="pre_header", component_index=1)
             db.add_all([subject_comp, preheader_comp])
             
             # Log creation
@@ -416,61 +426,96 @@ class ProjectService:
         components_data: List[dict]
     ) -> List[Component]:
         """
-        Save or update generated components in batch
-        This replaces all existing components for the project
+        Save or update generated components in batch.
+        - Text components: CLEAN SLATE (delete old, add new) to prevent index mismatches.
+        - Image components: UPSERT based on section to preserve uploads.
         """
         # Verify project exists
         project = ProjectService.get_project(db, project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # Delete existing components (cascade will delete translations)
-        db.query(Component).filter(Component.project_id == project_id).delete()
-        db.flush()
+        # 1. Identify text vs image components in the payload
+        new_text_comps = [c for c in components_data if c.get("component_type") != "image"]
+        new_image_comps = [c for c in components_data if c.get("component_type") == "image"]
+
+        # 2. Handle Text Components (Clean Slate)
+        if new_text_comps:
+            db.query(Component).filter(
+                Component.project_id == project_id,
+                Component.component_type != "image"
+            ).delete()
+            db.flush()
         
-        saved_components = []
-        
+        # 3. Process the payload
         for comp_data in components_data:
-            # Create component
-            component = Component(
-                project_id=project_id,
-                component_type=comp_data["component_type"],
-                component_index=comp_data.get("component_index"),
-                generated_content=comp_data["generated_content"],
-                component_url=comp_data.get("component_url"),
-                image_id=comp_data.get("image_id")
-            )
+            comp_type = comp_data["component_type"]
+            comp_idx = comp_data.get("component_index") or 1
+            sec_key = comp_data.get("section_key", "default")
+            sec_order = comp_data.get("section_order", 0)
             
-            db.add(component)
-            db.flush()  # Get component ID
-            
-            # Add translations if provided
-            translations_dict = comp_data.get("translations", {})
-            for lang_code, translated_text in translations_dict.items():
-                translation = Translation(
-                    component_id=component.id,
-                    language_code=lang_code,
-                    translated_content=translated_text
+            if comp_type == "image":
+                # UPSERT for images: find existing image in this section
+                existing_image = db.query(Component).filter(
+                    Component.project_id == project_id,
+                    Component.component_type == "image",
+                    Component.section_key == sec_key
+                ).first()
+                
+                if existing_image:
+                    existing_image.image_id = comp_data.get("image_id")
+                    existing_image.section_order = sec_order
+                    # Preserve generated_content if it's an image URL from AI
+                    if comp_data.get("generated_content"):
+                        existing_image.generated_content = comp_data["generated_content"]
+                else:
+                    # Create new image component
+                    new_img = Component(
+                        project_id=project_id,
+                        component_type="image",
+                        component_index=comp_idx,
+                        image_id=comp_data.get("image_id"),
+                        section_key=sec_key,
+                        section_order=sec_order,
+                        generated_content=comp_data.get("generated_content", "")
+                    )
+                    db.add(new_img)
+            else:
+                # CREATE for text (slate was already cleaned above)
+                component = Component(
+                    project_id=project_id,
+                    component_type=comp_type,
+                    component_index=comp_idx,
+                    generated_content=comp_data["generated_content"],
+                    component_url=comp_data.get("component_url"),
+                    section_key=sec_key,
+                    section_order=sec_order
                 )
-                db.add(translation)
-            
-            saved_components.append(component)
+                db.add(component)
+                db.flush() # Get ID for translations
+                
+                # Add translations if provided
+                translations_dict = comp_data.get("translations", {})
+                for lang_code, translated_text in translations_dict.items():
+                    translation = Translation(
+                        component_id=component.id,
+                        language_code=lang_code,
+                        translated_content=translated_text
+                    )
+                    db.add(translation)
         
-        # Log activity
-        ProjectService._log_activity(
-            db, project_id, user_id, user_name,
-            "saved_generated_content",
-            None, None, f"{len(saved_components)} components"
-        )
-        
+        # 4. Finalize
         db.commit()
         
-        # Refresh all components to get relationships
-        for component in saved_components:
-            db.refresh(component)
+        # Return EVERYTHING
+        all_project_components = db.query(Component).filter(
+            Component.project_id == project_id
+        ).all()
         
-        logger.info(f"Saved {len(saved_components)} components for project {project_id}")
-        return saved_components
+        for comp in all_project_components:
+            db.refresh(comp)
+            
+        return all_project_components
     
     @staticmethod
     def get_activity_log(db: Session, project_id: int, limit: int = 50) -> List[ActivityLog]:

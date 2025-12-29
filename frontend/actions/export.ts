@@ -2,7 +2,7 @@
 
 import { getAuthToken } from "@/actions/generate"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export type HandlebarsGenerateParams = {
   project_id: number

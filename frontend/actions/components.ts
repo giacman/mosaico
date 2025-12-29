@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export interface SavedComponent {
   component_type: string
@@ -11,6 +11,8 @@ export interface SavedComponent {
   generated_content: string
   component_url?: string
   image_id?: number
+  section_key?: string
+  section_order?: number
   translations: Record<string, string> // language_code -> translated_content
 }
 

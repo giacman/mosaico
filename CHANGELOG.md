@@ -2,6 +2,30 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [0.9.4] - 2025-12-29
+
+### Added
+- **Multi-section briefs**: Each section can now have its own brief for more targeted content generation
+- **Section-aware content generation**: AI generates content specific to each section's brief and context
+- **Dark mode**: Full dark mode support across the application
+- **Autosave**: Automatic saving of project changes
+- **Image upload guard**: Alert prompts user to upload images before generation
+- **Copy button feedback**: Toast notifications when copying component content
+
+### Fixed
+- **Subject/Pre-header not saving**: Fixed header generation loop that prevented Subject and Pre-header from being saved correctly
+- **Translation truncation**: Increased max_tokens from 2048 to 4096 to prevent long translations from being cut off
+- **CTA cross-contamination**: Added section_key to translation keys to prevent CTAs from different sections overwriting each other
+- **"Regenerate" button label**: Now shows "Generate" when no content exists, "Regenerate" only after content is generated
+- **Missing image alert false positive**: Fixed image check logic to use `image_id` on Component instead of non-existent `section_key` on Image
+
+### Changed
+- **Removed translations from Approved state**: Translations no longer required for project approval
+- **Component persistence**: Clean slate approach for text components (delete+create), UPSERT for image components (preserve uploads)
+- **Consistent indexing**: Standardized component_index=1 for all component types within sections
+- **UI improvements**: Various interface refinements
+
+
 ## [0.9.3] - 2025-12-09
 
 ### Added

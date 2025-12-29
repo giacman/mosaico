@@ -167,6 +167,7 @@ INSTRUCTION:
 {few_shot_section}
 
 GUIDELINES:
+- IMPORTANT: You MUST always respond in ENGLISH. Even if the INSTRUCTION is in another language (e.g., Italian), your output MUST be in English.
 - Generate creative and relevant text that aligns with the instruction for each component.
 - For any component with a count greater than one (e.g., 2 CTAs), you MUST generate unique keys for each instance (e.g., "cta_1", "cta_2").
 - Each instance MUST be completely DIFFERENT from the others - use different words, phrasing, and creative angles.
