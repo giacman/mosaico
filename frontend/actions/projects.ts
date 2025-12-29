@@ -12,6 +12,22 @@ export interface Translation {
   created_at: string
 }
 
+export interface ActivityLog {
+  id: number
+  project_id: number
+  user_id: string
+  user_name: string | null
+  action: string
+  field_changed: string | null
+  old_value: string | null
+  new_value: string | null
+  created_at: string
+}
+
+export interface GlobalActivityLog extends ActivityLog {
+  project_name: string
+}
+
 export interface Component {
   id: number
   project_id: number
@@ -384,3 +400,77 @@ export async function generateProjectContent(
   }
 }
 
+/**
+ * Get activity log for a project
+ */
+export async function getActivityLog(
+  projectId: number,
+  limit: number = 50
+): Promise<{ success: boolean; data?: ActivityLog[]; error?: string }> {
+  try {
+    const token = await getAuthToken()
+
+    const response = await fetch(
+      `${API_URL}/api/v1/projects/${projectId}/activity?limit=${limit}`,
+      {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        cache: "no-store"
+      }
+    )
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `Failed to fetch activity log: ${response.statusText}`
+      }
+    }
+
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting activity log:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get activity log"
+    }
+  }
+}
+
+/**
+ * Get global activity log across all projects
+ */
+export async function getGlobalActivityLog(
+  limit: number = 50
+): Promise<{ success: boolean; data?: GlobalActivityLog[]; error?: string }> {
+  try {
+    const token = await getAuthToken()
+
+    const response = await fetch(
+      `${API_URL}/api/v1/activity?limit=${limit}`,
+      {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        cache: "no-store"
+      }
+    )
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `Failed to fetch global activity: ${response.statusText}`
+      }
+    }
+
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting global activity:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get global activity"
+    }
+  }
+}

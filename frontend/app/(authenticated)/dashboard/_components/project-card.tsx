@@ -33,8 +33,20 @@ import { Copy, MoreVertical, Trash2, ImageIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { getLabelColor } from "./create-project-dialog"
 import Image from "next/image"
+
+// Color palette for labels based on their color property
+const LABEL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  red: { bg: "bg-red-100 dark:bg-red-950", text: "text-red-700 dark:text-red-300", border: "border-red-200 dark:border-red-800" },
+  blue: { bg: "bg-blue-100 dark:bg-blue-950", text: "text-blue-700 dark:text-blue-300", border: "border-blue-200 dark:border-blue-800" },
+  green: { bg: "bg-green-100 dark:bg-green-950", text: "text-green-700 dark:text-green-300", border: "border-green-200 dark:border-green-800" },
+  purple: { bg: "bg-purple-100 dark:bg-purple-950", text: "text-purple-700 dark:text-purple-300", border: "border-purple-200 dark:border-purple-800" },
+  orange: { bg: "bg-orange-100 dark:bg-orange-950", text: "text-orange-700 dark:text-orange-300", border: "border-orange-200 dark:border-orange-800" },
+  yellow: { bg: "bg-amber-100 dark:bg-amber-950", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200 dark:border-amber-800" },
+  pink: { bg: "bg-pink-100 dark:bg-pink-950", text: "text-pink-700 dark:text-pink-300", border: "border-pink-200 dark:border-pink-800" },
+  cyan: { bg: "bg-cyan-100 dark:bg-cyan-950", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-200 dark:border-cyan-800" },
+  gray: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300", border: "border-gray-200 dark:border-gray-700" },
+}
 
 const LANGUAGE_FLAGS: Record<string, string> = {
   it: "🇮🇹",
@@ -49,7 +61,12 @@ const LANGUAGE_FLAGS: Record<string, string> = {
   nl: "🇳🇱"
 }
 
-export function ProjectCard({ project }: { project: Project }) {
+interface ProjectCardProps {
+  project: Project
+  labelColorMap?: Record<string, string>
+}
+
+export function ProjectCard({ project, labelColorMap = {} }: ProjectCardProps) {
   const router = useRouter()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -133,7 +150,8 @@ export function ProjectCard({ project }: { project: Project }) {
               {project.labels && project.labels.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {project.labels.map((label) => {
-                    const colors = getLabelColor(label)
+                    const colorName = labelColorMap[label] || "gray"
+                    const colors = LABEL_COLORS[colorName] || LABEL_COLORS.gray
                     return (
                       <Badge 
                         key={label} 

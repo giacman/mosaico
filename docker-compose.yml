@@ -32,6 +32,7 @@ services:
       - "8000:8080" # Map container port 8080 to host port 8000
     volumes:
       - ./backend/app:/app/app # Mount local code for hot-reloading
+      - ./backend/migrations:/app/migrations # Mount migrations for development
       # Mount the GCP credentials file from the host into the container
       - ~/.config/gcloud/application_default_credentials.json:/app/gcp-credentials.json:ro
     depends_on:

@@ -253,10 +253,17 @@ class ProjectService:
         
         # Log each changed field
         for field, old_val, new_val in changes:
-            ProjectService._log_activity(
-                db, project_id, user_id, user_name,
-                f"updated_{field}", field, old_val, new_val
-            )
+            # Special case: log "approved_project" when status changes to approved
+            if field == "status" and new_val == "approved":
+                ProjectService._log_activity(
+                    db, project_id, user_id, user_name,
+                    "approved_project", field, old_val, new_val
+                )
+            else:
+                ProjectService._log_activity(
+                    db, project_id, user_id, user_name,
+                    f"updated_{field}", field, old_val, new_val
+                )
         
         db.commit()
         db.refresh(project)
@@ -504,7 +511,16 @@ class ProjectService:
                     )
                     db.add(translation)
         
-        # 4. Finalize
+        # 4. Log activity for content generation
+        component_count = len(new_text_comps)
+        if component_count > 0:
+            ProjectService._log_activity(
+                db, project_id, user_id, user_name,
+                "generated_content", None,
+                None, f"{component_count} components"
+            )
+        
+        # 5. Finalize
         db.commit()
         
         # Return EVERYTHING
@@ -527,3 +543,29 @@ class ProjectService:
         ).limit(limit).all()
         
         return logs
+    
+    @staticmethod
+    def get_global_activity_log(db: Session, limit: int = 50, offset: int = 0) -> List[dict]:
+        """Get activity across all projects with project names for audit purposes"""
+        logs = db.query(ActivityLog, Project.name).join(
+            Project, ActivityLog.project_id == Project.id
+        ).order_by(
+            ActivityLog.created_at.desc()
+        ).offset(offset).limit(limit).all()
+        
+        # Return logs with project name included
+        return [
+            {
+                "id": log.id,
+                "project_id": log.project_id,
+                "project_name": project_name,
+                "user_id": log.user_id,
+                "user_name": log.user_name,
+                "action": log.action,
+                "field_changed": log.field_changed,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "created_at": log.created_at
+            }
+            for log, project_name in logs
+        ]

@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from google.cloud import storage
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, User
 from app.core.config import settings
 from app.db.session import get_db
-from app.db.models import Image, Project
+from app.db.models import Image, Project, ActivityLog
 from app.models.project_schemas import ImageResponse
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 async def upload_image(
     file: UploadFile = File(...),
     project_id: int = Form(...),
-    user_id: str = Depends(get_current_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -115,13 +115,26 @@ async def upload_image(
     try:
         image = Image(
             project_id=project_id,
-            user_id=user_id,
+            user_id=user.id,
             filename=file.filename,
             gcs_path=f"gs://{settings.gcs_bucket_images}/{gcs_path}",
             gcs_public_url=public_url
         )
         
         db.add(image)
+        
+        # Log activity
+        log_entry = ActivityLog(
+            project_id=project_id,
+            user_id=user.id,
+            user_name=user.name,
+            action="uploaded_image",
+            field_changed=None,
+            old_value=None,
+            new_value=file.filename
+        )
+        db.add(log_entry)
+        
         db.commit()
         db.refresh(image)
         
@@ -145,7 +158,7 @@ async def upload_image(
 @router.get("/images/{image_id}", response_model=ImageResponse)
 async def get_image(
     image_id: int,
-    user_id: str = Depends(get_current_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -153,7 +166,7 @@ async def get_image(
     """
     image = db.query(Image).filter(
         Image.id == image_id,
-        Image.user_id == user_id
+        Image.user_id == user.id
     ).first()
     
     if not image:
@@ -168,7 +181,7 @@ async def get_image(
 @router.delete("/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_image(
     image_id: int,
-    user_id: str = Depends(get_current_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -176,7 +189,7 @@ async def delete_image(
     """
     image = db.query(Image).filter(
         Image.id == image_id,
-        Image.user_id == user_id
+        Image.user_id == user.id
     ).first()
     
     if not image:
