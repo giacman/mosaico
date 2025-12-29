@@ -2,6 +2,30 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [0.9.5] - 2025-12-29
+
+### Added
+- **Test infrastructure**: Jest unit tests (22 tests for section-utils) and Playwright E2E tests (9 tests for multi-section)
+- **Pre-commit hooks**: Husky-based hooks run unit tests before each commit
+- **Environment-based Slack channels**: Separate webhook URLs for dev vs production notifications
+- **Content ready for approval notification**: New Slack notification type for approval-ready content
+
+### Fixed
+- **AI inventing products**: Added strict rules to prevent AI from fabricating product names like "[Oversized Distressed Knitwear]"
+- **Placeholder brackets**: AI now writes complete, polished text without [brackets] or [placeholder] markers
+- **Image URL normalization**: Centralized `normalizeImage()` utility for consistent URL handling
+
+### Changed
+- **Removed "Project Updated" notifications**: Reduced Slack noise by only sending notifications for significant events (create, generate, translate, approve)
+- **Prompt optimization**: Updated prompt optimizer to explicitly forbid placeholders and invented details
+- **Code cleanup**: Removed unused utility functions and simplified component lookup logic
+
+### Technical Improvements
+- `normalizeImage()` function in `section-utils.ts` centralizes image URL normalization
+- Simplified `findComponentForSection()` with single-pass lookup
+- Jest configuration with jsdom environment and CSS module mocking
+- Playwright configuration for cross-browser E2E testing
+
 ## [0.9.4] - 2025-12-29
 
 ### Added

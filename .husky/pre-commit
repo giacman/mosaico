@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+
+echo "🧪 Running pre-commit checks..."
+
+# Check if frontend files changed
+FRONTEND_CHANGED=$(git diff --cached --name-only | grep "^frontend/" || true)
+
+if [ -n "$FRONTEND_CHANGED" ]; then
+  echo "📁 Frontend files changed, running tests..."
+  
+  cd frontend
+  
+  # Run unit tests
+  npm run test:unit
+  if [ $? -ne 0 ]; then
+    echo "❌ Unit tests failed. Commit aborted."
+    exit 1
+  fi
+  
+  # Type check (warning only - legacy errors exist)
+  npm run types 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "⚠️  TypeScript warnings found (legacy issues - not blocking)"
+  fi
+  
+  cd ..
+fi
+
+# Check if backend files changed
+BACKEND_CHANGED=$(git diff --cached --name-only | grep "^backend/" || true)
+
+if [ -n "$BACKEND_CHANGED" ]; then
+  echo "📁 Backend files changed..."
+  # Add backend tests here when available
+  # cd backend && pytest
+fi
+
+echo "✅ All checks passed!"

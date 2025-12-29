@@ -166,7 +166,28 @@ INSTRUCTION:
 
 {few_shot_section}
 
-GUIDELINES:
+=== CRITICAL CONTENT RULES ===
+⛔ ABSOLUTELY FORBIDDEN:
+1. DO NOT invent, fabricate, or mention specific product names (e.g., "Oversized Distressed Knitwear", "1996 Straight-Fit Jeans")
+2. DO NOT use ANY placeholders with brackets like [Product Name], [Brand], [Insert here], etc.
+3. DO NOT make up prices, discounts, or dates unless explicitly provided in the instruction
+4. DO NOT reference specific collections, capsules, or collaborations unless mentioned in the instruction
+
+✅ WHAT TO DO INSTEAD:
+- Use general, evocative language: "new arrivals", "this season's pieces", "the collection", "our latest designs"
+- Focus on emotions, experiences, and brand values rather than specific items
+- Describe qualities: "luxurious materials", "timeless elegance", "impeccable craftsmanship"
+- Write complete, polished text ready for immediate publication
+
+EXAMPLE OF FORBIDDEN OUTPUT:
+❌ "Discover the [Cashmere Blend Coat] and the [Heritage Loafers]..."
+❌ "This season's arrivals feature the Oversized Cable Knit Sweater..."
+
+EXAMPLE OF CORRECT OUTPUT:
+✅ "Discover our latest arrivals, designed with timeless elegance in mind..."
+✅ "This season's collection embodies refined craftsmanship and understated luxury..."
+
+=== OUTPUT GUIDELINES ===
 - IMPORTANT: You MUST always respond in ENGLISH. Even if the INSTRUCTION is in another language (e.g., Italian), your output MUST be in English.
 - Generate creative and relevant text that aligns with the instruction for each component.
 - For any component with a count greater than one (e.g., 2 CTAs), you MUST generate unique keys for each instance (e.g., "cta_1", "cta_2").

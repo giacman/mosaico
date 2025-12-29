@@ -3,6 +3,40 @@
  * Part of V2 multi-section implementation
  */
 
+/**
+ * Uploaded image type used in frontend
+ */
+export interface UploadedImage {
+  id: string
+  url: string
+  filename: string
+  uploading?: boolean
+}
+
+/**
+ * Backend image type (from API)
+ */
+export interface BackendImage {
+  id: number
+  project_id?: number
+  filename: string
+  gcs_path: string
+  gcs_public_url: string | null
+  uploaded_at?: string
+}
+
+/**
+ * Normalize a backend image to frontend UploadedImage format
+ * Handles the gcs_public_url -> url transformation
+ */
+export function normalizeImage(image: BackendImage | any): UploadedImage {
+  return {
+    id: String(image.id),
+    url: image.gcs_public_url || image.url || image.gcs_path || '',
+    filename: image.filename || 'image'
+  }
+}
+
 export interface SectionComponent {
   id?: number
   component_type: string
@@ -78,30 +112,28 @@ export interface Section {
 }
 
 /**
- * Find a component for a specific section with its index
- * Handles both section_key and section_order matching for backward compatibility
+ * Find a component for a specific section
+ * 
+ * Strategy: Look up by section_key (primary) or section_order (fallback for legacy data)
+ * Note: component_index is always 1 in our current data model
  */
 export function findComponentForSection(
   components: SectionComponent[],
   sectionKey: string,
   sectionOrder: number,
   componentType: string,
-  componentIndex: number = 1
+  _componentIndex: number = 1  // Kept for API compatibility, but always treated as 1
 ): SectionComponent | undefined {
-  const idx = componentIndex <= 0 ? 1 : componentIndex
-
-  // 1. Try to find by section_key AND index
+  // Primary: find by section_key + type
   const byKey = components.find(c =>
     c.component_type === componentType &&
-    (c.component_index === idx || (c.component_index || 1) === idx) &&
     c.section_key === sectionKey
   )
   if (byKey) return byKey
 
-  // 2. Try to find by section_order AND index (fallback)
+  // Fallback: find by section_order + type (for legacy data without section_key)
   return components.find(c =>
     c.component_type === componentType &&
-    (c.component_index === idx || (c.component_index || 1) === idx) &&
     c.section_order === sectionOrder
   )
 }

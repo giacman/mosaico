@@ -8,13 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { uploadImage } from "@/actions/upload"
 import imageCompression from "browser-image-compression"
-
-interface UploadedImage {
-  id: string
-  url: string
-  filename: string
-  uploading?: boolean
-}
+import { normalizeImage, type UploadedImage } from "@/lib/section-utils"
 
 interface ImageUploadManagerProps {
   projectId: number
@@ -99,12 +93,8 @@ export function ImageUploadManager({ projectId, value, onChange }: ImageUploadMa
           throw new Error(result.error || "Upload failed")
         }
 
-        // Use the public URL from GCS
-        const uploadedImage: UploadedImage = {
-          id: result.data.id.toString(),
-          url: result.data.gcs_public_url || result.data.gcs_path, // Use public URL
-          filename: result.data.filename
-        }
+        // Normalize the backend response to frontend format
+        const uploadedImage = normalizeImage(result.data)
 
         // Replace temp image with uploaded one using current state
         currentImages = currentImages.map((img) => (img.id === tempId ? uploadedImage : img))

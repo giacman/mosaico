@@ -18,7 +18,7 @@ from app.models.project_schemas import (
     SaveGeneratedContentRequest
 )
 from app.services.project_service import ProjectService
-from app.utils.notifications import notify_project_created, notify_project_updated
+from app.utils.notifications import notify_project_created
 
 logger = logging.getLogger(__name__)
 
@@ -123,13 +123,8 @@ async def update_project(
             detail="Project not found"
         )
     
-    # Send Slack notification (non-blocking)
-    asyncio.create_task(
-        notify_project_updated(
-            project_name=project.name,
-            user_email=getattr(user, 'email', None) or user.name
-        )
-    )
+    # NOTE: Project update notifications removed to reduce noise
+    # Only significant events (create, generate, translate, approve) trigger notifications
     
     return project
 
