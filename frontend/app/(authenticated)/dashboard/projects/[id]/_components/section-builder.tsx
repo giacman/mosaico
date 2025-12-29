@@ -31,19 +31,14 @@ import {
   findComponentForSection,
   findImageForSection,
   isMainSection,
+  normalizeImage,
   normalizeTranslationsMap,
   type Section,
   type SectionComponent,
+  type UploadedImage,
 } from "@/lib/section-utils"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { Button } from "@/components/ui/button"
-
-type UploadedImage = {
-  id: string
-  url: string
-  filename: string
-  uploading?: boolean
-}
 
 /**
  * Input component with local state to prevent focus loss on parent re-render
@@ -209,12 +204,7 @@ export function SectionBuilder({
         if (!image && comp?.image_id && projectImages) {
           const foundImage = projectImages.find(img => Number(img.id) === comp.image_id)
           if (foundImage) {
-            // Normalize: backend returns gcs_public_url, but frontend expects url
-            image = {
-              id: String(foundImage.id),
-              url: (foundImage as any).gcs_public_url || (foundImage as any).url,
-              filename: foundImage.filename
-            }
+            image = normalizeImage(foundImage)
           }
         }
 
@@ -358,11 +348,7 @@ export function SectionBuilder({
       const res = await uploadImage(projectId, compressed)
       if (!res.success || !res.data) throw new Error(res.error || "Upload failed")
 
-      const uploaded: UploadedImage = {
-        id: String(res.data.id),
-        url: res.data.gcs_public_url || res.data.gcs_path,
-        filename: res.data.filename,
-      }
+      const uploaded = normalizeImage(res.data)
 
       // Find section and component type
       const sectionIdx = value.findIndex(s => s.key === sectionKey)
@@ -502,23 +488,11 @@ export function SectionBuilder({
     })
   }
 
-  const renderPreview = (type: string, displayIndex: number, sectionKey?: string, sectionOrder?: number) => {
-    // Try to resolve generated or translated content for this component type/index/section
-    const idx = displayIndex <= 0 ? 1 : displayIndex
-
-    // Find component matching type, index, and optionally section
-    const found = components?.find((c) => {
-      const typeMatch = c.component_type === type
-      const indexMatch = (c.component_index || 1) === idx
-
-      // If section info provided, also match by section
-      if (sectionKey) {
-        const sectionMatch = c.section_key === sectionKey || c.section_order === sectionOrder
-        return typeMatch && indexMatch && sectionMatch
-      }
-
-      return typeMatch && indexMatch
-    })
+  const renderPreview = (type: string, _displayIndex: number, sectionKey?: string, sectionOrder?: number) => {
+    // Find component using simplified lookup (section_key primary, section_order fallback)
+    const found = sectionKey 
+      ? findComponentForSection(components || [], sectionKey, sectionOrder ?? 0, type)
+      : components?.find(c => c.component_type === type)
 
     const text = (() => {
       if (!found) return ""
@@ -658,8 +632,7 @@ export function SectionBuilder({
                 // Look specifically for components in the 'header' section
                 const found = components?.find(
                   (c) => c.component_type === type && 
-                         (c.component_index === 1 || (c.component_index || 1) === 1) &&
-                         ((c as any).section_key === "header" || (c as any).section_key === "default")
+                         (c.section_key === "header" || c.section_key === "default")
                 )
                 const currentText = (() => {
                   if (!found) return ""
@@ -710,7 +683,6 @@ export function SectionBuilder({
                                   // Check if this component had existing translations
                                   const existingComp = (components || []).find((c) => 
                                     c.component_type === type && 
-                                    (c.component_index === 1 || (c.component_index || 1) === 1) &&
                                     ((c as any).section_key === "header" || (c as any).section_key === "default")
                                   )
                                   const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
@@ -729,7 +701,6 @@ export function SectionBuilder({
 
                                         const merged = (components || []).map((c) => {
                                           if (c.component_type === type && 
-                                              (c.component_index === 1 || (c.component_index || 1) === 1) &&
                                               ((c as any).section_key === "header" || (c as any).section_key === "default")) {
                                             return { ...c, generated_content: val, translations: t, section_key: "header" }
                                           }
@@ -744,7 +715,6 @@ export function SectionBuilder({
                                     // No translations to regenerate, just update English content
                                     const merged = (components || []).map((c) => {
                                       if (c.component_type === type && 
-                                          (c.component_index === 1 || (c.component_index || 1) === 1) &&
                                           ((c as any).section_key === "header" || (c as any).section_key === "default")) {
                                         return { ...c, generated_content: val, section_key: "header" }
                                       }
