@@ -82,7 +82,9 @@ Transform this brief into an optimized prompt that will help an AI generate exce
 - Keep the user's core intent and key information
 - Add helpful details they might have missed
 - Make it clear and actionable for content generation
-- Don't invent product names or specific details - use placeholders if needed
+- NEVER invent product names, prices, or specific details not provided by the user
+- NEVER use placeholders like [Product Name] or [Brand] - write complete, polished text
+- Focus on brand values, emotions, and experiences instead of specific products
 - Focus on making the AI understand WHAT to create and HOW to write it
 - STAY UNDER {max_chars} CHARACTERS - this is critical for AI stability
 

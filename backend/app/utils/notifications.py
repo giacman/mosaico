@@ -1,6 +1,14 @@
 """
 Notification utilities for Mosaico
 Sends notifications to Slack for important events
+
+Supported notifications:
+- Project created
+- Content generated
+- Translations completed
+- Content ready for approval
+
+Note: "Project updated" notifications are intentionally NOT sent to reduce noise.
 """
 import httpx
 import logging
@@ -9,6 +17,16 @@ from typing import Optional
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def get_slack_webhook_url() -> str | None:
+    """
+    Get the appropriate Slack webhook URL based on environment.
+    Uses dev channel for development, production channel otherwise.
+    """
+    if settings.environment == "development" and settings.slack_webhook_url_dev:
+        return settings.slack_webhook_url_dev
+    return settings.slack_webhook_url
 
 
 async def send_slack_notification(
@@ -24,12 +42,14 @@ async def send_slack_notification(
         message: Main notification message
         project_name: Name of the project (if applicable)
         user_email: Email of the user who triggered the action
-        event_type: Type of event (info, success, error)
+        event_type: Type of event (info, success, error, project, generation, translation, approval)
     
     Returns:
         True if notification was sent successfully, False otherwise
     """
-    if not settings.slack_webhook_url:
+    webhook_url = get_slack_webhook_url()
+    
+    if not webhook_url:
         logger.debug("Slack webhook URL not configured, skipping notification")
         return False
     
@@ -41,9 +61,15 @@ async def send_slack_notification(
             "error": ":x:",
             "project": ":file_folder:",
             "generation": ":sparkles:",
-            "translation": ":globe_with_meridians:"
+            "translation": ":globe_with_meridians:",
+            "approval": ":rocket:"
         }
         emoji = emoji_map.get(event_type, ":bell:")
+        
+        # Add environment tag for dev
+        env_tag = ""
+        if settings.environment == "development":
+            env_tag = "[DEV] "
         
         # Build message blocks
         blocks = [
@@ -51,7 +77,7 @@ async def send_slack_notification(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"{emoji} *{message}*"
+                    "text": f"{emoji} *{env_tag}{message}*"
                 }
             }
         ]
@@ -79,7 +105,7 @@ async def send_slack_notification(
         
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(
-                settings.slack_webhook_url,
+                webhook_url,
                 json=payload
             )
             response.raise_for_status()
@@ -105,14 +131,8 @@ async def notify_project_created(project_name: str, user_email: Optional[str] = 
     )
 
 
-async def notify_project_updated(project_name: str, user_email: Optional[str] = None):
-    """Notify when a project is updated"""
-    await send_slack_notification(
-        message=f"Project updated: {project_name}",
-        project_name=project_name,
-        user_email=user_email,
-        event_type="project"
-    )
+# NOTE: notify_project_updated has been intentionally removed to reduce notification noise.
+# Project updates happen too frequently and don't provide actionable information.
 
 
 async def notify_generation_completed(
@@ -143,3 +163,15 @@ async def notify_translation_completed(
         event_type="translation"
     )
 
+
+async def notify_content_ready_for_approval(
+    project_name: str,
+    user_email: Optional[str] = None
+):
+    """Notify when content is ready for approval"""
+    await send_slack_notification(
+        message=f"Content ready for approval: {project_name}",
+        project_name=project_name,
+        user_email=user_email,
+        event_type="approval"
+    )
