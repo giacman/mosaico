@@ -165,13 +165,15 @@ async def generate_project_content(
                 continue
 
             # Build generation prompt for this section
+            # Include has_image flag when an image is assigned to this section
             ai_prompt = build_generation_prompt(
                 text=section_brief,
                 count=request.count,
                 tone=project.tone or "professional",
                 content_type=section_content_type,
                 structure=section_structure,
-                context=f"Section: {section_name}" if section_name else None
+                context=f"Section: {section_name}" if section_name else None,
+                has_image=bool(image_url)
             )
             
             logger.info(f"--- GENERATING SECTION: {section_name} (key: {section_key}) ---")

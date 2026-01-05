@@ -674,9 +674,9 @@ export function EmailStructure({
             </div>
 
             {/* Settings Row: Creativity, Optimize, and Generate */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
               {/* Creativity Level */}
-              <div className="space-y-2 md:col-span-4">
+              <div className="space-y-2 lg:flex-1 lg:max-w-[280px]">
                 <Label>Creativity Level</Label>
                 <div className="pt-2 px-1">
                   <Slider
@@ -694,35 +694,34 @@ export function EmailStructure({
                 </div>
               </div>
 
-              {/* Optimize Prompt Button */}
-              <div className="md:col-span-3 pb-0.5">
+              {/* Buttons container */}
+              <div className="flex flex-col sm:flex-row gap-3 lg:flex-1">
+                {/* Optimize Prompt Button */}
                 <Button
                   type="button"
                   size="default"
                   variant="outline"
-                  className="w-full gap-2 btn-ai-outline-coral shadow-sm h-10"
+                  className="gap-2 btn-ai-outline-coral shadow-sm h-10 sm:flex-1 lg:max-w-[180px]"
                   onClick={() => setShowPromptAssistant(true)}
                   disabled={!project.brief_text?.trim() || isReadOnly}
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs">Optimize Prompt</span>
+                  <Sparkles className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs whitespace-nowrap">Optimize Prompt</span>
                 </Button>
-              </div>
 
-              {/* Generate / Regenerate Button */}
-              <div className="md:col-span-5 pb-0.5">
+                {/* Generate / Regenerate Button */}
                 <Button
                   size="default"
-                  className="w-full btn-ai-coral shadow-lg hover:scale-[1.01] transition-all h-10 gap-2"
+                  className="btn-ai-coral shadow-lg hover:scale-[1.01] transition-all h-10 gap-2 sm:flex-1"
                   onClick={handleGenerate}
                   disabled={isGenerating || isReadOnly}
                 >
                   {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
                   ) : (
-                    <Sparkles className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4 flex-shrink-0" />
                   )}
-                  <span>{hasGeneratedContent ? "Regenerate All Content" : "Generate Content"}</span>
+                  <span className="whitespace-nowrap">{hasGeneratedContent ? "Regenerate All Content" : "Generate Content"}</span>
                 </Button>
               </div>
             </div>
