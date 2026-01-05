@@ -99,7 +99,8 @@ def build_generation_prompt(
     content_type: str,
     structure: list[StructureComponent],
     context: str | None = None,
-    use_few_shot: bool = False
+    use_few_shot: bool = False,
+    has_image: bool = False
 ) -> str:
     """
     Builds the dynamic prompt for the generative model based on a requested structure.
@@ -112,6 +113,7 @@ def build_generation_prompt(
         structure: List of components to generate
         context: Optional additional context
         use_few_shot: If True, include Few-Shot examples (recommended for regeneration only)
+        has_image: If True, include instructions for analyzing the provided image
     
     Returns:
         Formatted prompt string
@@ -139,6 +141,41 @@ def build_generation_prompt(
     
     context_block = f"\nADDITIONAL CONTEXT:\n{context}\n" if context else ""
     
+    # Content type specific guidelines
+    content_type_guidelines = ""
+    if content_type == "push_notification":
+        content_type_guidelines = """
+=== PUSH NOTIFICATION SPECIFIC RULES ===
+You are creating mobile push notifications. These must be:
+- **EXTREMELY SHORT**: Title max 50 characters, Body max 150 characters
+- **URGENT & ACTION-ORIENTED**: Create a sense of immediacy
+- **DIRECT**: Get to the point immediately, no filler words
+- **COMPELLING**: Make the user want to tap immediately
+- **EMOJI-FRIENDLY**: Use 1-2 emojis strategically (optional but effective)
+
+Examples of great push notifications:
+✅ Title: "New arrivals just dropped 🔥" | Body: "Discover this season's must-haves before they're gone"
+✅ Title: "Your exclusive access" | Body: "Private sale starts now. Shop first, save big."
+✅ Title: "Don't miss out ⚡" | Body: "Limited pieces, unlimited style. Shop the collection."
+
+"""
+    
+    # Visual context section - only included when an image is provided
+    visual_context_section = ""
+    if has_image:
+        visual_context_section = """
+=== VISUAL CONTEXT ===
+An image has been provided along with this prompt. You MUST analyze it carefully and use it to inform your content:
+
+1. **Identify key visual elements**: Products shown, setting, mood, colors, textures, and visual style
+2. **Contextualize your copy**: Reference what you observe - the atmosphere, the aesthetic, the emotions evoked
+3. **Complement the visual**: Your text should feel like it was written specifically FOR this image
+4. **Be specific but not inventive**: Describe what you SEE (e.g., "elegant evening wear", "warm autumn tones") but do NOT invent product names you cannot verify
+
+Your content should create a cohesive story with the image - the reader should feel the text and image belong together.
+
+"""
+    
     # Load Few-Shot examples ONLY if requested (for regeneration)
     # This keeps initial generation prompts lighter and more stable
     few_shot_section = ""
@@ -163,7 +200,7 @@ Maintain a {tone} tone and brand voice consistency.
 {context_block}
 INSTRUCTION:
 "{text}"
-
+{content_type_guidelines}{visual_context_section}
 {few_shot_section}
 
 === CRITICAL CONTENT RULES ===
@@ -226,6 +263,9 @@ async def generate_variations(
     # Use Few-Shot examples only if requested (for regeneration)
     use_few_shot = req.use_few_shot if req.use_few_shot is not None else False
     
+    # Check if an image is provided for visual context
+    has_image = bool(req.image_url)
+    
     prompt = build_generation_prompt(
         text=req.text,
         count=req.count,
@@ -234,6 +274,7 @@ async def generate_variations(
         structure=req.structure,
         context=req.context,
         use_few_shot=use_few_shot,
+        has_image=has_image,
     )
 
     # Use provided temperature or default to 0.7
