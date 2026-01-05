@@ -2,6 +2,20 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.0.1] - 2026-01-05
+
+### Fixed
+- **Optimize Prompt button layout**: Replaced CSS grid with flexbox for better responsiveness on smaller screens (MacBook 13")
+- **Jest test runner**: Added missing `@jest/test-sequencer` dependency
+
+### Changed
+- **Home Page card renamed**: "Home Page" tile renamed to "On-Site Banners" for clarity
+
+### Added
+- **Visual context for image prompts**: AI now receives explicit instructions to analyze and reference uploaded images when generating content, improving the relevance of generated copy to visual context
+
+---
+
 ## [1.0.0] - 2025-12-29 🎉
 
 ### First Official Release
