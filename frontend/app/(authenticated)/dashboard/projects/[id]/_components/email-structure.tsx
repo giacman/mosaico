@@ -674,9 +674,9 @@ export function EmailStructure({
             </div>
 
             {/* Settings Row: Creativity, Optimize, and Generate */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="grid grid-cols-1 gap-4 items-end sm:grid-cols-2 lg:grid-cols-12">
               {/* Creativity Level */}
-              <div className="space-y-2 md:col-span-4">
+              <div className="space-y-2 sm:col-span-2 lg:col-span-4">
                 <Label>Creativity Level</Label>
                 <div className="pt-2 px-1">
                   <Slider
@@ -695,7 +695,7 @@ export function EmailStructure({
               </div>
 
               {/* Optimize Prompt Button */}
-              <div className="md:col-span-3 pb-0.5">
+              <div className="sm:col-span-1 lg:col-span-3 pb-0.5">
                 <Button
                   type="button"
                   size="default"
@@ -705,12 +705,12 @@ export function EmailStructure({
                   disabled={!project.brief_text?.trim() || isReadOnly}
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span className="text-xs">Optimize Prompt</span>
+                  <span className="text-xs whitespace-nowrap">Optimize Prompt</span>
                 </Button>
               </div>
 
               {/* Generate / Regenerate Button */}
-              <div className="md:col-span-5 pb-0.5">
+              <div className="sm:col-span-1 lg:col-span-5 pb-0.5">
                 <Button
                   size="default"
                   className="w-full btn-ai-coral shadow-lg hover:scale-[1.01] transition-all h-10 gap-2"
@@ -722,7 +722,7 @@ export function EmailStructure({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  <span>{hasGeneratedContent ? "Regenerate All Content" : "Generate Content"}</span>
+                  <span className="whitespace-nowrap">{hasGeneratedContent ? "Regenerate All Content" : "Generate Content"}</span>
                 </Button>
               </div>
             </div>

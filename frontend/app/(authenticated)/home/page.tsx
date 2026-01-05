@@ -8,8 +8,8 @@ import { GlobalActivityLog } from "../dashboard/_components/global-activity-log"
 const tiles = [
   { title: "LVR Magazine", href: "/magazine", description: "Editorials, long-form content, and complex layouts", icon: FileText, comingSoon: true },
   { title: "Newsletter", href: "/newsletter", description: "Email projects (copy, images, translations)", icon: Newspaper, comingSoon: false },
-  { title: "Home Page", href: "/homepage", description: "Hero banners, labels, and HP testing", icon: HomeIcon, comingSoon: true },
-  { title: "Push Notification", href: "/push", description: "App push copy and targeting", icon: Bell, comingSoon: true },
+  { title: "On-Site Banners", href: "/homepage", description: "Web & app banners, hero sections, personalized content", icon: HomeIcon, comingSoon: true },
+  { title: "Push Notification", href: "/push", description: "App push copy and targeting", icon: Bell, comingSoon: false },
   { title: "Social Media", href: "/social", description: "Multi-channel copy and formats", icon: Share2, comingSoon: true },
   { title: "Marketing Campaigns", href: "/marketing", description: "Banners, landing pages, affiliation, programmatic", icon: Megaphone, comingSoon: true }
 ]
