@@ -25,6 +25,8 @@ class Project(Base):
     tone = Column(String(50))
     target_languages = Column(ARRAY(String))  # ['it', 'fr', 'de', ...]
     labels = Column(ARRAY(String), nullable=False, default=[])  # ['promo', 'october 2025', ...]
+    # Content type (newsletter, push_notification, etc.)
+    content_type = Column(String(50), nullable=False, server_default="newsletter")
     # Project status (simple workflow: in_progress, approved)
     status = Column(
         SAEnum("in_progress", "approved", name="projectstatus"),

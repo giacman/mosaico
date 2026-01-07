@@ -64,14 +64,16 @@ async def list_projects(
     request: Request, # Moved to the beginning
     skip: int = 0,
     limit: int = 100,
+    content_type: str = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     List ALL projects (shared across all users)
+    Optionally filter by content_type (newsletter, push_notification)
     """
     try:
-        projects = ProjectService.list_projects(db, skip, limit)
+        projects = ProjectService.list_projects(db, skip, limit, content_type)
         return projects
     except Exception as e:
         logger.error(f"Error listing projects: {str(e)}")
@@ -262,3 +264,77 @@ async def save_generated_content(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save generated content: {str(e)}"
         )
+
+
+@router.post("/projects/{project_id}/sections/{section_key}/to-push", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+async def create_push_from_section(
+    project_id: int,
+    section_key: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new Push Notification project from a newsletter section.
+    
+    Takes the brief and image from the specified section and creates
+    a new push_notification project with default structure (title, body).
+    """
+    from app.models.project_schemas import ProjectCreate, ContentType
+    
+    # Get source project
+    source_project = ProjectService.get_project(db, project_id)
+    if not source_project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source project not found"
+        )
+    
+    # Find the section in the project structure
+    section_data = None
+    for section in source_project.structure:
+        if section.get("key") == section_key:
+            section_data = section
+            break
+    
+    if not section_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Section '{section_key}' not found in project"
+        )
+    
+    # Build the brief for the push notification
+    section_name = section_data.get("name", section_key)
+    section_brief = section_data.get("brief", "")
+    
+    # Combine project brief with section brief
+    push_brief = f"Create a push notification based on this newsletter section:\n\n"
+    if source_project.brief_text:
+        push_brief += f"Original campaign brief: {source_project.brief_text}\n\n"
+    if section_brief:
+        push_brief += f"Section brief: {section_brief}\n"
+    
+    # Create the push notification project
+    push_project_data = ProjectCreate(
+        name=f"Push: {source_project.name} - {section_name}",
+        brief_text=push_brief,
+        structure=[],  # Will use default push structure
+        tone=source_project.tone,
+        target_languages=source_project.target_languages or [],
+        labels=source_project.labels or [],
+        content_type=ContentType.push_notification
+    )
+    
+    push_project = ProjectService.create_project(db, user.id, user.name, push_project_data)
+    
+    # Log the transformation
+    ProjectService._log_activity(
+        db, push_project.id, user.id, user.name,
+        "created_from_newsletter",
+        "source_project_id", None, str(project_id)
+    )
+    db.commit()
+    
+    # Refresh and return
+    db.refresh(push_project)
+    return push_project

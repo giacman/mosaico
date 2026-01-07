@@ -147,16 +147,20 @@ def build_generation_prompt(
         content_type_guidelines = """
 === PUSH NOTIFICATION SPECIFIC RULES ===
 You are creating mobile push notifications. These must be:
-- **EXTREMELY SHORT**: Title max 50 characters, Body max 150 characters
+- **TITLE**: Maximum 20 characters - punchy, attention-grabbing headline
+- **BODY**: Maximum 100 characters - urgent, action-oriented message
+- **CTA** (if included): Maximum 30 characters or 3 words - clear call to action
 - **URGENT & ACTION-ORIENTED**: Create a sense of immediacy
 - **DIRECT**: Get to the point immediately, no filler words
 - **COMPELLING**: Make the user want to tap immediately
 - **EMOJI-FRIENDLY**: Use 1-2 emojis strategically (optional but effective)
 
 Examples of great push notifications:
-✅ Title: "New arrivals just dropped 🔥" | Body: "Discover this season's must-haves before they're gone"
-✅ Title: "Your exclusive access" | Body: "Private sale starts now. Shop first, save big."
-✅ Title: "Don't miss out ⚡" | Body: "Limited pieces, unlimited style. Shop the collection."
+✅ Title: "New arrivals 🔥" (13 chars) | Body: "Discover this season's must-haves before they're gone" (54 chars)
+✅ Title: "Exclusive access" (16 chars) | Body: "Private sale starts now. Shop first." (37 chars)
+✅ Title: "Don't miss out ⚡" (15 chars) | Body: "Limited pieces, unlimited style." (33 chars)
+
+⚠️ CHARACTER LIMITS ARE STRICT - Count characters carefully!
 
 """
     

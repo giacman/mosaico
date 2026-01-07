@@ -18,10 +18,12 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { uploadImage } from "@/actions/upload"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import { createPushFromSection } from "@/actions/projects"
 import imageCompression from "browser-image-compression"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Edit2, Copy, FileCode, Check, Sparkles, Languages } from "lucide-react"
+import { RefreshCw, Edit2, Copy, FileCode, Check, Sparkles, Languages, Bell } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { generate } from "@/actions/generate"
 import { handlebarsGenerate } from "@/actions/export"
@@ -556,7 +558,9 @@ export function SectionBuilder({
   const [regenBusy, setRegenBusy] = useState<Record<string, boolean>>({})
   const [generatingSections, setGeneratingSections] = useState<Record<number, boolean>>({})
   const [translatingSections, setTranslatingSections] = useState<Record<number, boolean>>({})
+  const [creatingPushSections, setCreatingPushSections] = useState<Record<number, boolean>>({})
   const [optimizationSectionIdx, setOptimizationSectionIdx] = useState<number | null>(null)
+  const router = useRouter()
 
   const handleCopy = async (text: string) => {
     if (!text?.trim()) {
@@ -899,6 +903,35 @@ export function SectionBuilder({
                             <Languages className="h-3 w-3" />
                           )}
                           Translate
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-200"
+                          disabled={creatingPushSections[idx] || isReadOnly}
+                          onClick={async () => {
+                            setCreatingPushSections(prev => ({ ...prev, [idx]: true }))
+                            try {
+                              const result = await createPushFromSection(projectId, section.key)
+                              if (result.success && result.data) {
+                                toast.success("Push notification created!")
+                                router.push(`/push/projects/${result.data.id}`)
+                              } else {
+                                toast.error(result.error || "Failed to create push")
+                              }
+                            } catch (e) {
+                              toast.error("Failed to create push notification")
+                            } finally {
+                              setCreatingPushSections(prev => ({ ...prev, [idx]: false }))
+                            }
+                          }}
+                          title="Create a push notification from this section"
+                        >
+                          {creatingPushSections[idx] ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Bell className="h-3 w-3" />
+                          )}
+                          Push
                         </button>
                         {!isMainSection(section) && (
                           <button

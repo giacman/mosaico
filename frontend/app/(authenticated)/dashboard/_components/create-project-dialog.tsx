@@ -55,7 +55,11 @@ export function getLabelColor(label: string) {
   return LABEL_COLORS[label.toLowerCase()] || LABEL_COLORS["default"]
 }
 
-export function CreateProjectDialog() {
+interface CreateProjectDialogProps {
+  contentType?: "newsletter" | "push_notification"
+}
+
+export function CreateProjectDialog({ contentType = "newsletter" }: CreateProjectDialogProps) {
   const router = useRouter()
   const { addNotification } = useNotifications()
   const { labels: availableLabels, isLoading: labelsLoading, refresh: refreshLabels } = useLabels()
@@ -138,17 +142,22 @@ export function CreateProjectDialog() {
 
     setIsCreating(true)
 
-    // Create project with default structure (subject + pre_header)
+    // Create project with structure based on content type
+    const structure = contentType === "push_notification"
+      ? [{ key: "main", name: "Push Content", components: ["title", "body"] }]
+      : [
+          { component: "subject", count: 1 },
+          { component: "pre_header", count: 1 }
+        ]
+    
     const result = await createProject({
       name: formData.name,
       brief_text: undefined,
-      structure: [
-        { component: "subject", count: 1 },
-        { component: "pre_header", count: 1 }
-      ],
+      structure,
       tone: "professional",
       target_languages: [],
-      labels: formData.labels
+      labels: formData.labels,
+      content_type: contentType
     })
 
     if (result.success && result.data) {
@@ -164,8 +173,9 @@ export function CreateProjectDialog() {
       
       setOpen(false)
       setFormData({ name: "", labels: [] })
-      // Navigate to the project editor
-      router.push(`/dashboard/projects/${result.data.id}`)
+      // Navigate to the project editor based on content type
+      const basePath = contentType === "push_notification" ? "/push" : "/dashboard"
+      router.push(`${basePath}/projects/${result.data.id}`)
     } else {
       toast.error(result.error || "Failed to create project")
     }
@@ -185,9 +195,13 @@ export function CreateProjectDialog() {
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
+            <DialogTitle>
+              {contentType === "push_notification" ? "Create Push Notification" : "Create New Project"}
+            </DialogTitle>
             <DialogDescription>
-              Give your email campaign project a name. You'll add the brief and structure in the editor.
+              {contentType === "push_notification" 
+                ? "Give your push notification a name. You'll add the content in the editor."
+                : "Give your email campaign project a name. You'll add the brief and structure in the editor."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

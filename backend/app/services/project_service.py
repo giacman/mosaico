@@ -53,17 +53,36 @@ class ProjectService:
     ) -> Project:
         """Create a new project"""
         try:
-            # If structure is in old format, convert or use a default modern structure
-            # A modern project should have a main section with at least an image
-            if project_data.structure and len(project_data.structure) > 0 and "component" in project_data.structure[0]:
-                # Old format detection, we'll let the frontend convert it usually,
-                # but for new projects we want the modern format immediately.
-                structure_dict = [
-                    {"key": "main", "name": "Main Section", "components": ["image", "title", "body", "cta"]}
-                ]
+            # Get content type from project data (default: newsletter)
+            content_type = getattr(project_data, "content_type", None) or "newsletter"
+            if hasattr(content_type, "value"):
+                content_type = content_type.value
+            
+            # Set default structure based on content type
+            if project_data.structure and len(project_data.structure) > 0:
+                if "component" in project_data.structure[0]:
+                    # Old format detection - convert based on content type
+                    if content_type == "push_notification":
+                        structure_dict = [
+                            {"key": "main", "name": "Push Content", "components": ["title", "body"]}
+                        ]
+                    else:
+                        structure_dict = [
+                            {"key": "main", "name": "Main Section", "components": ["image", "title", "body", "cta"]}
+                        ]
+                else:
+                    # Convert structure to dict format for JSON storage
+                    structure_dict = [item.model_dump() for item in project_data.structure]
             else:
-                # Convert structure to dict format for JSON storage
-                structure_dict = [item.model_dump() for item in project_data.structure]
+                # No structure provided - use default based on content type
+                if content_type == "push_notification":
+                    structure_dict = [
+                        {"key": "main", "name": "Push Content", "components": ["title", "body"]}
+                    ]
+                else:
+                    structure_dict = [
+                        {"key": "main", "name": "Main Section", "components": ["image", "title", "body", "cta"]}
+                    ]
             
             # Handle status value (enum or string)
             status_val = getattr(project_data.status, "value", None) or getattr(project_data, "status", None) or "in_progress"
@@ -75,6 +94,7 @@ class ProjectService:
                 tone=project_data.tone,
                 target_languages=project_data.target_languages or [],
                 labels=project_data.labels or [],
+                content_type=content_type,
                 status=status_val,
                 created_by_user_id=user_id,
                 created_by_user_name=user_name
@@ -83,11 +103,11 @@ class ProjectService:
             db.add(project)
             db.flush()  # Get ID before logging
 
-            # Create default Subject and Pre-header components
-            # Using index 1 for both as they are the primary components of the 'header' section
-            subject_comp = Component(project_id=project.id, section_key="header", section_order=-1, component_type="subject", component_index=1)
-            preheader_comp = Component(project_id=project.id, section_key="header", section_order=-1, component_type="pre_header", component_index=1)
-            db.add_all([subject_comp, preheader_comp])
+            # Create default header components only for newsletters (not for push notifications)
+            if content_type != "push_notification":
+                subject_comp = Component(project_id=project.id, section_key="header", section_order=-1, component_type="subject", component_index=1)
+                preheader_comp = Component(project_id=project.id, section_key="header", section_order=-1, component_type="pre_header", component_index=1)
+                db.add_all([subject_comp, preheader_comp])
             
             # Log creation
             ProjectService._log_activity(
@@ -202,11 +222,17 @@ class ProjectService:
         return project
     
     @staticmethod
-    def list_projects(db: Session, skip: int = 0, limit: int = 100) -> List[Project]:
+    def list_projects(db: Session, skip: int = 0, limit: int = 100, content_type: Optional[str] = None) -> List[Project]:
         """
         List all projects (shared across all users)
+        Optionally filter by content_type
         """
-        projects = db.query(Project).order_by(
+        query = db.query(Project)
+        
+        if content_type:
+            query = query.filter(Project.content_type == content_type)
+        
+        projects = query.order_by(
             Project.updated_at.desc()
         ).offset(skip).limit(limit).all()
         
