@@ -619,7 +619,9 @@ export function EmailStructure({
         <CardHeader>
           <CardTitle>Project Details</CardTitle>
           <CardDescription>
-            Basic information about your email campaign
+            {(project as any).content_type === "push_notification" 
+              ? "Basic information about your push notification"
+              : "Basic information about your email campaign"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -652,7 +654,9 @@ export function EmailStructure({
           <CardHeader>
             <CardTitle>AI Generation & Strategy</CardTitle>
             <CardDescription>
-              Generate premium email content using AI
+              {(project as any).content_type === "push_notification"
+                ? "Generate push notification content using AI"
+                : "Generate premium email content using AI"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -851,6 +855,7 @@ export function EmailStructure({
         components={(project.components as any) || []}
         projectImages={(project.images as any) || []}
         brief={project.brief_text || ""}
+        contentType={(project as any).content_type || "newsletter"}
         tone={tone}
         currentLanguage={viewLang}
         targetLanguages={(project.target_languages as any) || []}

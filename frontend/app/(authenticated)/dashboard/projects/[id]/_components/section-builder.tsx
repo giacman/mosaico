@@ -147,6 +147,7 @@ export function SectionBuilder({
   languageFlags,
   isReadOnly = false,
   onProjectChange,
+  contentType = "newsletter",
 }: {
   value: Section[]
   onChange: (next: Section[]) => void
@@ -167,6 +168,7 @@ export function SectionBuilder({
   languageFlags?: React.ReactNode
   isReadOnly?: boolean
   onProjectChange?: (field: any, value: any, silent?: boolean) => void
+  contentType?: "newsletter" | "push_notification"
 }) {
   const componentsPalette = [
     { id: "title", label: "Title" },
@@ -610,8 +612,14 @@ export function SectionBuilder({
       <CardHeader className="pb-4">
         <div className="flex flex-col gap-3">
           <div>
-            <CardTitle className="text-2xl">Email Structure</CardTitle>
-            <CardDescription>Arrange sections and components. Preview mirrors the output style.</CardDescription>
+            <CardTitle className="text-2xl">
+              {contentType === "push_notification" ? "Push Notification" : "Email Structure"}
+            </CardTitle>
+            <CardDescription>
+              {contentType === "push_notification" 
+                ? "Configure your push notification content."
+                : "Arrange sections and components. Preview mirrors the output style."}
+            </CardDescription>
           </div>
           {languageFlags && (
             <div className="flex flex-wrap gap-2 pt-1 border-t mt-1">
@@ -622,7 +630,8 @@ export function SectionBuilder({
       </CardHeader>
       <CardContent className="px-6 sm:px-8 md:px-10 py-8 bg-background transition-colors">
 
-        {/* Fixed header components (visual only) */}
+        {/* Fixed header components (visual only) - Only for newsletters */}
+        {contentType === "newsletter" && (
         <div className="mb-6 rounded-lg border border-primary/10 bg-accent/30 p-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Header (always included)</div>
           <div className="mt-3 space-y-3">
@@ -831,6 +840,7 @@ export function SectionBuilder({
             })()}
           </div>
         </div>
+        )}
 
         {/* Sections DnD */}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSectionsDragEnd}>
@@ -855,84 +865,91 @@ export function SectionBuilder({
                           className={`w-full rounded-md border bg-background px-2 py-1 text-sm ${isMainSection(section) ? 'opacity-70 cursor-not-allowed select-none italic font-medium bg-muted/50' : ''}`}
                           disabled={isMainSection(section) || isReadOnly}
                         />
-                        <button
-                          type="button"
-                          className="rounded-md px-2 py-1 text-xs flex items-center gap-1 btn-ai-coral shadow-sm hover:scale-[1.02] transition-all"
-                          disabled={isGenerating || generatingSections[idx] || isReadOnly}
-                          onClick={async () => {
-                            if (!onGenerateSection) return
-                            setGeneratingSections(prev => ({ ...prev, [idx]: true }))
-                            try {
-                              await onGenerateSection(idx)
-                            } finally {
-                              setGeneratingSections(prev => ({ ...prev, [idx]: false }))
-                            }
-                          }}
-                        >
-                          {generatingSections[idx] ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3 w-3" />
-                          )}
-                          {(() => {
-                            // Check if this specific section has ANY generated content
-                            const hasSectionContent = section.components.some(type => {
-                              const comp = findComponentForSection(components || [], section.key, idx, type)
-                              return !!comp?.generated_content
-                            })
-                            return hasSectionContent ? "Regenerate" : "Generate"
-                          })()}
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-green-50 text-green-700 border-green-200"
-                          disabled={isTranslating || translatingSections[idx] || section.components.length === 0 || isReadOnly}
-                          onClick={async () => {
-                            if (!onTranslateSection) return
-                            setTranslatingSections(prev => ({ ...prev, [idx]: true }))
-                            try {
-                              await onTranslateSection(idx)
-                            } finally {
-                              setTranslatingSections(prev => ({ ...prev, [idx]: false }))
-                            }
-                          }}
-                        >
-                          {translatingSections[idx] ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Languages className="h-3 w-3" />
-                          )}
-                          Translate
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-200"
-                          disabled={creatingPushSections[idx] || isReadOnly}
-                          onClick={async () => {
-                            setCreatingPushSections(prev => ({ ...prev, [idx]: true }))
-                            try {
-                              const result = await createPushFromSection(projectId, section.key)
-                              if (result.success && result.data) {
-                                toast.success("Push notification created!")
-                                router.push(`/push/projects/${result.data.id}`)
-                              } else {
-                                toast.error(result.error || "Failed to create push")
+                        {/* Section-level Generate/Translate buttons - only for newsletters (multi-section) */}
+                        {contentType === "newsletter" && (
+                          <>
+                            <button
+                              type="button"
+                              className="rounded-md px-2 py-1 text-xs flex items-center gap-1 btn-ai-coral shadow-sm hover:scale-[1.02] transition-all"
+                              disabled={isGenerating || generatingSections[idx] || isReadOnly}
+                              onClick={async () => {
+                                if (!onGenerateSection) return
+                                setGeneratingSections(prev => ({ ...prev, [idx]: true }))
+                                try {
+                                  await onGenerateSection(idx)
+                                } finally {
+                                  setGeneratingSections(prev => ({ ...prev, [idx]: false }))
+                                }
+                              }}
+                            >
+                              {generatingSections[idx] ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3 w-3" />
+                              )}
+                              {(() => {
+                                // Check if this specific section has ANY generated content
+                                const hasSectionContent = section.components.some(type => {
+                                  const comp = findComponentForSection(components || [], section.key, idx, type)
+                                  return !!comp?.generated_content
+                                })
+                                return hasSectionContent ? "Regenerate" : "Generate"
+                              })()}
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-green-50 text-green-700 border-green-200"
+                              disabled={isTranslating || translatingSections[idx] || section.components.length === 0 || isReadOnly}
+                              onClick={async () => {
+                                if (!onTranslateSection) return
+                                setTranslatingSections(prev => ({ ...prev, [idx]: true }))
+                                try {
+                                  await onTranslateSection(idx)
+                                } finally {
+                                  setTranslatingSections(prev => ({ ...prev, [idx]: false }))
+                                }
+                              }}
+                            >
+                              {translatingSections[idx] ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Languages className="h-3 w-3" />
+                              )}
+                              Translate
+                            </button>
+                          </>
+                        )}
+                        {contentType === "newsletter" && (
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-200"
+                            disabled={creatingPushSections[idx] || isReadOnly}
+                            onClick={async () => {
+                              setCreatingPushSections(prev => ({ ...prev, [idx]: true }))
+                              try {
+                                const result = await createPushFromSection(projectId, section.key)
+                                if (result.success && result.data) {
+                                  toast.success("Push notification created!")
+                                  router.push(`/push/projects/${result.data.id}`)
+                                } else {
+                                  toast.error(result.error || "Failed to create push")
+                                }
+                              } catch (e) {
+                                toast.error("Failed to create push notification")
+                              } finally {
+                                setCreatingPushSections(prev => ({ ...prev, [idx]: false }))
                               }
-                            } catch (e) {
-                              toast.error("Failed to create push notification")
-                            } finally {
-                              setCreatingPushSections(prev => ({ ...prev, [idx]: false }))
-                            }
-                          }}
-                          title="Create a push notification from this section"
-                        >
-                          {creatingPushSections[idx] ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Bell className="h-3 w-3" />
-                          )}
-                          Push
-                        </button>
+                            }}
+                            title="Create a push notification from this section"
+                          >
+                            {creatingPushSections[idx] ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Bell className="h-3 w-3" />
+                            )}
+                            Push
+                          </button>
+                        )}
                         {!isMainSection(section) && (
                           <button
                             type="button"
@@ -1013,6 +1030,231 @@ export function SectionBuilder({
                         </div>
                       )}
 
+                      {/* Push Notification Preview - Modern iPhone style */}
+                      {contentType === "push_notification" ? (
+                        <div className="mt-4 flex flex-col lg:flex-row gap-6">
+                          {/* iPhone mockup */}
+                          <div className="mx-auto lg:mx-0 flex-shrink-0">
+                            <div className="relative w-[280px]">
+                              {/* iPhone frame - modern style with Dynamic Island */}
+                              <div className="bg-black rounded-[3rem] p-[10px] shadow-2xl">
+                                {/* Screen */}
+                                <div className="bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-300 rounded-[2.5rem] overflow-hidden relative">
+                                  {/* Dynamic Island */}
+                                  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[90px] h-[28px] bg-black rounded-full z-10"></div>
+                                  
+                                  {/* Status bar */}
+                                  <div className="flex justify-between items-center px-8 pt-4 pb-2 text-white text-xs font-medium">
+                                    <span>9:41</span>
+                                    <div className="flex items-center gap-1">
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3C8.5 3 5.5 4.5 3.5 7L12 18l8.5-11C18.5 4.5 15.5 3 12 3z"/></svg>
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2 17h2v4H2v-4zm4-5h2v9H6v-9zm4-4h2v13h-2V8zm4-3h2v16h-2V5z"/></svg>
+                                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17 4h-3V2h-4v2H7v18h10V4z"/></svg>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Notification area - with padding for Dynamic Island */}
+                                  <div className="px-3 pt-6 pb-40 space-y-2">
+                                    {/* Push Notification Card */}
+                                    <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden">
+                                      {/* App header */}
+                                      <div className="flex items-center gap-2 px-3 py-2">
+                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-sm">
+                                          <span className="text-white text-xs font-bold">L</span>
+                                        </div>
+                                        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 tracking-wide">LUISAVIAROMA</span>
+                                        <span className="text-[10px] text-gray-400 ml-auto">now</span>
+                                      </div>
+                                      
+                                      {/* Notification content */}
+                                      <div className="px-3 pb-3 space-y-1">
+                                        {/* Title Preview */}
+                                        {(() => {
+                                          const titleComp = findComponentForSection(components || [], section.key, idx, "title", 1)
+                                          const titleText = titleComp?.generated_content || ""
+                                          return (
+                                            <p className={`font-semibold text-[13px] text-gray-900 dark:text-white leading-tight ${!titleText && 'text-gray-300 italic'}`}>
+                                              {titleText || "Push title here..."}
+                                            </p>
+                                          )
+                                        })()}
+                                        
+                                        {/* Body Preview */}
+                                        {(() => {
+                                          const bodyComp = findComponentForSection(components || [], section.key, idx, "body", 1)
+                                          const bodyText = bodyComp?.generated_content || ""
+                                          return (
+                                            <p className={`text-[12px] text-gray-600 dark:text-gray-300 leading-snug ${!bodyText && 'text-gray-300 italic'}`}>
+                                              {bodyText || "Push body text here..."}
+                                            </p>
+                                          )
+                                        })()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Home indicator */}
+                                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/50 rounded-full"></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Editor Panel */}
+                          <div className="flex-1 space-y-4">
+                            <div className="text-sm text-muted-foreground mb-2">
+                              Edit your push notification content below:
+                            </div>
+                            
+                            {/* Title Editor */}
+                            {(() => {
+                              const titleComp = findComponentForSection(components || [], section.key, idx, "title", 1)
+                              const titleText = (() => {
+                                if (!titleComp) return ""
+                                if (currentLanguage && currentLanguage !== "en") {
+                                  const transMap = normalizeTranslationsMap((titleComp as any).translations)
+                                  const t = transMap[currentLanguage.toLowerCase()]
+                                  if (t && String(t).trim()) return String(t)
+                                }
+                                return titleComp.generated_content || ""
+                              })()
+                              const titleKey = `${section.key}:title:1`
+                              const isTitleEditing = !!editing[titleKey]
+                              const titleEditText = editValues[titleKey] ?? titleText
+                              
+                              return (
+                                <div className="rounded-lg border bg-card p-4 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                      Title <span className="text-gray-400 font-normal">(max 20 chars)</span>
+                                    </label>
+                                    <span className={`text-xs font-medium ${titleText.length > 20 ? "text-red-500" : titleText.length > 0 ? "text-green-500" : "text-gray-400"}`}>
+                                      {titleText.length}/20
+                                    </span>
+                                  </div>
+                                  {isTitleEditing ? (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="text"
+                                        maxLength={25}
+                                        className="w-full rounded-md border bg-background px-3 py-2 text-sm font-medium"
+                                        value={titleEditText}
+                                        onChange={(e) => setEditValues(v => ({ ...v, [titleKey]: e.target.value }))}
+                                        autoFocus
+                                        placeholder="Enter push title..."
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => setEditing(v => ({ ...v, [titleKey]: false }))}>
+                                          Cancel
+                                        </Button>
+                                        <Button size="sm" onClick={() => {
+                                          if (onUpdateComponent) onUpdateComponent("title", 1, titleEditText, section.key)
+                                          setEditing(v => ({ ...v, [titleKey]: false }))
+                                        }}>
+                                          <Check className="h-3 w-3 mr-1" /> Save
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className={`rounded-md border bg-background px-3 py-2 text-sm cursor-pointer hover:bg-accent transition-colors ${!titleText && 'text-muted-foreground italic'}`}
+                                      onClick={() => !isReadOnly && setEditing(v => ({ ...v, [titleKey]: true }))}
+                                    >
+                                      {titleText || "Click to add title..."}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                            
+                            {/* Body Editor */}
+                            {(() => {
+                              const bodyComp = findComponentForSection(components || [], section.key, idx, "body", 1)
+                              const bodyText = (() => {
+                                if (!bodyComp) return ""
+                                if (currentLanguage && currentLanguage !== "en") {
+                                  const transMap = normalizeTranslationsMap((bodyComp as any).translations)
+                                  const t = transMap[currentLanguage.toLowerCase()]
+                                  if (t && String(t).trim()) return String(t)
+                                }
+                                return bodyComp.generated_content || ""
+                              })()
+                              const bodyKey = `${section.key}:body:1`
+                              const isBodyEditing = !!editing[bodyKey]
+                              const bodyEditText = editValues[bodyKey] ?? bodyText
+                              
+                              return (
+                                <div className="rounded-lg border bg-card p-4 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                      Body <span className="text-gray-400 font-normal">(max 100 chars)</span>
+                                    </label>
+                                    <span className={`text-xs font-medium ${bodyText.length > 100 ? "text-red-500" : bodyText.length > 0 ? "text-green-500" : "text-gray-400"}`}>
+                                      {bodyText.length}/100
+                                    </span>
+                                  </div>
+                                  {isBodyEditing ? (
+                                    <div className="space-y-2">
+                                      <textarea
+                                        maxLength={110}
+                                        className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none"
+                                        rows={3}
+                                        value={bodyEditText}
+                                        onChange={(e) => setEditValues(v => ({ ...v, [bodyKey]: e.target.value }))}
+                                        autoFocus
+                                        placeholder="Enter push body text..."
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => setEditing(v => ({ ...v, [bodyKey]: false }))}>
+                                          Cancel
+                                        </Button>
+                                        <Button size="sm" onClick={() => {
+                                          if (onUpdateComponent) onUpdateComponent("body", 1, bodyEditText, section.key)
+                                          setEditing(v => ({ ...v, [bodyKey]: false }))
+                                        }}>
+                                          <Check className="h-3 w-3 mr-1" /> Save
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className={`rounded-md border bg-background px-3 py-2 text-sm cursor-pointer hover:bg-accent transition-colors ${!bodyText && 'text-muted-foreground italic'}`}
+                                      onClick={() => !isReadOnly && setEditing(v => ({ ...v, [bodyKey]: true }))}
+                                    >
+                                      {bodyText || "Click to add body text..."}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                            
+                            {/* Add Component buttons for Push */}
+                            {!isReadOnly && (
+                              <div className="flex flex-wrap items-center gap-2 pt-2">
+                                <span className="text-xs text-muted-foreground">Add optional:</span>
+                                {!section.components.includes("cta") && (
+                                  <button
+                                    type="button"
+                                    className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                                    onClick={() => addComponent(idx, "cta")}
+                                  >
+                                    + CTA
+                                  </button>
+                                )}
+                                {!section.components.includes("image") && (
+                                  <button
+                                    type="button"
+                                    className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                                    onClick={() => addComponent(idx, "image")}
+                                  >
+                                    + Image
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
                       <DndContext
                         sensors={sensors}
                         collisionDetection={closestCenter}
@@ -1300,8 +1542,9 @@ export function SectionBuilder({
                           </div>
                         </SortableContext>
                       </DndContext>
+                      )}
 
-                      {!isReadOnly && (
+                      {!isReadOnly && contentType === "newsletter" && (
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <span className="text-xs text-muted-foreground">Add component:</span>
                           {componentsPalette.map((cp) => (
@@ -1324,19 +1567,18 @@ export function SectionBuilder({
           </SortableContext>
         </DndContext>
 
-        {
-          !isReadOnly && (
-            <div className="mt-3">
-              <button
-                type="button"
-                className="rounded-md border px-3 py-1 text-sm hover:bg-accent"
-                onClick={addSection}
-              >
-                + Add Section
-              </button>
-            </div>
-          )
-        }
+        {/* Add Section button - only for newsletters (push notifications are single-section) */}
+        {!isReadOnly && contentType === "newsletter" && (
+          <div className="mt-3">
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1 text-sm hover:bg-accent"
+              onClick={addSection}
+            >
+              + Add Section
+            </button>
+          </div>
+        )}
       </CardContent>
 
       <PromptAssistantDialog
