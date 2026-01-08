@@ -61,6 +61,7 @@ export interface Project {
   tone: string | null
   target_languages: string[]
   labels: string[]
+  content_type: "newsletter" | "push_notification"
   status: "in_progress" | "approved"
   created_by_user_id: string | null
   created_by_user_name: string | null
@@ -82,6 +83,7 @@ export interface CreateProjectInput {
   tone?: string
   target_languages?: string[]
   labels?: string[]
+  content_type?: "newsletter" | "push_notification"
   status?: "in_progress" | "approved"
 }
 
@@ -107,9 +109,9 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 /**
- * List all projects
+ * List all projects, optionally filtered by content type
  */
-export async function listProjects(): Promise<{
+export async function listProjects(contentType?: "newsletter" | "push_notification"): Promise<{
   success: boolean
   data?: Project[]
   error?: string
@@ -117,7 +119,12 @@ export async function listProjects(): Promise<{
   try {
     const token = await getAuthToken()
     
-    const response = await fetch(`${API_URL}/api/v1/projects`, {
+    const url = new URL(`${API_URL}/api/v1/projects`)
+    if (contentType) {
+      url.searchParams.set("content_type", contentType)
+    }
+    
+    const response = await fetch(url.toString(), {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
@@ -208,8 +215,10 @@ export async function createProject(
 
     const data = await response.json()
     
-    // Revalidate the dashboard to show the new project
+    // Revalidate paths to show the new project
     revalidatePath("/dashboard")
+    revalidatePath("/newsletter")
+    revalidatePath("/push")
     
     return { success: true, data }
   } catch (error) {
@@ -471,6 +480,55 @@ export async function getGlobalActivityLog(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to get global activity"
+    }
+  }
+}
+
+/**
+ * Create a Push Notification project from a newsletter section
+ */
+export async function createPushFromSection(
+  projectId: number,
+  sectionKey: string
+): Promise<{ success: boolean; data?: Project; error?: string }> {
+  try {
+    const token = await getAuthToken()
+    
+    if (!token) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const response = await fetch(
+      `${API_URL}/api/v1/projects/${projectId}/sections/${sectionKey}/to-push`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return {
+        success: false,
+        error: errorData.detail || `Failed to create push: ${response.statusText}`
+      }
+    }
+
+    const data = await response.json()
+    
+    // Revalidate paths
+    revalidatePath("/push")
+    revalidatePath(`/push/projects/${data.id}`)
+    
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error creating push from section:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create push notification"
     }
   }
 }

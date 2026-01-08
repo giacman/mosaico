@@ -2,6 +2,42 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.0] - 2026-01-08 🚀
+
+### New Feature: Push Notifications
+
+This release introduces a new content type: **Push Notifications**! Create concise, impactful push notification content directly from the Mosaico platform.
+
+### Added
+- **Push Notification content type**: New project type with Title (max 20 chars), Body (max 100 chars), and optional CTA (max 30 chars)
+- **Push Notifications page**: Dedicated `/push` route for managing push notification projects
+- **Newsletter-to-Push transformation**: Convert any newsletter section into a push notification with one click
+  - "Push" button 🔔 on each newsletter section
+  - Automatically generates content based on section brief (respecting character limits)
+  - Automatically carries over brief and context from the source section
+- **Database migration**: New `content_type` column to support multiple content types
+- **Modern iPhone mockup UI**: Push notification editor displays content in a realistic mobile phone frame
+- **Slack notifications**: Automatic notifications when creating push from newsletter and when content is generated
+- **Clickable sidebar icons**: Section icons (📁 Newsletter, 🔔 Push) now link directly to list pages
+
+### Fixed
+- **Sidebar duplicate key error**: Fixed React warning for projects with identical names
+- **Back button navigation**: Creating push from newsletter no longer adds intermediate page to history
+- **Empty sidebar sections**: "Approved" sections now hidden when empty instead of showing non-clickable element
+
+### Changed
+- **AI Model upgrade**: Updated Optimize Prompt feature from deprecated `gemini-2.0-flash-001` to `gemini-2.5-flash` (old model shutting down Feb 2026)
+
+### Technical
+- `ContentType` enum extended with `push_notification`
+- `/api/v1/projects/{id}/sections/{key}/to-push` endpoint with auto-generation
+- `createPushFromSection` frontend action
+- Push-specific prompt guidelines with strict character limits
+- Projects list API now supports `content_type` filter parameter
+- `notify_project_created` now supports `content_type` parameter for notification labels
+
+---
+
 ## [1.0.1] - 2026-01-05
 
 ### Fixed

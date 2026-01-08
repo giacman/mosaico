@@ -1,6 +1,6 @@
 "use client"
 
-import { FolderKanban, Settings2 } from "lucide-react"
+import { FolderKanban, Bell, Settings2 } from "lucide-react"
 import * as React from "react"
 import { useEffect, useState } from "react"
 import { listProjects, type Project } from "@/actions/projects"
@@ -30,18 +30,28 @@ export function AppSidebar({
     membership: string
   }
 }) {
-  const [projects, setProjects] = useState<Project[]>([])
+  const [newsletterProjects, setNewsletterProjects] = useState<Project[]>([])
+  const [pushProjects, setPushProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const result = await listProjects()
-        if (result.success && result.data) {
-          // Sort by updated_at descending (show all projects)
-          const sortedProjects = result.data
+        const [newsletterResult, pushResult] = await Promise.all([
+          listProjects("newsletter"),
+          listProjects("push_notification")
+        ])
+        
+        if (newsletterResult.success && newsletterResult.data) {
+          const sorted = newsletterResult.data
             .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-          setProjects(sortedProjects)
+          setNewsletterProjects(sorted)
+        }
+        
+        if (pushResult.success && pushResult.data) {
+          const sorted = pushResult.data
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          setPushProjects(sorted)
         }
       } catch (error) {
         console.error("Error loading projects:", error)
@@ -56,6 +66,9 @@ export function AppSidebar({
     const interval = setInterval(loadProjects, 30000)
     return () => clearInterval(interval)
   }, [])
+  
+  // Combine all projects for label filtering
+  const projects = [...newsletterProjects, ...pushProjects]
 
   // Extract unique labels from all projects
   const allLabels = Array.from(new Set(projects.flatMap(p => p.labels || []))).sort()
@@ -71,9 +84,13 @@ export function AppSidebar({
   }
 
   // Filter projects based on selection
-  const filteredProjects = selectedLabels.length > 0
-    ? projects.filter(p => (p.labels || []).some(l => selectedLabels.includes(l)))
-    : projects
+  const filteredNewsletters = selectedLabels.length > 0
+    ? newsletterProjects.filter(p => (p.labels || []).some(l => selectedLabels.includes(l)))
+    : newsletterProjects
+    
+  const filteredPush = selectedLabels.length > 0
+    ? pushProjects.filter(p => (p.labels || []).some(l => selectedLabels.includes(l)))
+    : pushProjects
 
   const data = {
     user: userData,
@@ -94,7 +111,7 @@ export function AppSidebar({
           : [
             {
               title: "In Progress",
-              children: filteredProjects
+              children: filteredNewsletters
                 .filter(p => (p as any).status !== "approved")
                 .map(p => ({
                   title: p.name,
@@ -104,11 +121,40 @@ export function AppSidebar({
             },
             {
               title: "Approved",
-              children: filteredProjects
+              children: filteredNewsletters
                 .filter(p => (p as any).status === "approved")
                 .map(p => ({
                   title: p.name,
                   url: `/newsletter/projects/${p.id}`,
+                  labels: p.labels || []
+                }))
+            }
+          ]
+      },
+      {
+        title: "Push Notifications",
+        url: "/push",
+        icon: Bell,
+        items: isLoading
+          ? [{ title: "Loading...", url: "#" }]
+          : [
+            {
+              title: "In Progress",
+              children: filteredPush
+                .filter(p => (p as any).status !== "approved")
+                .map(p => ({
+                  title: p.name,
+                  url: `/push/projects/${p.id}`,
+                  labels: p.labels || []
+                }))
+            },
+            {
+              title: "Approved",
+              children: filteredPush
+                .filter(p => (p as any).status === "approved")
+                .map(p => ({
+                  title: p.name,
+                  url: `/push/projects/${p.id}`,
                   labels: p.labels || []
                 }))
             }

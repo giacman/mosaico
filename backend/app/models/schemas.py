@@ -23,6 +23,7 @@ class ToneType(str, Enum):
 class ContentType(str, Enum):
     """Content types supported by Mosaico"""
     NEWSLETTER = "newsletter"
+    PUSH_NOTIFICATION = "push_notification"
     SOCIAL_POST = "social_post"
     PRODUCT_DESCRIPTION = "product_description"
     EDITORIAL = "editorial"

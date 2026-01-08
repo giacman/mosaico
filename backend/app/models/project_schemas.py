@@ -13,6 +13,11 @@ class ProjectStatus(str, Enum):
     in_progress = "in_progress"
     approved = "approved"
 
+
+class ContentType(str, Enum):
+    newsletter = "newsletter"
+    push_notification = "push_notification"
+
 class SectionStructureCreate(BaseModel):
     """A section in the email structure"""
     key: str = Field(..., description="Unique identifier for the section (e.g., 'section_1')")
@@ -31,10 +36,11 @@ class ProjectCreate(BaseModel):
     """Request to create a new project"""
     name: str = Field(..., min_length=1, max_length=255)
     brief_text: Optional[str] = None
-    structure: List[SectionStructureCreate]
+    structure: List[SectionStructureCreate] = Field(default_factory=list)
     tone: Optional[str] = None
     target_languages: List[str] = Field(default_factory=list)
     labels: List[str] = Field(default_factory=list)
+    content_type: ContentType = ContentType.newsletter
     status: ProjectStatus = ProjectStatus.in_progress
 
     @model_validator(mode="before")
@@ -106,6 +112,7 @@ class ProjectResponse(BaseModel):
     tone: Optional[str]
     target_languages: List[str]
     labels: List[str]
+    content_type: str = "newsletter"
     status: ProjectStatus
     
     # Audit fields

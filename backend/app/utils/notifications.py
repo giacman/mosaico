@@ -121,10 +121,11 @@ async def send_slack_notification(
         return False
 
 
-async def notify_project_created(project_name: str, user_email: Optional[str] = None):
+async def notify_project_created(project_name: str, user_email: Optional[str] = None, content_type: str = "newsletter"):
     """Notify when a new project is created"""
+    type_label = "Push Notification" if content_type == "push_notification" else "Newsletter"
     await send_slack_notification(
-        message=f"New project created: {project_name}",
+        message=f"New {type_label} created: {project_name}",
         project_name=project_name,
         user_email=user_email,
         event_type="project"
