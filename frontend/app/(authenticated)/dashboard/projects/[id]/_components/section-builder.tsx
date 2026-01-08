@@ -930,7 +930,7 @@ export function SectionBuilder({
                                 const result = await createPushFromSection(projectId, section.key)
                                 if (result.success && result.data) {
                                   toast.success("Push notification created!")
-                                  router.push(`/push/projects/${result.data.id}`)
+                                  router.replace(`/push/projects/${result.data.id}`)
                                 } else {
                                   toast.error(result.error || "Failed to create push")
                                 }

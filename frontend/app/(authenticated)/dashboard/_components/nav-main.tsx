@@ -196,18 +196,30 @@ export function NavMain({
                 suppressHydrationWarning
               >
                 <div>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={item.title}>
-                      {item.icon && <item.icon />}
-                      <span>{item.title}</span>
-                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
+                  <SidebarMenuButton tooltip={item.title} className="group/navitem">
+                    {item.icon && item.url && (
+                      <Link href={item.url} className="hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
+                        <item.icon className="h-4 w-4" />
+                      </Link>
+                    )}
+                    {item.icon && !item.url && <item.icon />}
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center flex-1 cursor-pointer">
+                        <span className="flex-1">{item.title}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </div>
+                    </CollapsibleTrigger>
+                  </SidebarMenuButton>
                   <CollapsibleContent>
                     <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
                       <SidebarMenuSub>
-                        {item.items?.map((subItem, idx) => (
-                          subItem.separator ? (
+                        {item.items?.map((subItem, idx) => {
+                          // Skip sections with empty children array
+                          if (subItem.children && subItem.children.length === 0) {
+                            return null
+                          }
+                          
+                          return subItem.separator ? (
                             <div key={`sep-${idx}`} className="h-px bg-border mx-3 my-1" />
                           ) : subItem.children && subItem.children.length > 0 ? (
                             <SidebarMenuSubItem key={subItem.title}>
@@ -230,7 +242,7 @@ export function NavMain({
                                       const dotColor = primaryLabel ? getLabelColor(primaryLabel).bg : "bg-transparent"
 
                                       return (
-                                        <SidebarMenuSubButton key={child.title} asChild>
+                                        <SidebarMenuSubButton key={child.url} asChild>
                                           <a href={child.url}>
                                             <div className="flex items-center justify-between gap-2 w-full">
                                               <span className="truncate flex-1">{child.title}</span>
@@ -258,7 +270,7 @@ export function NavMain({
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           )
-                        ))}
+                        })}
                       </SidebarMenuSub>
                     </div>
                   </CollapsibleContent>

@@ -18,7 +18,7 @@ from app.models.project_schemas import (
     SaveGeneratedContentRequest
 )
 from app.services.project_service import ProjectService
-from app.utils.notifications import notify_project_created, notify_content_ready_for_approval
+from app.utils.notifications import notify_project_created, notify_content_ready_for_approval, notify_generation_completed
 
 logger = logging.getLogger(__name__)
 
@@ -277,10 +277,14 @@ async def create_push_from_section(
     """
     Create a new Push Notification project from a newsletter section.
     
-    Takes the brief and image from the specified section and creates
-    a new push_notification project with default structure (title, body).
+    Takes the brief and image from the specified section, creates
+    a new push_notification project, and automatically generates content.
     """
     from app.models.project_schemas import ProjectCreate, ContentType
+    from app.api.generate import build_generation_prompt
+    from app.core.vertex_ai import VertexAIClient
+    from app.db.models import Component
+    import json
     
     # Get source project
     source_project = ProjectService.get_project(db, project_id)
@@ -308,16 +312,16 @@ async def create_push_from_section(
     section_brief = section_data.get("brief", "")
     
     # Combine project brief with section brief
-    push_brief = f"Create a push notification based on this newsletter section:\n\n"
+    push_brief = ""
     if source_project.brief_text:
-        push_brief += f"Original campaign brief: {source_project.brief_text}\n\n"
+        push_brief += f"{source_project.brief_text}\n\n"
     if section_brief:
-        push_brief += f"Section brief: {section_brief}\n"
+        push_brief += f"Section focus: {section_brief}\n"
     
     # Create the push notification project
     push_project_data = ProjectCreate(
         name=f"Push: {source_project.name} - {section_name}",
-        brief_text=push_brief,
+        brief_text=push_brief.strip(),
         structure=[],  # Will use default push structure
         tone=source_project.tone,
         target_languages=source_project.target_languages or [],
@@ -334,6 +338,114 @@ async def create_push_from_section(
         "source_project_id", None, str(project_id)
     )
     db.commit()
+    db.refresh(push_project)
+    
+    # Send Slack notification for push creation (non-blocking)
+    asyncio.create_task(
+        notify_project_created(
+            project_name=push_project.name,
+            user_email=getattr(user, 'email', None) or user.name,
+            content_type="push_notification"
+        )
+    )
+    
+    # --- AUTO-GENERATE PUSH NOTIFICATION CONTENT ---
+    try:
+        logger.info(f"Starting auto-generation for push notification {push_project.id}")
+        ai_client = VertexAIClient()
+        
+        # Build prompt for push notification generation
+        from app.models.schemas import StructureComponent, ComponentType
+        
+        push_structure = [
+            StructureComponent(component=ComponentType.TITLE, count=1),
+            StructureComponent(component=ComponentType.BODY, count=1),
+        ]
+        
+        prompt = build_generation_prompt(
+            text=push_brief.strip() or "Create engaging push notification content",
+            count=1,
+            tone=source_project.tone or "professional",
+            content_type="push_notification",
+            structure=push_structure,
+            context="Push Notification"
+        )
+        
+        logger.info(f"Generated prompt for push notification, calling AI...")
+        
+        # Generate content
+        response = await ai_client.generate_content(prompt, temperature=0.7)
+        
+        logger.info(f"AI response received: {response[:200]}...")
+        
+        # Parse response
+        try:
+            # Clean markdown code blocks if present
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                lines = clean_response.split("\n")
+                clean_response = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+            
+            generated = json.loads(clean_response)
+            logger.info(f"Parsed AI response: {generated}")
+            
+            # Extract the first variation from the response
+            variation = None
+            if "variations" in generated and isinstance(generated["variations"], list) and len(generated["variations"]) > 0:
+                variation = generated["variations"][0]
+            else:
+                # Fallback: maybe the response is already flat
+                variation = generated
+            
+            logger.info(f"Using variation: {variation}")
+            
+            # Create components for push notification (title, body)
+            # These need to be created since create_project doesn't create them
+            title_comp = Component(
+                project_id=push_project.id,
+                section_key="main",
+                section_order=0,
+                component_type="title",
+                component_index=1,
+                generated_content=variation.get("title", "")
+            )
+            body_comp = Component(
+                project_id=push_project.id,
+                section_key="main",
+                section_order=0,
+                component_type="body",
+                component_index=1,
+                generated_content=variation.get("body", "")
+            )
+            db.add_all([title_comp, body_comp])
+            logger.info(f"Created title component with content: {variation.get('title', '')[:50]}...")
+            logger.info(f"Created body component with content: {variation.get('body', '')[:50]}...")
+            
+            # Log content generation
+            ProjectService._log_activity(
+                db, push_project.id, user.id, user.name,
+                "generated_content"
+            )
+            db.commit()
+            logger.info(f"Successfully generated content for push notification {push_project.id}")
+            
+            # Send Slack notification for content generation (non-blocking)
+            asyncio.create_task(
+                notify_generation_completed(
+                    project_name=push_project.name,
+                    component_count=2,  # title + body
+                    user_email=getattr(user, 'email', None) or user.name
+                )
+            )
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse AI response for push notification: {e}")
+            logger.warning(f"Raw response was: {response}")
+            # Continue without generated content - user can generate manually
+            
+    except Exception as e:
+        logger.error(f"Failed to auto-generate push notification content: {e}", exc_info=True)
+        # Continue without generated content - user can generate manually
     
     # Refresh and return
     db.refresh(push_project)

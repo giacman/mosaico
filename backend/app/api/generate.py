@@ -145,22 +145,33 @@ def build_generation_prompt(
     content_type_guidelines = ""
     if content_type == "push_notification":
         content_type_guidelines = """
-=== PUSH NOTIFICATION SPECIFIC RULES ===
-You are creating mobile push notifications. These must be:
-- **TITLE**: Maximum 20 characters - punchy, attention-grabbing headline
-- **BODY**: Maximum 100 characters - urgent, action-oriented message
-- **CTA** (if included): Maximum 30 characters or 3 words - clear call to action
-- **URGENT & ACTION-ORIENTED**: Create a sense of immediacy
-- **DIRECT**: Get to the point immediately, no filler words
-- **COMPELLING**: Make the user want to tap immediately
-- **EMOJI-FRIENDLY**: Use 1-2 emojis strategically (optional but effective)
 
-Examples of great push notifications:
-✅ Title: "New arrivals 🔥" (13 chars) | Body: "Discover this season's must-haves before they're gone" (54 chars)
-✅ Title: "Exclusive access" (16 chars) | Body: "Private sale starts now. Shop first." (37 chars)
-✅ Title: "Don't miss out ⚡" (15 chars) | Body: "Limited pieces, unlimited style." (33 chars)
+🚨🚨🚨 CRITICAL: STRICT CHARACTER LIMITS FOR PUSH NOTIFICATIONS 🚨🚨🚨
 
-⚠️ CHARACTER LIMITS ARE STRICT - Count characters carefully!
+You MUST respect these EXACT character limits. COUNT EVERY CHARACTER including spaces:
+
+📌 TITLE: MAXIMUM 20 CHARACTERS (including spaces and emojis)
+📌 BODY: MAXIMUM 100 CHARACTERS (including spaces and emojis)  
+📌 CTA (if included): MAXIMUM 30 CHARACTERS
+
+⛔ IF YOU EXCEED THESE LIMITS, YOUR OUTPUT IS INVALID AND WILL BE REJECTED.
+
+WRITING TECHNIQUE FOR SHORT COPY:
+- Title: Use 2-4 words ONLY. Examples: "New drops 🔥" (11), "Flash sale" (10), "Just in ✨" (9)
+- Body: One SHORT sentence. Cut every unnecessary word. Be direct.
+
+EXAMPLES WITH CHARACTER COUNT:
+✅ Title: "New in store" (12 chars) | Body: "Fresh arrivals just landed. Explore now." (41 chars)
+✅ Title: "Final hours ⏰" (13 chars) | Body: "Sale ends tonight. Don't miss 50% off." (39 chars)
+✅ Title: "For you 💫" (10 chars) | Body: "Curated picks based on your style." (35 chars)
+
+❌ WRONG - TOO LONG:
+❌ Title: "New Beauty Arrivals from Gucci" (30 chars - EXCEEDS 20 LIMIT!)
+❌ Body: "A new narrative of beauty unfolds. Discover the latest creations..." (EXCEEDS 100 LIMIT!)
+
+BEFORE OUTPUT, COUNT YOUR CHARACTERS:
+- Title must be ≤ 20 characters
+- Body must be ≤ 100 characters
 
 """
     
