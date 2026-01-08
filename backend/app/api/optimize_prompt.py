@@ -101,7 +101,7 @@ Return ONLY the JSON, no other text."""
         from vertexai.generative_models import GenerativeModel, GenerationConfig
         
         model = GenerativeModel(
-            model_name="gemini-2.0-flash-001",
+            model_name="gemini-2.5-flash",  # Updated from deprecated gemini-2.0-flash-001
             generation_config=GenerationConfig(
                 temperature=0.7,
                 max_output_tokens=1500,

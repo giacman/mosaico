@@ -25,6 +25,9 @@ This release introduces a new content type: **Push Notifications**! Create conci
 - **Back button navigation**: Creating push from newsletter no longer adds intermediate page to history
 - **Empty sidebar sections**: "Approved" sections now hidden when empty instead of showing non-clickable element
 
+### Changed
+- **AI Model upgrade**: Updated Optimize Prompt feature from deprecated `gemini-2.0-flash-001` to `gemini-2.5-flash` (old model shutting down Feb 2026)
+
 ### Technical
 - `ContentType` enum extended with `push_notification`
 - `/api/v1/projects/{id}/sections/{key}/to-push` endpoint with auto-generation
