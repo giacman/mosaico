@@ -20,6 +20,7 @@
 ## ✨ Key Features
 
 - 🤖 **AI Content Generation**: Create email components (subjects, pre-headers, title, body, CTAs) with customizable tone and structure
+- 📱 **Push Notifications**: Create mobile push notifications with strict character limits (Title: 20, Body: 100, CTA: 30 chars) - convert newsletter sections to push with one click
 - 🎓 **Few-Shot Learning**: Strategic use of examples during regeneration to increase content variety while maintaining JSON stability
 - 🌍 **Enhanced Translation System**: AI-powered transcreation with Sequential Validation
   - Gemini 2.5 Pro for cultural nuance and natural phrasing
