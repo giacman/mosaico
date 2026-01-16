@@ -114,24 +114,40 @@ export interface Section {
 /**
  * Find a component for a specific section
  * 
- * Strategy: Look up by section_key (primary) or section_order (fallback for legacy data)
- * Note: component_index is always 1 in our current data model
+ * Strategy: Look up by section_key + type + component_index
+ * Falls back to section_order for legacy data without section_key
  */
 export function findComponentForSection(
   components: SectionComponent[],
   sectionKey: string,
   sectionOrder: number,
   componentType: string,
-  _componentIndex: number = 1  // Kept for API compatibility, but always treated as 1
+  componentIndex: number = 1
 ): SectionComponent | undefined {
-  // Primary: find by section_key + type
+  // Primary: find by section_key + type + component_index
+  const byKeyAndIndex = components.find(c =>
+    c.component_type === componentType &&
+    c.section_key === sectionKey &&
+    (c.component_index || 1) === componentIndex
+  )
+  if (byKeyAndIndex) return byKeyAndIndex
+
+  // Secondary: find by section_key + type (for components without explicit index)
   const byKey = components.find(c =>
     c.component_type === componentType &&
     c.section_key === sectionKey
   )
   if (byKey) return byKey
 
-  // Fallback: find by section_order + type (for legacy data without section_key)
+  // Fallback: find by section_order + type + component_index (for legacy data)
+  const byOrderAndIndex = components.find(c =>
+    c.component_type === componentType &&
+    c.section_order === sectionOrder &&
+    (c.component_index || 1) === componentIndex
+  )
+  if (byOrderAndIndex) return byOrderAndIndex
+
+  // Last resort: section_order + type
   return components.find(c =>
     c.component_type === componentType &&
     c.section_order === sectionOrder

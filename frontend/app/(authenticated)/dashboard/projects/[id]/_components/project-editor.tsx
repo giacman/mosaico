@@ -305,9 +305,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         open={showPromptAssistant}
         onOpenChange={setShowPromptAssistant}
         originalBrief={project.brief_text ?? ""}
-        contentType="newsletter"
-        tone={project.tone ?? "professional"}
-        structure={project.structure as any}
         onApply={(optimizedPrompt) => {
           updateField("brief_text", optimizedPrompt)
         }}

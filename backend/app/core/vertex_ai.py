@@ -210,6 +210,18 @@ class VertexAIClient:
                 logger.warning(
                     f"Attempt {attempt} failed with error: {str(e)}. Trying to fix..."
                 )
+                
+                # Try to fix common JSON issues before retrying with AI
+                fixed_json = self._try_fix_json(response_text)
+                if fixed_json:
+                    try:
+                        parsed_json = json.loads(fixed_json)
+                        if "variations" in parsed_json and isinstance(parsed_json["variations"], list):
+                            logger.info("Recovered JSON using manual fix")
+                            return fixed_json
+                    except json.JSONDecodeError:
+                        pass  # Manual fix didn't work, continue with AI fix
+                
                 fixing_prompt = self._create_fixing_prompt(prompt, response_text)
                 final_prompt = [Part.from_text(fixing_prompt)]  # For fixing, we only use text
             except Exception as e:
@@ -220,6 +232,70 @@ class VertexAIClient:
         raise HTTPException(
             status_code=500, detail="Failed to generate valid content from the model."
         )
+
+    def _try_fix_json(self, malformed_json: str) -> str | None:
+        """Try to fix common JSON issues manually before retrying with AI"""
+        import re
+        
+        if not malformed_json:
+            return None
+        
+        try:
+            # Remove any markdown code blocks
+            text = re.sub(r'^```json?\s*', '', malformed_json, flags=re.MULTILINE)
+            text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+            
+            # Try to find and extract a valid JSON object
+            # Look for the outermost { }
+            start = text.find('{')
+            if start == -1:
+                return None
+            
+            # Count braces to find matching closing brace
+            depth = 0
+            in_string = False
+            escape_next = False
+            end = start
+            
+            for i, char in enumerate(text[start:], start):
+                if escape_next:
+                    escape_next = False
+                    continue
+                if char == '\\':
+                    escape_next = True
+                    continue
+                if char == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+            
+            if depth != 0:
+                # Try to close the JSON by adding missing braces
+                extracted = text[start:] 
+                # Add missing closing braces/brackets
+                extracted = extracted.rstrip()
+                if not extracted.endswith('}'):
+                    # Try to find last complete variation and close
+                    last_bracket = extracted.rfind(']')
+                    if last_bracket > 0:
+                        extracted = extracted[:last_bracket+1] + '}'
+                    else:
+                        extracted += ']}'
+                return extracted
+            
+            return text[start:end]
+            
+        except Exception as e:
+            logger.debug(f"Manual JSON fix failed: {e}")
+            return None
 
     def _create_fixing_prompt(self, original_prompt: str, malformed_json: str) -> str:
         return f"""

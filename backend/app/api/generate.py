@@ -242,8 +242,10 @@ EXAMPLE OF CORRECT OUTPUT:
 === OUTPUT GUIDELINES ===
 - IMPORTANT: You MUST always respond in ENGLISH. Even if the INSTRUCTION is in another language (e.g., Italian), your output MUST be in English.
 - Generate creative and relevant text that aligns with the instruction for each component.
-- For any component with a count greater than one (e.g., 2 CTAs), you MUST generate unique keys for each instance (e.g., "cta_1", "cta_2").
-- Each instance MUST be completely DIFFERENT from the others - use different words, phrasing, and creative angles.
+- For any component with a count greater than one (e.g., 2 CTAs, 2 bodies), generate unique keys (e.g., "cta_1", "cta_2").
+- IMPORTANT: Each numbered instance (body_1 vs body_2, cta_1 vs cta_2) MUST have COMPLETELY DIFFERENT content.
+- Do NOT copy, repeat, or paraphrase - write fresh, unique text for each instance.
+
 - The value for every key in the JSON object MUST be a single string.
 - Output ONLY as a valid JSON object containing a single key "variations".
 - The "variations" key must be a list of "flat" JSON objects, where each object is one complete content variation.

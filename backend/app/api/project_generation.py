@@ -196,6 +196,10 @@ async def generate_project_content(
                     generated_content = variations[0]
                     logger.info(f"Section '{section_key}' AI keys received: {list(generated_content.keys())}")
                     
+                    # DEBUG: Log actual content for each key to verify uniqueness
+                    for k, v in generated_content.items():
+                        logger.info(f"  {k}: {v[:80]}..." if len(str(v)) > 80 else f"  {k}: {v}")
+                    
                     section_type_counters = {}
                     # Sort keys to ensure deterministic processing (important for index assignment)
                     sorted_keys = sorted(generated_content.keys())
@@ -229,6 +233,7 @@ async def generate_project_content(
                             continue
 
                         # Create component data
+                        logger.info(f"  -> Saving {base_type}_{current_index} for section {section_key}")
                         all_generated_components.append({
                             "component_type": base_type,
                             "component_index": current_index,

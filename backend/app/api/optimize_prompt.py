@@ -21,9 +21,6 @@ limiter = Limiter(key_func=get_remote_address)
 class OptimizePromptRequest(BaseModel):
     """Request to optimize a user's brief/description"""
     text: str = Field(..., description="User's original brief or description")
-    content_type: str = Field(default="newsletter", description="Type of content to generate")
-    tone: str = Field(default="professional", description="Desired tone")
-    structure: list[dict] = Field(..., description="Email structure (what components to generate)")
 
 
 class OptimizePromptResponse(BaseModel):
@@ -42,69 +39,56 @@ async def optimize_prompt(
     Transform a simple user description into an optimized prompt for AI generation.
     
     This helps users who aren't familiar with prompt engineering to get better results
-    from the AI by adding context, structure, and clarity to their brief.
+    from the AI by adding context and clarity to their brief.
     """
     try:
-        # Calculate max length based on whether structure includes images
-        # Images use ~1000 tokens, so we need shorter prompts when images are present
-        has_image_context = any('image' in str(s).lower() for s in req.structure)
-        max_chars = 600 if has_image_context else 1000
+        max_chars = 500  # Keep briefs concise for better AI performance
         
         # Build the meta-prompt that will optimize the user's brief
-        optimization_prompt = f"""You are an expert prompt engineer specializing in marketing content generation.
+        optimization_prompt = f"""You are an expert prompt engineer specializing in marketing content.
 
-Your task is to transform a user's simple description into a detailed, effective prompt for generating email marketing content.
+Your task is to transform a user's simple description into a detailed, effective brief for generating marketing content.
 
 **User's Original Brief:**
 {req.text}
 
-**Context:**
-- Content Type: {req.content_type}
-- Tone: {req.tone}
-- Structure: {', '.join([f"{s['component']} ({s['count']})" for s in req.structure])}
-
 **Your Task:**
-Transform this brief into an optimized prompt that will help an AI generate excellent email content. The optimized prompt should:
+Transform this brief into an optimized version that will help an AI generate excellent content. The optimized brief should:
 
 1. **Add Context**: Include target audience, brand positioning, and campaign goals if not specified
-2. **Add Specificity**: Make vague descriptions more concrete with examples
-3. **Add Structure**: Clearly explain what each component should achieve
-4. **Add Style Guidelines**: Specify tone, length, and formatting expectations
-5. **Add Key Messages**: Highlight what to emphasize and what to avoid
+2. **Add Specificity**: Make vague descriptions more concrete
+3. **Add Style Guidelines**: Specify tone and formatting expectations
+4. **Add Key Messages**: Highlight what to emphasize and what to avoid
 
 **Critical Constraints:**
-- The optimized prompt MUST be under {max_chars} characters (current: {len(req.text)} chars)
-- Be concise but informative - every word should add value
-- Prioritize the most important details
-- If the original brief is already long, consolidate and clarify rather than expand
+- The optimized brief MUST be UNDER {max_chars} characters - this is CRITICAL
+- Be very concise - every word must add value
+- Prioritize the most important information
+- If the original brief is already good, just polish it slightly
 
 **Important:**
 - Keep the user's core intent and key information
 - Add helpful details they might have missed
-- Make it clear and actionable for content generation
-- NEVER invent product names, prices, or specific details not provided by the user
-- NEVER use placeholders like [Product Name] or [Brand] - write complete, polished text
-- Focus on brand values, emotions, and experiences instead of specific products
-- Focus on making the AI understand WHAT to create and HOW to write it
-- STAY UNDER {max_chars} CHARACTERS - this is critical for AI stability
+- NEVER invent product names, prices, or specific details not provided
+- NEVER use placeholders like [Product Name] or [Brand]
+- Focus on brand values, emotions, and experiences
 
-Return your response as JSON with this structure:
+Return your response as JSON:
 {{
-    "optimized_prompt": "The complete, detailed prompt ready for AI generation (UNDER {max_chars} chars)",
-    "improvements": ["Improvement 1: What you added/clarified", "Improvement 2: ...", "Improvement 3: ..."]
+    "optimized_prompt": "The improved brief (UNDER {max_chars} chars)",
+    "improvements": ["What you improved 1", "What you improved 2", "What you improved 3"]
 }}
 
-Return ONLY the JSON, no other text."""
+Return ONLY valid JSON, no other text."""
 
         # Call Vertex AI to optimize the prompt
-        # Use direct generation without the "fixing" logic since we have custom JSON structure
         from vertexai.generative_models import GenerativeModel, GenerationConfig
         
         model = GenerativeModel(
-            model_name="gemini-2.5-flash",  # Updated from deprecated gemini-2.0-flash-001
+            model_name="gemini-2.5-flash",
             generation_config=GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=1500,
+                max_output_tokens=2048,
                 response_mime_type="application/json"
             )
         )
@@ -112,24 +96,59 @@ Return ONLY the JSON, no other text."""
         response = await model.generate_content_async(optimization_prompt)
         response_text = response.text
         
-        # Parse response
-        response_data = json.loads(response_text)
+        logger.debug(f"Raw AI response: {response_text[:500]}...")
+        
+        # Parse response with fallback
+        try:
+            response_data = json.loads(response_text)
+        except json.JSONDecodeError as parse_error:
+            logger.error(f"JSON parse error: {parse_error}")
+            logger.error(f"Raw response (first 1000 chars): {response_text[:1000]}")
+            
+            # Try to extract content manually as fallback
+            import re
+            
+            # Try complete string first
+            match = re.search(r'"optimized_prompt"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', response_text)
+            if match:
+                logger.info("Recovered optimized_prompt using regex fallback")
+                return OptimizePromptResponse(
+                    optimized_prompt=match.group(1).replace('\\"', '"').replace('\\n', '\n'),
+                    improvements=["⚠️ Recovered from partial AI response"]
+                )
+            
+            # If truncated, try to extract whatever we have
+            match = re.search(r'"optimized_prompt"\s*:\s*"([^"]+)', response_text)
+            if match:
+                truncated_text = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+                # Find last complete sentence
+                last_period = max(truncated_text.rfind('.'), truncated_text.rfind('!'), truncated_text.rfind('?'))
+                if last_period > len(truncated_text) * 0.5:
+                    truncated_text = truncated_text[:last_period + 1]
+                else:
+                    truncated_text = truncated_text.rstrip() + "..."
+                logger.info(f"Recovered truncated optimized_prompt: {len(truncated_text)} chars")
+                return OptimizePromptResponse(
+                    optimized_prompt=truncated_text,
+                    improvements=["⚠️ Response was truncated, recovered partial content"]
+                )
+            raise
+            
         optimized = response_data.get("optimized_prompt", req.text)
         improvements = response_data.get("improvements", [])
         
-        # Validate length and force truncate if needed (shouldn't happen, but safety check)
+        # Validate length and truncate if needed
         if len(optimized) > max_chars:
             logger.warning(f"Optimized prompt exceeded {max_chars} chars ({len(optimized)}), truncating...")
-            # Truncate at sentence boundary
             truncated = optimized[:max_chars]
             last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
-            if last_period > max_chars * 0.8:  # Only truncate at sentence if it's not too far back
+            if last_period > max_chars * 0.8:
                 optimized = optimized[:last_period + 1]
             else:
                 optimized = truncated.rstrip() + "..."
-            improvements.append(f"⚠️ Truncated to {len(optimized)} chars for AI stability")
+            improvements.append(f"⚠️ Truncated to {len(optimized)} chars")
         
-        logger.info(f"Optimized prompt: {len(req.text)} chars → {len(optimized)} chars (limit: {max_chars})")
+        logger.info(f"Optimized prompt: {len(req.text)} chars → {len(optimized)} chars")
         
         return OptimizePromptResponse(
             optimized_prompt=optimized,
@@ -148,4 +167,3 @@ Return ONLY the JSON, no other text."""
             status_code=500,
             detail=f"Failed to optimize prompt: {str(e)}"
         )
-
