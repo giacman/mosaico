@@ -20,9 +20,6 @@ interface PromptAssistantDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   originalBrief: string
-  contentType: string
-  tone: string
-  structure: Array<{ component: string; count: number }>
   onApply: (optimizedPrompt: string) => void
 }
 
@@ -35,9 +32,6 @@ export function PromptAssistantDialog({
   open,
   onOpenChange,
   originalBrief,
-  contentType,
-  tone,
-  structure,
   onApply
 }: PromptAssistantDialogProps) {
   const [isOptimizing, setIsOptimizing] = useState(false)
@@ -52,10 +46,7 @@ export function PromptAssistantDialog({
     setIsOptimizing(true)
     try {
       const result = await optimizePrompt({
-        text: originalBrief,
-        content_type: contentType,
-        tone: tone,
-        structure: structure
+        text: originalBrief
       })
 
       if (result.success && result.data) {
@@ -111,22 +102,6 @@ export function PromptAssistantDialog({
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                 {originalBrief || "Nessun brief inserito"}
               </p>
-            </div>
-          </div>
-
-          {/* Context Info */}
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground mb-1">Tone</p>
-              <Badge variant="outline" className="capitalize">{tone}</Badge>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1">Struttura</p>
-              <Badge variant="outline">{structure.length} componenti</Badge>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1">Tipo</p>
-              <Badge variant="outline" className="capitalize">{contentType}</Badge>
             </div>
           </div>
 

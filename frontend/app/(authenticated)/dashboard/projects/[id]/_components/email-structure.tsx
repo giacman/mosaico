@@ -969,22 +969,6 @@ export function EmailStructure({
         open={showPromptAssistant}
         onOpenChange={setShowPromptAssistant}
         originalBrief={project.brief_text ?? ""}
-        contentType="newsletter"
-        tone={tone}
-        structure={(() => {
-          const counts: Record<string, number> = { title: 0, body: 0, cta: 0 }
-          sections.forEach((sec: any) => (sec.components || []).forEach((c: string) => {
-            if (c === "title" || c === "body" || c === "cta") counts[c] = (counts[c] || 0) + 1
-          }))
-          const arr: Array<{ component: string; count: number }> = [
-            { component: "subject", count: 1 },
-            { component: "pre_header", count: 1 },
-          ]
-          if (counts.title) arr.push({ component: "title", count: counts.title })
-          if (counts.body) arr.push({ component: "body", count: counts.body })
-          if (counts.cta) arr.push({ component: "cta", count: counts.cta })
-          return arr as any
-        })()}
         onApply={(optimized) => onProjectChange("brief_text", optimized)}
       />
     </div >

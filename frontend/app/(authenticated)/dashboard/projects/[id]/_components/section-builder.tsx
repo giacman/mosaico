@@ -492,11 +492,12 @@ export function SectionBuilder({
     })
   }
 
-  const renderPreview = (type: string, _displayIndex: number, sectionKey?: string, sectionOrder?: number) => {
+  const renderPreview = (type: string, displayIndex: number, sectionKey?: string, sectionOrder?: number) => {
     // Find component using simplified lookup (section_key primary, section_order fallback)
+    // IMPORTANT: Pass displayIndex to correctly find body_1 vs body_2, cta_1 vs cta_2, etc.
     const found = sectionKey 
-      ? findComponentForSection(components || [], sectionKey, sectionOrder ?? 0, type)
-      : components?.find(c => c.component_type === type)
+      ? findComponentForSection(components || [], sectionKey, sectionOrder ?? 0, type, displayIndex)
+      : components?.find(c => c.component_type === type && (c.component_index || 1) === displayIndex)
 
     const text = (() => {
       if (!found) return ""
@@ -1585,9 +1586,6 @@ export function SectionBuilder({
         open={optimizationSectionIdx !== null}
         onOpenChange={(open) => !open && setOptimizationSectionIdx(null)}
         originalBrief={optimizationSectionIdx !== null ? value[optimizationSectionIdx]?.brief || value[optimizationSectionIdx]?.name || "" : ""}
-        contentType="newsletter"
-        tone={tone || "professional"}
-        structure={[]} // Section optimization is plain text usually
         onApply={(optimized) => {
           if (optimizationSectionIdx !== null) {
             updateSectionBrief(optimizationSectionIdx, optimized)

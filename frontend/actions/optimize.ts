@@ -6,10 +6,7 @@ import { getAuthToken } from "@/actions/generate"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export type OptimizePromptParams = {
-  prompt: string
-  content_type: string
-  tone: string
-  structure: Array<{ component: string; count: number }>
+  text: string
 }
 
 interface OptimizePromptResult {

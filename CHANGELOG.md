@@ -2,6 +2,29 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.1] - 2026-01-16
+
+### Fixed
+- **Critical: Duplicate content for multiple components**: Fixed bug where multiple instances of the same component type (e.g., `body_1` and `body_2`, `cta_1` and `cta_2`) would all display the same content in the UI
+  - Root cause: `findComponentForSection()` in `section-utils.ts` was ignoring the `component_index` parameter
+  - Root cause: `renderPreview()` in `section-builder.tsx` was not passing `displayIndex` to the lookup function
+  - Backend was generating unique content correctly, but frontend was always displaying the first instance
+
+### Changed
+- **Simplified Prompt Optimization**: Removed redundant `tone`, `structure`, and `content_type` parameters from the Optimize Prompt feature
+  - These were remnants of the original application and didn't add value given the project already defines its structure
+  - Cleaner, simpler prompt assistant dialog without confusing badge indicators
+- **Prompt Optimization robustness**: Added regex-based fallback for malformed JSON responses from AI, preventing errors when responses are truncated
+- **Increased token limit**: Raised `max_output_tokens` from 1500 to 2048 for prompt optimization to prevent truncation
+
+### Technical
+- `findComponentForSection()` now correctly uses `component_index` for multi-instance lookups
+- `renderPreview()` passes `displayIndex` to component lookup
+- `OptimizePromptRequest` simplified to only require `text` parameter
+- Added fallback JSON extraction in `optimize_prompt.py` using regex patterns
+
+---
+
 ## [1.1.0] - 2026-01-08 🚀
 
 ### New Feature: Push Notifications
