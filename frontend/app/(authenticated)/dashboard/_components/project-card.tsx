@@ -34,6 +34,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import Image from "next/image"
+import { getFlagUrlForLanguage } from "@/lib/languages"
 
 // Color palette for labels based on their color property
 const LABEL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -48,18 +49,6 @@ const LABEL_COLORS: Record<string, { bg: string; text: string; border: string }>
   gray: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300", border: "border-gray-200 dark:border-gray-700" },
 }
 
-const LANGUAGE_FLAGS: Record<string, string> = {
-  it: "🇮🇹",
-  de: "🇩🇪",
-  fr: "🇫🇷",
-  es: "🇪🇸",
-  pt: "🇵🇹",
-  ru: "🇷🇺",
-  zh: "🇨🇳",
-  ja: "🇯🇵",
-  ar: "🇸🇦",
-  nl: "🇳🇱"
-}
 
 interface ProjectCardProps {
   project: Project
@@ -271,13 +260,15 @@ export function ProjectCard({ project, labelColorMap = {} }: ProjectCardProps) {
             {project.target_languages && project.target_languages.length > 0 && (
               <div className="flex gap-1.5 items-center">
                 {project.target_languages.map((lang) => (
-                  <span 
-                    key={lang} 
-                    className="text-lg leading-none"
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img 
+                    key={lang}
+                    src={getFlagUrlForLanguage(lang, 20)}
+                    alt={lang.toUpperCase()}
+                    width={20}
+                    height={15}
                     title={lang.toUpperCase()}
-                  >
-                    {LANGUAGE_FLAGS[lang] || lang}
-                  </span>
+                  />
                 ))}
               </div>
             )}

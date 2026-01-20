@@ -27,7 +27,7 @@ import { RefreshCw, Edit2, Copy, FileCode, Check, Sparkles, Languages, Bell } fr
 import { Loader2 } from "lucide-react"
 import { generate } from "@/actions/generate"
 import { handlebarsGenerate } from "@/actions/export"
-import { batchTranslate } from "@/actions/translate"
+import { batchTranslate, translateContent } from "@/actions/translate"
 import {
   ensureSectionKeys,
   findComponentForSection,
@@ -674,67 +674,97 @@ export function SectionBuilder({
                         <button
                           type="button"
                           className="rounded px-2 py-1 text-xs hover:bg-accent inline-flex items-center border"
-                          disabled={!!regenBusy[compKey] || !brief || isReadOnly}
+                          disabled={!!regenBusy[compKey] || (currentLanguage === "en" ? !brief : !found?.generated_content) || isReadOnly}
                           onClick={async () => {
-                            if (!brief) return
                             setRegenBusy(v => ({ ...v, [compKey]: true }))
                             try {
-                              const result = await generate({
-                                project_id: projectId,
-                                text: brief!,
-                                count: 1,
-                                tone: tone || "professional",
-                                content_type: "newsletter",
-                                structure: [{ component: type as any, count: 1 }],
-                                temperature: 0.7,
-                                use_few_shot: true,
-                                use_flash: true,
-                              })
-                              if (result.success && result.data) {
-                                const val = String(result.data.variations[0][type] || "")
-
-                                if (val && onUpdateComponents) {
-                                  // Check if this component had existing translations
-                                  const existingComp = (components || []).find((c) => 
-                                    c.component_type === type && 
-                                    ((c as any).section_key === "header" || (c as any).section_key === "default")
-                                  )
-                                  const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
-
-                                  // If component had translations and target languages are set, retranslate
-                                  if (hadTranslations && (targetLanguages || []).length > 0) {
-                                    try {
-                                      // Include section_key in key to match email-structure.tsx format
-                                      const translationKey = `header:${type}`
-                                      const texts = [{ key: translationKey, content: val }]
-                                      const langs = targetLanguages || []
-                                      const res = await batchTranslate(texts, langs, projectId)
-
-                                      if (res.success && res.data) {
-                                        const t = (res.data[translationKey] || {}) as Record<string, string>
-
-                                        const merged = (components || []).map((c) => {
-                                          if (c.component_type === type && 
-                                              ((c as any).section_key === "header" || (c as any).section_key === "default")) {
-                                            return { ...c, generated_content: val, translations: t, section_key: "header" }
-                                          }
-                                          return c
-                                        })
-                                        onUpdateComponents(merged as any)
+                              // RETRANSLATE: When viewing non-English, re-translate from English content
+                              if (currentLanguage && currentLanguage !== "en") {
+                                const englishContent = found?.generated_content
+                                if (!englishContent) {
+                                  toast.error("No English content to translate from")
+                                  return
+                                }
+                                const result = await translateContent({
+                                  text: englishContent,
+                                  target_language: currentLanguage,
+                                  source_language: "en",
+                                  content_type: "newsletter"
+                                })
+                                if (result.success && result.data && onUpdateComponents) {
+                                  const newTranslation = result.data.translated_text
+                                  const merged = (components || []).map((c) => {
+                                    if (c.component_type === type && 
+                                        ((c as any).section_key === "header" || (c as any).section_key === "default")) {
+                                      const existingTranslations = normalizeTranslationsMap((c as any).translations)
+                                      return { 
+                                        ...c, 
+                                        translations: { 
+                                          ...existingTranslations, 
+                                          [currentLanguage.toLowerCase()]: newTranslation 
+                                        },
+                                        section_key: "header" 
                                       }
-                                    } catch (err) {
-                                      console.error(`Error retranslating ${type}:`, err)
                                     }
-                                  } else {
-                                    // No translations to regenerate, just update English content
-                                    const merged = (components || []).map((c) => {
-                                      if (c.component_type === type && 
-                                          ((c as any).section_key === "header" || (c as any).section_key === "default")) {
-                                        return { ...c, generated_content: val, section_key: "header" }
+                                    return c
+                                  })
+                                  onUpdateComponents(merged as any)
+                                  toast.success(`Retranslated to ${currentLanguage.toUpperCase()}`)
+                                } else {
+                                  toast.error("Failed to retranslate")
+                                }
+                              } else {
+                                // REGENERATE: When viewing English, generate new content from brief
+                                if (!brief) return
+                                const result = await generate({
+                                  project_id: projectId,
+                                  text: brief!,
+                                  count: 1,
+                                  tone: tone || "professional",
+                                  content_type: "newsletter",
+                                  structure: [{ component: type as any, count: 1 }],
+                                  temperature: 0.7,
+                                  use_few_shot: true,
+                                  use_flash: true,
+                                })
+                                if (result.success && result.data) {
+                                  const val = String(result.data.variations[0][type] || "")
+                                  if (val && onUpdateComponents) {
+                                    const existingComp = (components || []).find((c) => 
+                                      c.component_type === type && 
+                                      ((c as any).section_key === "header" || (c as any).section_key === "default")
+                                    )
+                                    const hadTranslations = existingComp?.translations && typeof existingComp.translations === 'object' && Object.keys(existingComp.translations).length > 0
+                                    if (hadTranslations && (targetLanguages || []).length > 0) {
+                                      try {
+                                        const translationKey = `header:${type}`
+                                        const texts = [{ key: translationKey, content: val }]
+                                        const langs = targetLanguages || []
+                                        const res = await batchTranslate(texts, langs, projectId)
+                                        if (res.success && res.data) {
+                                          const t = (res.data[translationKey] || {}) as Record<string, string>
+                                          const merged = (components || []).map((c) => {
+                                            if (c.component_type === type && 
+                                                ((c as any).section_key === "header" || (c as any).section_key === "default")) {
+                                              return { ...c, generated_content: val, translations: t, section_key: "header" }
+                                            }
+                                            return c
+                                          })
+                                          onUpdateComponents(merged as any)
+                                        }
+                                      } catch (err) {
+                                        console.error(`Error retranslating ${type}:`, err)
                                       }
-                                      return c
-                                    })
-                                    onUpdateComponents(merged as any)
+                                    } else {
+                                      const merged = (components || []).map((c) => {
+                                        if (c.component_type === type && 
+                                            ((c as any).section_key === "header" || (c as any).section_key === "default")) {
+                                          return { ...c, generated_content: val, section_key: "header" }
+                                        }
+                                        return c
+                                      })
+                                      onUpdateComponents(merged as any)
+                                    }
                                   }
                                 }
                               }
@@ -748,7 +778,9 @@ export function SectionBuilder({
                           ) : (
                             <RefreshCw className="h-3.5 w-3.5 mr-1" />
                           )}
-                          {found?.generated_content?.trim() ? "Regenerate" : "Generate"}
+                          {currentLanguage && currentLanguage !== "en" 
+                            ? "Retranslate" 
+                            : (found?.generated_content?.trim() ? "Regenerate" : "Generate")}
                         </button>
                         {!isReadOnly && (
                           <button
@@ -1414,68 +1446,96 @@ export function SectionBuilder({
                                             <button
                                               type="button"
                                               className="rounded px-2 py-0.5 text-xs hover:bg-accent inline-flex items-center border"
-                                              disabled={!!regenBusy[compKey] || (!section.brief && !brief)}
+                                              disabled={!!regenBusy[compKey] || (currentLanguage === "en" ? (!section.brief && !brief) : !contentObj?.generated_content)}
                                               onClick={async () => {
-                                                // Use section brief if available, fallback to main brief
-                                                const textToUse = section.brief?.trim() || brief
-                                                if (!textToUse) return
                                                 setRegenBusy(v => ({ ...v, [compKey]: true }))
                                                 try {
-                                                  const result = await generate({
-                                                    project_id: projectId,
-                                                    text: textToUse,
-                                                    count: 1,
-                                                    tone: tone || "professional",
-                                                    content_type: "newsletter",
-                                                    structure: [{ component: c as any, count: 1 }],
-                                                    temperature: 0.8,
-                                                    use_few_shot: true,
-                                                    use_flash: c === "cta",
-                                                  })
-                                                  if (result.success && result.data) {
-                                                    const val = String(result.data.variations[0][c] || "")
-                                                    const finalVal = c === "cta" ? val.toUpperCase() : val
-                                                    if (finalVal && onUpdateComponents) {
-                                                      // Find this component correctly using section context
-                                                      const existingComp = findComponentForSection(
-                                                        components || [],
-                                                        section.key,
-                                                        idx,
-                                                        c
-                                                      )
-                                                      
-                                                      // Always retranslate if target languages are set
-                                                      if ((targetLanguages || []).length > 0) {
-                                                        try {
-                                                          // Include section.key in translation key to prevent cross-section contamination
-                                                          const translationKey = `${section.key}:${c}${typeInSectionIdx > 1 ? `_${typeInSectionIdx}` : ""}`
-                                                          const texts = [{ key: translationKey, content: finalVal }]
-                                                          const langs = targetLanguages || []
-                                                          const res = await batchTranslate(texts, langs, projectId)
-                                                          if (res.success && res.data) {
-                                                            const newTranslations = res.data[translationKey]
-                                                            const merged = (components || []).map((item) => {
-                                                              const typeMatch = item.component_type === c
-                                                              const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
-                                                              if (typeMatch && sectionMatch) {
-                                                                return { ...item, generated_content: finalVal, translations: newTranslations }
-                                                              }
-                                                              return item
-                                                            })
-                                                            onUpdateComponents(merged as any)
+                                                  // RETRANSLATE: When viewing non-English, re-translate from English content
+                                                  if (currentLanguage && currentLanguage !== "en") {
+                                                    const englishContent = contentObj?.generated_content
+                                                    if (!englishContent) {
+                                                      toast.error("No English content to translate from")
+                                                      return
+                                                    }
+                                                    const result = await translateContent({
+                                                      text: englishContent,
+                                                      target_language: currentLanguage,
+                                                      source_language: "en",
+                                                      content_type: contentType || "newsletter"
+                                                    })
+                                                    if (result.success && result.data && onUpdateComponents) {
+                                                      const newTranslation = result.data.translated_text
+                                                      const merged = (components || []).map((item) => {
+                                                        const typeMatch = item.component_type === c
+                                                        const indexMatch = (item.component_index || 1) === typeInSectionIdx
+                                                        const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
+                                                        if (typeMatch && sectionMatch && indexMatch) {
+                                                          const existingTranslations = normalizeTranslationsMap((item as any).translations)
+                                                          return { 
+                                                            ...item, 
+                                                            translations: { 
+                                                              ...existingTranslations, 
+                                                              [currentLanguage.toLowerCase()]: newTranslation 
+                                                            } 
                                                           }
-                                                        } catch { }
-                                                      } else {
-                                                        // No translations to regenerate, just update English content
-                                                        const merged = (components || []).map((item) => {
-                                                          const typeMatch = item.component_type === c
-                                                          const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
-                                                          if (typeMatch && sectionMatch) {
-                                                            return { ...item, generated_content: finalVal }
-                                                          }
-                                                          return item
-                                                        })
-                                                        onUpdateComponents(merged as any)
+                                                        }
+                                                        return item
+                                                      })
+                                                      onUpdateComponents(merged as any)
+                                                      toast.success(`Retranslated to ${currentLanguage.toUpperCase()}`)
+                                                    } else {
+                                                      toast.error("Failed to retranslate")
+                                                    }
+                                                  } else {
+                                                    // REGENERATE: When viewing English, generate new content from brief
+                                                    const textToUse = section.brief?.trim() || brief
+                                                    if (!textToUse) return
+                                                    const result = await generate({
+                                                      project_id: projectId,
+                                                      text: textToUse,
+                                                      count: 1,
+                                                      tone: tone || "professional",
+                                                      content_type: "newsletter",
+                                                      structure: [{ component: c as any, count: 1 }],
+                                                      temperature: 0.8,
+                                                      use_few_shot: true,
+                                                      use_flash: c === "cta",
+                                                    })
+                                                    if (result.success && result.data) {
+                                                      const val = String(result.data.variations[0][c] || "")
+                                                      const finalVal = c === "cta" ? val.toUpperCase() : val
+                                                      if (finalVal && onUpdateComponents) {
+                                                        // Always retranslate if target languages are set
+                                                        if ((targetLanguages || []).length > 0) {
+                                                          try {
+                                                            const translationKey = `${section.key}:${c}${typeInSectionIdx > 1 ? `_${typeInSectionIdx}` : ""}`
+                                                            const texts = [{ key: translationKey, content: finalVal }]
+                                                            const langs = targetLanguages || []
+                                                            const res = await batchTranslate(texts, langs, projectId)
+                                                            if (res.success && res.data) {
+                                                              const newTranslations = res.data[translationKey]
+                                                              const merged = (components || []).map((item) => {
+                                                                const typeMatch = item.component_type === c
+                                                                const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
+                                                                if (typeMatch && sectionMatch) {
+                                                                  return { ...item, generated_content: finalVal, translations: newTranslations }
+                                                                }
+                                                                return item
+                                                              })
+                                                              onUpdateComponents(merged as any)
+                                                            }
+                                                          } catch { }
+                                                        } else {
+                                                          const merged = (components || []).map((item) => {
+                                                            const typeMatch = item.component_type === c
+                                                            const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
+                                                            if (typeMatch && sectionMatch) {
+                                                              return { ...item, generated_content: finalVal }
+                                                            }
+                                                            return item
+                                                          })
+                                                          onUpdateComponents(merged as any)
+                                                        }
                                                       }
                                                     }
                                                   }
@@ -1489,7 +1549,9 @@ export function SectionBuilder({
                                               ) : (
                                                 <RefreshCw className="h-3.5 w-3.5 mr-1" />
                                               )}
-                                              {contentObj?.generated_content?.trim() ? "Regenerate" : "Generate"}
+                                              {currentLanguage && currentLanguage !== "en" 
+                                                ? "Retranslate" 
+                                                : (contentObj?.generated_content?.trim() ? "Regenerate" : "Generate")}
                                             </button>
                                             <button
                                               type="button"

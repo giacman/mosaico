@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
   eslint: {
     // Unblock deployment: don't fail the build on ESLint errors
     ignoreDuringBuilds: true
+  },
+  images: {
+    // Allow external flag images from flagcdn.com
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "flagcdn.com",
+        pathname: "/**"
+      }
+    ]
   }
 }
 

@@ -38,6 +38,8 @@ import { normalizeComponentList, normalizeTranslationsMap, ensureSectionKeys } f
 import { ImageUploadGuard } from "./image-upload-guard"
 import { useLabels } from "@/hooks/use-labels"
 import { createLabel, deleteLabel } from "@/actions/labels"
+import { LANGUAGES, ENGLISH_LANGUAGE } from "@/lib/languages"
+import Image from "next/image"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,15 +56,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-const LANGUAGES = [
-  { value: "it", label: "Italian", flag: "🇮🇹" },
-  { value: "fr", label: "French", flag: "🇫🇷" },
-  { value: "es", label: "Spanish", flag: "🇪🇸" },
-  { value: "de", label: "German", flag: "🇩🇪" },
-  { value: "zh", label: "Chinese", flag: "🇨🇳" },
-  { value: "ko", label: "Korean", flag: "🇰🇷" },
-  { value: "ja", label: "Japanese", flag: "🇯🇵" }
-]
 
 interface UploadedImage {
   id: string
@@ -755,7 +748,7 @@ export function EmailStructure({
                         onProjectChange("target_languages", next as any)
                       }}
                     >
-                      <span className="text-base leading-none">{lang.flag}</span>
+                      <Image src={lang.flagUrl} alt={lang.label} width={20} height={14} unoptimized />
                       {lang.label}
                     </Badge>
                   )
@@ -915,7 +908,7 @@ export function EmailStructure({
         isReadOnly={isReadOnly}
         languageFlags={
           <div className="flex flex-wrap gap-2">
-            {[{ value: "en", label: "English", flag: "🇬🇧" }, ...LANGUAGES.filter(l => (project.target_languages || []).includes(l.value))].map((l) => {
+            {[ENGLISH_LANGUAGE, ...LANGUAGES.filter(l => (project.target_languages || []).includes(l.value))].map((l) => {
               const isTranslated = l.value === "en" || translatedLanguages.has(l.value)
               const showSpinner = isTranslating && l.value !== "en"
 
@@ -926,7 +919,7 @@ export function EmailStructure({
                   className={`cursor-pointer gap-1.5 px-3 py-1 text-xs transition-all ${viewLang === l.value ? 'ring-2 ring-primary/20 scale-105' : 'hover:bg-accent/50'}`}
                   onClick={() => setViewLang(l.value)}
                 >
-                  <span className="text-base leading-none">{l.flag}</span>
+                  <Image src={l.flagUrl} alt={l.label} width={20} height={14} unoptimized />
                   {l.label}
                   {showSpinner && (
                     <Loader2 className="h-3 w-3 animate-spin ml-1" />
