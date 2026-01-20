@@ -708,7 +708,7 @@ export function SectionBuilder({
                                       const translationKey = `header:${type}`
                                       const texts = [{ key: translationKey, content: val }]
                                       const langs = targetLanguages || []
-                                      const res = await batchTranslate(texts, langs)
+                                      const res = await batchTranslate(texts, langs, projectId)
 
                                       if (res.success && res.data) {
                                         const t = (res.data[translationKey] || {}) as Record<string, string>
@@ -1451,7 +1451,7 @@ export function SectionBuilder({
                                                           const translationKey = `${section.key}:${c}${typeInSectionIdx > 1 ? `_${typeInSectionIdx}` : ""}`
                                                           const texts = [{ key: translationKey, content: finalVal }]
                                                           const langs = targetLanguages || []
-                                                          const res = await batchTranslate(texts, langs)
+                                                          const res = await batchTranslate(texts, langs, projectId)
                                                           if (res.success && res.data) {
                                                             const newTranslations = res.data[translationKey]
                                                             const merged = (components || []).map((item) => {

@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -34,7 +34,7 @@
 - 📊 **Project Management**: Organize campaigns with team collaboration and activity tracking
 - 🏷️ **Labels & Status**: Add pastel color labels; `in_progress` (editable) vs `approved` (read-only) with UI gating
 - 🧭 **Sidebar & Filters**: Projects nested under In Progress / Approved; dashboard tabs for filtering
-- 🔔 **Notifications**: Real-time in-app and Slack notifications for team handoffs with persistent notification bell
+- 🔔 **Notifications**: Real-time in-app and Slack notifications with project context, user identification, and direct project links
 - 📤 **Handlebar Export**: Export components with multi-language handlebar templates for Airship integration
 - 🔠 **CTA Consistency**: CTAs normalized to UPPERCASE across generation and regeneration
 - 🔁 **Auto-Retranslation**: Regeneration and manual edits trigger translation updates with clear UX feedback states

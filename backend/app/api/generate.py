@@ -319,14 +319,10 @@ async def generate_variations(
         logger.info(f"Successfully generated {len(variations_list)} variations")
         
         # Send Slack notification (non-blocking)
+        # Note: This endpoint doesn't have project context, so we skip the notification
+        # Project-based generation should use /projects/{id}/generate instead
         component_count = sum(comp.count for comp in req.structure)
-        asyncio.create_task(
-            notify_generation_completed(
-                project_name="Unknown",  # Will be enriched when we have project context
-                component_count=component_count,
-                user_email=None
-            )
-        )
+        # Skipping notification - no project_id available
         
         return GenerateVariationsResponse(
             variations=variations_list,

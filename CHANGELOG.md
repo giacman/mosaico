@@ -2,6 +2,29 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.2] - 2026-01-16
+
+### Added
+- **Enhanced Slack Notifications**: Notifications now include comprehensive project context
+  - Project name displayed in all notifications (no more "Unknown" projects)
+  - User email included to identify who performed the action
+  - Clickable "View Project" button that opens the project directly in the app
+  - Project URL automatically built from `FRONTEND_URL` configuration
+
+### Changed
+- **Notification functions**: All notification functions now require `project_id` parameter for proper context
+- **Batch translate endpoint**: Now accepts optional `project_id` and `user_email` to send contextual notifications
+- **Frontend translation calls**: Updated to pass `projectId` when calling batch translate API
+
+### Technical
+- Added `frontend_url` configuration setting (defaults to `http://localhost:3000` for local dev)
+- `send_slack_notification()` now accepts `project_id` and builds project URLs
+- `notify_project_created()`, `notify_generation_completed()`, `notify_translation_completed()`, and `notify_content_ready_for_approval()` all require `project_id`
+- `BatchTranslateRequest` model extended with optional `project_id` and `user_email` fields
+- Frontend `batchTranslate()` function now accepts optional `projectId` parameter
+
+---
+
 ## [1.1.1] - 2026-01-16
 
 ### Fixed

@@ -33,6 +33,7 @@ async def send_slack_notification(
     message: str,
     project_name: Optional[str] = None,
     user_email: Optional[str] = None,
+    project_id: Optional[int] = None,
     event_type: str = "info"
 ) -> bool:
     """
@@ -42,6 +43,7 @@ async def send_slack_notification(
         message: Main notification message
         project_name: Name of the project (if applicable)
         user_email: Email of the user who triggered the action
+        project_id: ID of the project (for building URL)
         event_type: Type of event (info, success, error, project, generation, translation, approval)
     
     Returns:
@@ -71,6 +73,12 @@ async def send_slack_notification(
         if settings.environment == "development":
             env_tag = "[DEV] "
         
+        # Build project URL if project_id is available
+        project_url = None
+        if project_id:
+            base_url = settings.frontend_url.rstrip('/')
+            project_url = f"{base_url}/dashboard/projects/{project_id}"
+        
         # Build message blocks
         blocks = [
             {
@@ -81,6 +89,19 @@ async def send_slack_notification(
                 }
             }
         ]
+        
+        # Add project link button if URL is available
+        if project_url and project_name:
+            blocks[0]["accessory"] = {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "View Project",
+                    "emoji": True
+                },
+                "url": project_url,
+                "action_id": "view_project"
+            }
         
         # Add context if available
         context_elements = []
@@ -121,13 +142,14 @@ async def send_slack_notification(
         return False
 
 
-async def notify_project_created(project_name: str, user_email: Optional[str] = None, content_type: str = "newsletter"):
+async def notify_project_created(project_name: str, project_id: int, user_email: Optional[str] = None, content_type: str = "newsletter"):
     """Notify when a new project is created"""
     type_label = "Push Notification" if content_type == "push_notification" else "Newsletter"
     await send_slack_notification(
         message=f"New {type_label} created: {project_name}",
         project_name=project_name,
         user_email=user_email,
+        project_id=project_id,
         event_type="project"
     )
 
@@ -138,6 +160,7 @@ async def notify_project_created(project_name: str, user_email: Optional[str] = 
 
 async def notify_generation_completed(
     project_name: str,
+    project_id: int,
     component_count: int,
     user_email: Optional[str] = None
 ):
@@ -146,12 +169,14 @@ async def notify_generation_completed(
         message=f"Content generated: {component_count} component(s)",
         project_name=project_name,
         user_email=user_email,
+        project_id=project_id,
         event_type="generation"
     )
 
 
 async def notify_translation_completed(
     project_name: str,
+    project_id: int,
     language_count: int,
     component_count: int,
     user_email: Optional[str] = None
@@ -161,12 +186,14 @@ async def notify_translation_completed(
         message=f"Translation completed: {component_count} component(s) to {language_count} language(s)",
         project_name=project_name,
         user_email=user_email,
+        project_id=project_id,
         event_type="translation"
     )
 
 
 async def notify_content_ready_for_approval(
     project_name: str,
+    project_id: int,
     user_email: Optional[str] = None
 ):
     """Notify when content is ready for approval"""
@@ -174,5 +201,6 @@ async def notify_content_ready_for_approval(
         message=f"Content ready for approval: {project_name}",
         project_name=project_name,
         user_email=user_email,
+        project_id=project_id,
         event_type="approval"
     )

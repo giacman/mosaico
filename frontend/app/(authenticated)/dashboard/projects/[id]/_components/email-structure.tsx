@@ -554,7 +554,7 @@ export function EmailStructure({
         return
       }
 
-      const res = await batchTranslate(textsToTranslate, langs)
+      const res = await batchTranslate(textsToTranslate, langs, project.id)
       if (res.success && res.data) {
         // 3. Merge new translations with existing ones
         let failedCount = 0
@@ -791,7 +791,7 @@ export function EmailStructure({
 
                       if (texts.length === 0) { toast.error("Generate content first"); return }
                       const langs = project.target_languages || []
-                      const res = await batchTranslate(texts, langs)
+                      const res = await batchTranslate(texts, langs, project.id)
                       if (res.success && res.data) {
                         const merged = (project.components || []).map((c: any) => {
                           const key = `${c.section_key}:${c.component_type}${(c.component_index || 1) > 1 ? '_' + c.component_index : ''}`

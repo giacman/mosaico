@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     slack_webhook_url: str | None = None  # Default/production channel
     slack_webhook_url_dev: str | None = None  # Development channel (optional)
     
+    # Frontend URL for building project links in notifications
+    frontend_url: str = "http://localhost:3000"  # Default to local dev, override in production
+    
     # Authentication (optional - for local dev with service account)
     google_application_credentials: str | None = None
     

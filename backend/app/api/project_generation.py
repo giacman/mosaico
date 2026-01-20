@@ -2,6 +2,7 @@
 Project-based Generation and Translation Endpoints
 Combines AI generation with database persistence
 """
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -253,6 +254,17 @@ async def generate_project_content(
         
         logger.info(f"Generated and saved {len(saved_components)} components across {len(project.structure)} sections for project {project_id}")
         
+        # Send Slack notification (non-blocking)
+        from app.utils.notifications import notify_generation_completed
+        asyncio.create_task(
+            notify_generation_completed(
+                project_name=project.name,
+                project_id=project.id,
+                component_count=len(saved_components),
+                user_email=user_id  # user_id is a string identifier
+            )
+        )
+        
         return GenerateProjectContentResponse(
             project_id=project_id,
             components=[ComponentResponse.from_orm(c) for c in saved_components]
@@ -342,6 +354,18 @@ async def translate_project_content(
         ).all()
         
         logger.info(f"Translated {len(components)} components for project {project_id}")
+        
+        # Send Slack notification (non-blocking)
+        from app.utils.notifications import notify_translation_completed
+        asyncio.create_task(
+            notify_translation_completed(
+                project_name=project.name,
+                project_id=project.id,
+                language_count=len(target_languages),
+                component_count=len(components),
+                user_email=user_id  # user_id is a string identifier
+            )
+        )
         
         return TranslateProjectResponse(
             project_id=project_id,
