@@ -61,6 +61,7 @@ jobs:
             DATABASE_URL=postgresql+psycopg2://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/${{ secrets.DB_NAME }}?host=/cloudsql/${{ secrets.CLOUD_SQL_INSTANCE_NAME }}
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
             SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             ENVIRONMENT=production
 
       - name: Output service URL
