@@ -43,7 +43,8 @@ async def create_project(
         asyncio.create_task(
             notify_project_created(
                 project_name=project.name,
-                user_email=getattr(user, 'email', None) or user.name
+                project_id=project.id,
+                user_email=user.name  # user.name contains email from Clerk
             )
         )
         
@@ -130,7 +131,8 @@ async def update_project(
         asyncio.create_task(
             notify_content_ready_for_approval(
                 project_name=project.name,
-                user_email=getattr(user, 'email', None) or user.name
+                project_id=project.id,
+                user_email=user.name  # user.name contains email from Clerk
             )
         )
     
@@ -344,7 +346,8 @@ async def create_push_from_section(
     asyncio.create_task(
         notify_project_created(
             project_name=push_project.name,
-            user_email=getattr(user, 'email', None) or user.name,
+            project_id=push_project.id,
+            user_email=user.name,  # user.name contains email from Clerk
             content_type="push_notification"
         )
     )
@@ -433,8 +436,9 @@ async def create_push_from_section(
             asyncio.create_task(
                 notify_generation_completed(
                     project_name=push_project.name,
+                    project_id=push_project.id,
                     component_count=2,  # title + body
-                    user_email=getattr(user, 'email', None) or user.name
+                    user_email=user.name  # user.name contains email from Clerk
                 )
             )
             

@@ -9,12 +9,17 @@ import logging
 import json
 import asyncio
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from app.models.schemas import TranslateRequest, TranslateResponse
 from app.core.vertex_ai import vertex_client
 from app.core.config import settings
 from app.utils.notifications import notify_translation_completed
+from app.core.auth import get_current_user, User
+from app.db.session import get_db
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -483,6 +488,8 @@ class TextToTranslate(BaseModel):
 class BatchTranslateRequest(BaseModel):
     texts: List[TextToTranslate]
     target_languages: List[str]
+    project_id: Optional[int] = None  # Optional project ID for notifications
+    user_email: Optional[str] = None  # Optional user email for notifications
 
 
 class BatchTranslateResponse(BaseModel):
@@ -534,7 +541,9 @@ async def translate_single_with_retry(
 @limiter.limit(f"{settings.rate_limit_per_second}/second")
 async def batch_translate(
     request: Request,
-    req: BatchTranslateRequest
+    req: BatchTranslateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ) -> BatchTranslateResponse:
     """
     Batch translate multiple texts to multiple languages in parallel
@@ -577,15 +586,24 @@ async def batch_translate(
         
         logger.info(f"Batch translation completed successfully")
         
-        # Send Slack notification (non-blocking)
-        asyncio.create_task(
-            notify_translation_completed(
-                project_name="Unknown",  # Will be enriched when we have project context
-                language_count=len(req.target_languages),
-                component_count=len(req.texts),
-                user_email=None
-            )
-        )
+        # Send Slack notification if project_id is provided
+        if req.project_id:
+            try:
+                from app.db.models import Project
+                project = db.query(Project).filter(Project.id == req.project_id).first()
+                if project:
+                    user_email = req.user_email or user.name if hasattr(user, 'name') else None
+                    asyncio.create_task(
+                        notify_translation_completed(
+                            project_name=project.name,
+                            project_id=project.id,
+                            language_count=len(req.target_languages),
+                            component_count=len(req.texts),
+                            user_email=user_email
+                        )
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to send translation notification: {str(e)}")
         
         return BatchTranslateResponse(translations=translations)
     

@@ -75,7 +75,8 @@ export async function translateContent(
  */
 export async function batchTranslate(
   texts: { key: string; content: string }[],
-  targetLanguages: string[]
+  targetLanguages: string[],
+  projectId?: number
 ): Promise<{
   success: boolean
   data?: Record<string, Record<string, string>> // { componentKey: { lang: translatedText } }
@@ -92,7 +93,8 @@ export async function batchTranslate(
       },
       body: JSON.stringify({
         texts: texts,
-        target_languages: targetLanguages
+        target_languages: targetLanguages,
+        ...(projectId && { project_id: projectId })
       })
     })
 
