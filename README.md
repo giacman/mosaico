@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -114,6 +114,9 @@ Edit `.env` with your credentials:
 - **Vertex AI**: `VERTEX_AI_MODEL=gemini-2.5-pro`
 - **Storage**: `GCS_BUCKET_IMAGES` (e.g., `mosaico-images-dev-xxxxx`)
 - **Auth**: `CLERK_SECRET_KEY`
+- **Slack (Dev)**: `SLACK_WEBHOOK_URL_DEV` - Webhook for `mosaico-test-notifications` channel (dev notifications)
+
+> **Note**: When `ENVIRONMENT=development` (default for local), Slack notifications are sent to `SLACK_WEBHOOK_URL_DEV` instead of the production channel. This prevents test notifications from appearing in production.
 
 **Authenticate locally:**
 To let the backend container access GCP services (Vertex AI, GCS):

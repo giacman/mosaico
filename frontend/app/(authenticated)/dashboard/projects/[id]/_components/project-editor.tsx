@@ -53,15 +53,12 @@ const TONES = [
 
 const LANGUAGES = [
   { value: "it", label: "Italian" },
-  { value: "de", label: "German" },
   { value: "fr", label: "French" },
   { value: "es", label: "Spanish" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ru", label: "Russian" },
+  { value: "de", label: "German" },
   { value: "zh", label: "Chinese" },
-  { value: "ja", label: "Japanese" },
-  { value: "ar", label: "Arabic" },
-  { value: "nl", label: "Dutch" }
+  { value: "ko", label: "Korean" },
+  { value: "ja", label: "Japanese" }
 ]
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
