@@ -2,6 +2,25 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.4] - 2026-01-20
+
+### Added
+- **Flag images from flagcdn.com**: Replaced emoji flags with proper flag images from flagcdn.com CDN for cross-platform compatibility (fixes Windows Chrome flag display)
+- **Retranslate feature**: When viewing translated content, "Regenerate" button becomes "Retranslate" to re-translate from English source
+
+### Changed
+- **Shared language configuration**: Languages now defined in `frontend/lib/languages.ts` to avoid duplication
+- **Flag rendering**: Uses `<Image>` component with flagcdn.com URLs instead of emoji text
+- **Project cards**: Language flags on newsletter/push list pages now use proper flag images
+
+### Technical
+- Created `frontend/lib/languages.ts` with `LANGUAGES` array, `getFlagUrl()`, and `getFlagUrlForLanguage()` helper functions
+- Updated `email-structure.tsx`, `project-editor.tsx`, and `project-card.tsx` to use shared language config
+- Updated `section-builder.tsx` with Retranslate logic that calls existing `/translate` endpoint
+- Uses flagcdn.com CDN for flag images (no local assets needed)
+
+---
+
 ## [1.1.3] - 2026-01-20
 
 ### Added

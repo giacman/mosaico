@@ -31,6 +31,7 @@ import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dia
 import { getLabelColor } from "../../../_components/create-project-dialog"
 import { useProject } from "@/hooks/use-project"
 import { useDebounce } from "@/hooks/use-debounce"
+import { LANGUAGES } from "@/lib/languages"
 
 interface ProjectEditorProps {
   projectId: number
@@ -51,15 +52,6 @@ const TONES = [
   { value: "direct", label: "Direct" }
 ]
 
-const LANGUAGES = [
-  { value: "it", label: "Italian" },
-  { value: "fr", label: "French" },
-  { value: "es", label: "Spanish" },
-  { value: "de", label: "German" },
-  { value: "zh", label: "Chinese" },
-  { value: "ko", label: "Korean" },
-  { value: "ja", label: "Japanese" }
-]
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const { user } = useUser()
