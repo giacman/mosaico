@@ -56,15 +56,12 @@ import {
 
 const LANGUAGES = [
   { value: "it", label: "Italian", flag: "🇮🇹" },
-  { value: "de", label: "German", flag: "🇩🇪" },
   { value: "fr", label: "French", flag: "🇫🇷" },
   { value: "es", label: "Spanish", flag: "🇪🇸" },
-  { value: "pt", label: "Portuguese", flag: "🇵🇹" },
-  { value: "ru", label: "Russian", flag: "🇷🇺" },
+  { value: "de", label: "German", flag: "🇩🇪" },
   { value: "zh", label: "Chinese", flag: "🇨🇳" },
-  { value: "ja", label: "Japanese", flag: "🇯🇵" },
-  { value: "ar", label: "Arabic", flag: "🇸🇦" },
-  { value: "nl", label: "Dutch", flag: "🇳🇱" }
+  { value: "ko", label: "Korean", flag: "🇰🇷" },
+  { value: "ja", label: "Japanese", flag: "🇯🇵" }
 ]
 
 interface UploadedImage {

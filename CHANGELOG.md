@@ -2,6 +2,22 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.3] - 2026-01-20
+
+### Added
+- **App version in sidebar**: Version number now displayed in bottom-left of sidebar footer
+- **Slack dev channel separation**: Development notifications now go to separate `mosaico-test-notifications` channel when `SLACK_WEBHOOK_URL_DEV` is configured
+- **Korean language support**: Added Korean (KO) as a target translation language
+
+### Changed
+- **Streamlined language list**: Reduced available languages to core markets: IT, FR, ES, DE, ZH, KO, JA (removed PT, RU, AR, NL)
+
+### Technical
+- `SLACK_WEBHOOK_URL_DEV` environment variable for dev-only Slack notifications
+- Version imported from `package.json` and displayed dynamically in sidebar
+
+---
+
 ## [1.1.2] - 2026-01-16
 
 ### Added

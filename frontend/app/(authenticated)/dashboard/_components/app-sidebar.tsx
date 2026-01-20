@@ -7,6 +7,7 @@ import { listProjects, type Project } from "@/actions/projects"
 import { getLabelColor } from "./create-project-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import packageJson from "../../../../package.json"
 
 import {
   Sidebar,
@@ -212,6 +213,9 @@ export function AppSidebar({
         <div className="px-4 py-2 flex items-center justify-between border-t border-sidebar-border/50">
           <span className="text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">Theme Mode</span>
           <ModeToggle />
+        </div>
+        <div className="px-4 py-1 group-data-[collapsible=icon]:hidden">
+          <span className="text-[10px] text-muted-foreground/60">v{packageJson.version}</span>
         </div>
         <NavUser user={data.user} />
       </SidebarFooter>
