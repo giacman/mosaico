@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Card,
   CardContent,
@@ -338,6 +338,12 @@ export function EmailStructure({
   const [translatedLanguages, setTranslatedLanguages] = useState<Set<string>>(new Set())
   const [viewLang, setViewLang] = useState<string>("en")
   const { addNotification } = useNotifications()
+  
+  // Ref to track the latest components (avoids stale closure issues in async callbacks)
+  const latestComponentsRef = useRef(project.components)
+  useEffect(() => {
+    latestComponentsRef.current = project.components
+  }, [project.components])
 
   // Check which languages already have translations on mount/update
   useEffect(() => {
@@ -411,12 +417,37 @@ export function EmailStructure({
   const executeGenerate = async () => {
     setIsGenerating(true)
     try {
+      // Get the latest components (use ref for most up-to-date state)
+      const currentComponents = latestComponentsRef.current || []
+      
+      // Find ALL existing CTA components that have content (e.g., from presets)
+      // These should be preserved and NOT regenerated
+      const existingCtasWithContent = currentComponents.filter((c: any) => 
+        c.component_type === "cta" && 
+        c.generated_content?.trim()
+      )
+      
+      // Create modified sections structure that excludes CTAs for sections that already have CTA content
+      const modifiedSections = sections.map(section => {
+        const sectionHasCtaWithContent = existingCtasWithContent.some(
+          (c: any) => c.section_key === section.key
+        )
+        
+        if (sectionHasCtaWithContent) {
+          return {
+            ...section,
+            components: (section.components || []).filter((c: string) => c !== "cta")
+          }
+        }
+        return section
+      })
+      
       // Use the project-specific generation endpoint that handles multiple sections
-      // Send the current sections state so the backend has the latest briefs
+      // Send the MODIFIED sections state so CTAs with content are not regenerated
       const result = await generateProjectContent(project.id, {
         count: 1,
         image_urls: images.map(img => img.url),
-        structure: sections
+        structure: modifiedSections
       })
 
       if (result.success && result.data) {
@@ -432,9 +463,21 @@ export function EmailStructure({
 
         // Update components from backend response
         if (result.data.components) {
-          // Use common normalization utility
-          const formattedComponents = normalizeComponentList(result.data.components)
-          onProjectChange("components", formattedComponents as any)
+          // Merge: keep existing CTAs with content, add new generated components
+          let mergedComponents = normalizeComponentList(result.data.components)
+          
+          // If we preserved CTAs, add them back to the merged list
+          if (existingCtasWithContent.length > 0) {
+            // Remove any newly generated CTAs (shouldn't be any since we excluded them, but just in case)
+            const ctaSectionKeys = new Set(existingCtasWithContent.map((c: any) => c.section_key))
+            mergedComponents = mergedComponents.filter((c: any) => 
+              !(c.component_type === "cta" && ctaSectionKeys.has(c.section_key))
+            )
+            // Add back the preserved CTAs
+            mergedComponents = [...mergedComponents, ...existingCtasWithContent]
+          }
+          
+          onProjectChange("components", mergedComponents as any)
         }
       } else {
         toast.error(result.error || "Failed to generate content")
@@ -486,12 +529,36 @@ export function EmailStructure({
       const section = sections[sectionIdx]
       if (!section) return
 
+      // Find existing CTA components in this section that have content (e.g., from presets)
+      // These should be preserved and NOT regenerated
+      // Use latestComponentsRef to get the most recent state (avoids stale closure issues)
+      const currentComponents = latestComponentsRef.current || []
+      
+      const existingCtasWithContent = currentComponents.filter((c: any) => 
+        c.component_type === "cta" && 
+        c.section_key === section.key && 
+        c.generated_content?.trim()
+      )
+      
+      // Create a modified section structure that excludes CTAs if they already have content
+      const ctaCountInSection = (section.components || []).filter((c: string) => c === "cta").length
+      const existingCtaCount = existingCtasWithContent.length
+      
+      // If all CTAs in section already have content, remove CTAs from generation structure
+      let modifiedSection = section
+      if (existingCtaCount >= ctaCountInSection && ctaCountInSection > 0) {
+        modifiedSection = {
+          ...section,
+          components: (section.components || []).filter((c: string) => c !== "cta")
+        }
+      }
+
       // Use the project-specific generation endpoint but ONLY for this section
       // We pass a structure containing only this section
       const result = await generateProjectContent(project.id, {
         count: 1,
         image_urls: images.map(img => img.url),
-        structure: [section]
+        structure: [modifiedSection]
       })
 
       if (result.success && result.data) {
@@ -499,9 +566,20 @@ export function EmailStructure({
         
         // Update components from backend response
         if (result.data.components) {
-          // Use common normalization utility
-          const formattedComponents = normalizeComponentList(result.data.components)
-          onProjectChange("components", formattedComponents as any)
+          // Merge: keep existing CTAs with content, add new generated components
+          let mergedComponents = normalizeComponentList(result.data.components)
+          
+          // If we preserved CTAs, add them back to the merged list
+          if (existingCtasWithContent.length > 0) {
+            // Remove any newly generated CTAs for this section (shouldn't be any, but just in case)
+            mergedComponents = mergedComponents.filter((c: any) => 
+              !(c.component_type === "cta" && c.section_key === section.key)
+            )
+            // Add back the preserved CTAs
+            mergedComponents = [...mergedComponents, ...existingCtasWithContent]
+          }
+          
+          onProjectChange("components", mergedComponents as any)
         }
       } else {
         toast.error(result.error || "Failed to generate section content")
@@ -851,6 +929,10 @@ export function EmailStructure({
         targetLanguages={(project.target_languages as any) || []}
         onUpdateComponents={async (list) => {
           const normalized = normalizeComponentList(list as any)
+
+          // IMMEDIATELY update the ref so that executeGenerateSection can see it
+          // (avoids stale closure issues when Generate is clicked right after preset selection)
+          latestComponentsRef.current = normalized as any
 
           // Optimistically update the UI for responsiveness (silent: true to avoid triggering autosave loop)
           onProjectChange("components", normalized as any, true)
