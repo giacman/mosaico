@@ -372,7 +372,8 @@ export function EmailStructure({
       return
     }
 
-    // Check that non-main sections have their own brief
+    // Validation moved to executeGenerate to allow fallback to main brief
+    /*
     const sectionsWithoutBrief = sections.filter(s => 
       s.key !== "main" && (!s.brief || !s.brief.trim())
     )
@@ -383,6 +384,7 @@ export function EmailStructure({
       )
       return
     }
+    */
 
     // Check for missing images across ALL sections
     // Images are linked via image_id on the Component, not via section_key on Image
@@ -415,6 +417,31 @@ export function EmailStructure({
   }
 
   const executeGenerate = async () => {
+    // Check for brief availability before starting generation
+    const mainBrief = project.brief_text?.trim()
+    let missingBrief = false
+    let usedFallback = false
+    
+    sections.forEach(s => {
+      // Skip sections that don't need text generation (e.g. only images)
+      const hasTextComponents = (s.components || []).some(c => c !== 'image')
+      if (!hasTextComponents) return
+
+      if (!s.brief?.trim()) {
+        if (mainBrief) usedFallback = true
+        else missingBrief = true
+      }
+    })
+    
+    if (missingBrief) {
+      toast.error("Some sections are missing a brief. Please add section briefs or a main project brief.")
+      return
+    }
+    
+    if (usedFallback) {
+      toast.info("Using main brief for sections without specific instructions.")
+    }
+
     setIsGenerating(true)
     try {
       // CAPTURE CTA state BEFORE any async operations
@@ -536,11 +563,31 @@ export function EmailStructure({
 
   const executeGenerateSection = async (sectionIdx: number) => {
     if (isGenerating) return
+
+    const section = sections[sectionIdx]
+    if (!section) return
+
+    // Check brief for this section
+    const sectionBrief = section.brief?.trim()
+    const mainBrief = project.brief_text?.trim()
+    
+    // Skip check if section only has images (no text to generate)
+    const hasTextComponents = (section.components || []).some(c => c !== 'image')
+    
+    if (hasTextComponents) {
+      if (!sectionBrief && !mainBrief) {
+        toast.error("Please add a brief to this section or the main project brief.")
+        return
+      }
+      
+      if (!sectionBrief && mainBrief) {
+        toast.info(`Using main brief for "${section.name}"`)
+      }
+    }
+
     setIsGenerating(true)
 
     try {
-      const section = sections[sectionIdx]
-      if (!section) return
 
       // CAPTURE CTA state BEFORE any async operations
       // Check BOTH the ref AND the current project.components
