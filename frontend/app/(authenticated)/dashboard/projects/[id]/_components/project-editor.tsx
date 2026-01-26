@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
 import { ArrowLeft, Save, Loader2 } from "lucide-react"
@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { updateProject, type Project } from "@/actions/projects"
+import { saveGeneratedComponents } from "@/actions/components"
 import { EmailStructure } from "./email-structure"
 import { normalizeComponentList } from "@/lib/section-utils"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
@@ -131,8 +132,22 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const isReadOnly = (project as any).status === "approved"
 
   const handleSave = async () => {
+    // Capture the exact version we are saving
+    const projectToSave = project
     setIsSaving(true)
+    
     try {
+      // 1. Save components first to ensure content edits are persisted
+      // We explicitly pass the components from our local state which contains the edits
+      if (projectToSave.components && projectToSave.components.length > 0) {
+        const compResult = await saveGeneratedComponents(project.id, projectToSave.components as any)
+        if (!compResult.success) {
+          console.error("Failed to save components:", compResult.error)
+          // We continue to try saving metadata, but this is a partial failure
+        }
+      }
+
+      // 2. Save project metadata (name, brief, structure, etc.)
       const result = await updateProject(project.id, {
         name: project.name,
         brief_text: project.brief_text ?? undefined,
@@ -148,11 +163,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           ...result.data,
           components: normalizeComponentList(result.data.components)
         }
-        setEditedProject(normalized as any)
-        setHasChanges(false)
+        
         // Update SWR cache immediately with the new data
         mutate(normalized as any, false)
-        toast.success("Project saved successfully!")
+        
+        // Only update local state if it hasn't changed since save started
+        setEditedProject(current => {
+          if (current === projectToSave) {
+            setHasChanges(false)
+            toast.success("Project saved successfully!")
+            return normalized as any
+          }
+          // If changes happened during save, keep current state and keep hasChanges=true
+          return current
+        })
       } else {
         toast.error(result.error || "Failed to save project")
       }
