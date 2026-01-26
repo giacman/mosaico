@@ -853,7 +853,15 @@ export function SectionBuilder({
                           <button
                             type="button"
                             className="text-xs px-3 py-1.5 rounded hover:bg-muted font-medium text-muted-foreground"
-                            onClick={() => setEditing(v => ({ ...v, [compKey]: false }))}
+                            onClick={() => {
+                              // Clear edit value on cancel too
+                              setEditValues(v => {
+                                const next = { ...v }
+                                delete next[compKey]
+                                return next
+                              })
+                              setEditing(v => ({ ...v, [compKey]: false }))
+                            }}
                           >
                             Cancel
                           </button>
@@ -864,6 +872,12 @@ export function SectionBuilder({
                               if (onUpdateComponent) {
                                 onUpdateComponent(type, 1, editText, "header")
                               }
+                              // Clear edit value on save
+                              setEditValues(v => {
+                                const next = { ...v }
+                                delete next[compKey]
+                                return next
+                              })
                               setEditing(v => ({ ...v, [compKey]: false }))
                             }}
                           >
@@ -1186,11 +1200,23 @@ export function SectionBuilder({
                                         placeholder="Enter push title..."
                                       />
                                       <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" onClick={() => setEditing(v => ({ ...v, [titleKey]: false }))}>
+                                        <Button size="sm" variant="outline" onClick={() => {
+                                          setEditValues(v => {
+                                            const next = { ...v }
+                                            delete next[titleKey]
+                                            return next
+                                          })
+                                          setEditing(v => ({ ...v, [titleKey]: false }))
+                                        }}>
                                           Cancel
                                         </Button>
                                         <Button size="sm" onClick={() => {
                                           if (onUpdateComponent) onUpdateComponent("title", 1, titleEditText, section.key)
+                                          setEditValues(v => {
+                                            const next = { ...v }
+                                            delete next[titleKey]
+                                            return next
+                                          })
                                           setEditing(v => ({ ...v, [titleKey]: false }))
                                         }}>
                                           <Check className="h-3 w-3 mr-1" /> Save
@@ -1247,11 +1273,23 @@ export function SectionBuilder({
                                         placeholder="Enter push body text..."
                                       />
                                       <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" onClick={() => setEditing(v => ({ ...v, [bodyKey]: false }))}>
+                                        <Button size="sm" variant="outline" onClick={() => {
+                                          setEditValues(v => {
+                                            const next = { ...v }
+                                            delete next[bodyKey]
+                                            return next
+                                          })
+                                          setEditing(v => ({ ...v, [bodyKey]: false }))
+                                        }}>
                                           Cancel
                                         </Button>
                                         <Button size="sm" onClick={() => {
                                           if (onUpdateComponent) onUpdateComponent("body", 1, bodyEditText, section.key)
+                                          setEditValues(v => {
+                                            const next = { ...v }
+                                            delete next[bodyKey]
+                                            return next
+                                          })
                                           setEditing(v => ({ ...v, [bodyKey]: false }))
                                         }}>
                                           <Check className="h-3 w-3 mr-1" /> Save
@@ -1437,6 +1475,12 @@ export function SectionBuilder({
                                                 type="button"
                                                 className="inline-flex items-center rounded border px-2 py-1 text-xs hover:bg-accent"
                                                 onClick={() => {
+                                                  // Clear the edit value for this key so next time we open it (even in another language) it starts fresh
+                                                  setEditValues(v => {
+                                                    const next = { ...v }
+                                                    delete next[compKey]
+                                                    return next
+                                                  })
                                                   setEditing(v => ({ ...v, [compKey]: false }))
                                                   if (onUpdateComponent) {
                                                     onUpdateComponent(c, typeInSectionIdx, editText, section.key)
