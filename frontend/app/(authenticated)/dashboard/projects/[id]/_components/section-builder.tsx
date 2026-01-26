@@ -135,6 +135,50 @@ function SectionBriefInput({
   )
 }
 
+// Helper components defined outside to prevent re-creation on render
+function SortableSectionItem({ id, children, isReadOnly }: { id: string; children: React.ReactNode; isReadOnly?: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id,
+    disabled: isReadOnly
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+  return (
+    <div ref={setNodeRef} style={style} className="rounded-md border border-border p-3 bg-card/50">
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none -mt-1 -mb-1 mb-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        Drag to reorder
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function SortableComponentItem({ id, children, isReadOnly }: { id: string; children: (p: { attributes: any; listeners: any }) => React.ReactNode; isReadOnly?: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id,
+    disabled: isReadOnly
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="block"
+    >
+      {children({ attributes, listeners })}
+    </div>
+  )
+}
+
 export function SectionBuilder({
   value,
   onChange,
@@ -290,49 +334,6 @@ export function SectionBuilder({
     if (from === -1 || to === -1 || from === to) return
     const next = arrayMove(ensureSectionKeys(value), from, to)
     onChange(next)
-  }
-
-  function SortableSectionItem({ id, children }: { id: string; children: React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-      id,
-      disabled: isReadOnly
-    })
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    }
-    return (
-      <div ref={setNodeRef} style={style} className="rounded-md border border-border p-3 bg-card/50">
-        <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing touch-none -mt-1 -mb-1 mb-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Drag to reorder
-        </div>
-        {children}
-      </div>
-    )
-  }
-
-  function SortableComponentItem({ id, children }: { id: string; children: (p: { attributes: any; listeners: any }) => React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-      id,
-      disabled: isReadOnly
-    })
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    }
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className="block"
-      >
-        {children({ attributes, listeners })}
-      </div>
-    )
   }
 
   const compressImage = async (file: File): Promise<File> => {
@@ -893,7 +894,7 @@ export function SectionBuilder({
                   const sectionTypeCounters: Record<string, number> = {}
                   
                   return (
-                    <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`}>
+                    <SortableSectionItem key={`section:${section.key}`} id={`section:${section.key}`} isReadOnly={isReadOnly}>
                       {/* ... content ... */}
                       {/* (Skipping unrelated lines, focusing on the component loop below) */}
 
@@ -1357,7 +1358,7 @@ export function SectionBuilder({
                               const isEditing = !!editing[compKey]
                               const editText = editValues[compKey] ?? currentText
                               return (
-                                <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`}>
+                                <SortableComponentItem key={`compwrap:${section.key}::${compIdx}`} id={`comp:${section.key}::${compIdx}`} isReadOnly={isReadOnly}>
                                   {({ attributes, listeners }) => (
                                     <div className="rounded-xl border border-border bg-card p-5 space-y-3 shadow-sm">
                                       <div className="flex items-center justify-between">
