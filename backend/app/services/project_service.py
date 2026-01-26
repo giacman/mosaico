@@ -3,6 +3,7 @@ Service layer for Project operations
 """
 import logging
 from typing import List, Optional
+from collections import defaultdict
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
@@ -473,11 +474,46 @@ class ProjectService:
         new_image_comps = [c for c in components_data if c.get("component_type") == "image"]
 
         # 2. Handle Text Components (Clean Slate)
+        # BUG FIX: Only delete text components that are INCLUDED in the payload if partial updates are intended.
+        # BUT current architecture assumes "generate project" replaces all text.
+        # To support partial updates (like "generate single section"), the payload must contain EVERYTHING or we must be selective.
+        # The frontend sends a FULL list of components to save_generated_content, so Clean Slate is correct IF the frontend sends everything.
+        # However, generate_project_content ONLY returns the newly generated components for that section/project.
+        # IF generate_project_content calls this, it might be wiping out other sections if it doesn't include them.
+        
+        # Let's check who calls this.
+        # 1. API /projects/{id}/components (save_generated_content) -> receives FULL list from frontend. OK.
+        # 2. API /projects/{id}/generate (generate_project_content) -> Generates content, then calls this.
+        #    If generating ONE section, it only creates components for THAT section.
+        #    If we then wipe ALL text components, we lose the other sections!
+        
+        # FIX: Only delete components that overlap with the SECTIONS we are updating.
+        
         if new_text_comps:
-            db.query(Component).filter(
-                Component.project_id == project_id,
-                Component.component_type != "image"
-            ).delete()
+            # Get the section keys we are updating
+            section_keys_to_update = {c.get("section_key", "default") for c in new_text_comps}
+            
+            # If we are updating "header" (subject/pre-header), handle carefully
+            # Usually header has section_key="header" or section_order=-1
+            
+            # Delete only components that match both the SECTION and the COMPONENT TYPE being updated
+            # This ensures that if we update "body" in "section_1", we don't delete "cta" in "section_1"
+            
+            # Group by section to handle per-section updates efficiently
+            comps_by_section = defaultdict(set)
+            for c in new_text_comps:
+                s_key = c.get("section_key", "default")
+                c_type = c.get("component_type")
+                comps_by_section[s_key].add(c_type)
+            
+            # Perform selective deletes
+            for s_key, types in comps_by_section.items():
+                db.query(Component).filter(
+                    Component.project_id == project_id,
+                    Component.section_key == s_key,
+                    Component.component_type.in_(types)
+                ).delete(synchronize_session=False)
+            
             db.flush()
         
         # 3. Process the payload

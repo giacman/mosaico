@@ -39,6 +39,14 @@ import {
   type SectionComponent,
   type UploadedImage,
 } from "@/lib/section-utils"
+import { CTA_PRESETS, type CTAPreset } from "@/lib/cta-presets"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { PromptAssistantDialog } from "../../../_components/prompt-assistant-dialog"
 import { Button } from "@/components/ui/button"
 
@@ -1560,6 +1568,68 @@ export function SectionBuilder({
                                             >
                                               <Edit2 className="h-3 w-3 mr-1" /> Edit
                                             </button>
+                                            {/* CTA Preset Selector - only for CTA components */}
+                                            {c === "cta" && !isReadOnly && (
+                                              <Select
+                                                value=""
+                                                onValueChange={(presetId) => {
+                                                  const preset = CTA_PRESETS.find(p => p.id === presetId)
+                                                  if (!preset || !onUpdateComponents) return
+                                                  
+                                                  const englishText = preset.en.toUpperCase()
+                                                  const presetTranslations: Record<string, string> = {}
+                                                  Object.entries(preset.translations).forEach(([lang, text]) => {
+                                                    presetTranslations[lang] = text.toUpperCase()
+                                                  })
+                                                  
+                                                  // Update component with preset content and translations
+                                                  const merged = (components || []).map((item) => {
+                                                    const typeMatch = item.component_type === "cta"
+                                                    const indexMatch = (item.component_index || 1) === typeInSectionIdx
+                                                    const sectionMatch = (item as any).section_key === section.key || (item as any).section_order === idx
+                                                    if (typeMatch && sectionMatch && indexMatch) {
+                                                      return { 
+                                                        ...item, 
+                                                        generated_content: englishText,
+                                                        translations: presetTranslations
+                                                      }
+                                                    }
+                                                    return item
+                                                  })
+                                                  
+                                                  // If component doesn't exist yet, add it
+                                                  const exists = merged.some(item => 
+                                                    item.component_type === "cta" && 
+                                                    ((item as any).section_key === section.key || (item as any).section_order === idx) &&
+                                                    (item.component_index || 1) === typeInSectionIdx
+                                                  )
+                                                  if (!exists) {
+                                                    merged.push({
+                                                      component_type: "cta",
+                                                      component_index: typeInSectionIdx,
+                                                      generated_content: englishText,
+                                                      translations: presetTranslations,
+                                                      section_key: section.key,
+                                                      section_order: idx,
+                                                    } as any)
+                                                  }
+                                                  
+                                                  onUpdateComponents(merged as any)
+                                                  toast.success(`Applied CTA preset: "${preset.en}"`)
+                                                }}
+                                              >
+                                                <SelectTrigger className="h-6 w-[130px] text-xs border">
+                                                  <SelectValue placeholder="Use Preset..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {CTA_PRESETS.map((preset) => (
+                                                    <SelectItem key={preset.id} value={preset.id} className="text-xs">
+                                                      {preset.en}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            )}
                                             <button
                                               type="button"
                                               className="rounded px-2 py-0.5 text-xs hover:bg-accent inline-flex items-center border"

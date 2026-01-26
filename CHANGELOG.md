@@ -2,6 +2,26 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.5] - 2026-01-22
+
+### Added
+- **CTA Preset Selector**: New dropdown in CTA component toolbar allowing users to select from pre-translated CTA presets
+  - 5 presets available: "Book the experience", "Discover more", "Redeem now", "Explore All Rewards", "Discover the Reward"
+  - Each preset includes verified translations for all supported languages (IT, FR, ES, DE, ZH, KO)
+  - Selecting a preset instantly populates CTA text and all translations
+
+### Changed
+- **CTA Preservation during Generation**: When a CTA has content (from preset or manual entry), it is now preserved during "Generate All Content" and per-section generation
+  - Structure sent to backend excludes CTAs that already have content
+  - Prevents AI from overwriting carefully chosen CTA text
+
+### Technical
+- Created `frontend/lib/cta-presets.ts` with preset data and translations
+- Added `useRef` in `email-structure.tsx` to track latest components state (fixes stale closure issues)
+- Modified `executeGenerate` and `executeGenerateSection` to filter out CTAs with existing content from generation structure
+
+---
+
 ## [1.1.4] - 2026-01-20
 
 ### Added
