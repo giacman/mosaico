@@ -996,9 +996,24 @@ export function EmailStructure({
             (!sectionKey || c.section_key === sectionKey)
           )
           const finalContent = type === "cta" ? (content || "").toUpperCase() : content
+          
           if (idx >= 0) {
-            list[idx] = { ...list[idx], generated_content: finalContent }
+            if (viewLang && viewLang !== "en") {
+              // Update translation for the current language
+              const existingTranslations = normalizeTranslationsMap(list[idx].translations)
+              list[idx] = { 
+                ...list[idx], 
+                translations: {
+                  ...existingTranslations,
+                  [viewLang.toLowerCase()]: finalContent
+                }
+              }
+            } else {
+              // Update source content (English)
+              list[idx] = { ...list[idx], generated_content: finalContent }
+            }
           } else {
+            // New component creation always assumes source content
             list.push({ 
               component_type: type, 
               component_index: index, 
