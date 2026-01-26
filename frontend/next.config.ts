@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "flagcdn.com",
         pathname: "/**"
+      },
+      {
+        protocol: "https",
+        hostname: "storage.googleapis.com",
+        pathname: "/**"
       }
     ]
   }

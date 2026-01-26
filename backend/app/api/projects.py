@@ -14,6 +14,7 @@ from app.models.project_schemas import (
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,
+    ProjectListResponse,
     ActivityLogResponse,
     SaveGeneratedContentRequest
 )
@@ -60,7 +61,7 @@ async def create_project(
         )
 
 
-@router.get("/projects", response_model=List[ProjectResponse])
+@router.get("/projects", response_model=List[ProjectListResponse])
 async def list_projects(
     request: Request, # Moved to the beginning
     skip: int = 0,
@@ -72,6 +73,7 @@ async def list_projects(
     """
     List ALL projects (shared across all users)
     Optionally filter by content_type (newsletter, push_notification)
+    Returns lightweight objects (no components) for performance
     """
     try:
         projects = ProjectService.list_projects(db, skip, limit, content_type)

@@ -132,6 +132,39 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 
+class ProjectListResponse(BaseModel):
+    """
+    Lightweight project response for lists
+    Excludes heavy content components but keeps images for previews
+    """
+    id: int
+    name: str
+    brief_text: Optional[str]
+    structure: List[dict]
+    tone: Optional[str]
+    target_languages: List[str]
+    labels: List[str]
+    content_type: str = "newsletter"
+    status: ProjectStatus
+    
+    # Audit fields
+    created_by_user_id: Optional[str]
+    created_by_user_name: Optional[str]
+    updated_by_user_id: Optional[str]
+    updated_by_user_name: Optional[str]
+    
+    created_at: datetime
+    updated_at: datetime
+    
+    # Images are needed for preview cards
+    images: List["ImageResponse"] = []
+    
+    # Components are EXCLUDED to prevent N+1 query performance issues
+    
+    class Config:
+        from_attributes = True
+
+
 # ===== Component Schemas =====
 
 class ComponentCreate(BaseModel):

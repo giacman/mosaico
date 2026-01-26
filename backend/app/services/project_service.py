@@ -228,7 +228,10 @@ class ProjectService:
         List all projects (shared across all users)
         Optionally filter by content_type
         """
-        query = db.query(Project)
+        # Optimize: Eager load images for preview cards, but NOT components
+        query = db.query(Project).options(
+            joinedload(Project.images)
+        )
         
         if content_type:
             query = query.filter(Project.content_type == content_type)
