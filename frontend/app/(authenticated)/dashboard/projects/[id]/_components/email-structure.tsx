@@ -417,23 +417,36 @@ export function EmailStructure({
   const executeGenerate = async () => {
     setIsGenerating(true)
     try {
-      // Get the latest components (use ref for most up-to-date state)
-      const currentComponents = latestComponentsRef.current || []
+      // CAPTURE CTA state BEFORE any async operations
+      // Check BOTH the ref AND the current project.components to find all CTAs with content
+      const refComponents = latestComponentsRef.current || []
+      const projectComponents = (project.components as any) || []
       
-      // Find ALL existing CTA components that have content (e.g., from presets)
-      // These should be preserved and NOT regenerated
-      const existingCtasWithContent = currentComponents.filter((c: any) => 
+      // Merge both sources to find all CTAs (in case one is more up-to-date than the other)
+      const allKnownComponents = [...refComponents]
+      projectComponents.forEach((pc: any) => {
+        const alreadyExists = allKnownComponents.some((rc: any) =>
+          rc.component_type === pc.component_type &&
+          rc.section_key === pc.section_key &&
+          (rc.component_index || 1) === (pc.component_index || 1)
+        )
+        if (!alreadyExists) {
+          allKnownComponents.push(pc)
+        }
+      })
+      
+      // Find ALL existing CTA components that have content (from presets or manual edits)
+      const ctasToPreserve = allKnownComponents.filter((c: any) => 
         c.component_type === "cta" && 
         c.generated_content?.trim()
       )
       
+      // Create a set of section keys that have CTAs to preserve
+      const sectionsWithCtas = new Set(ctasToPreserve.map((c: any) => c.section_key))
+      
       // Create modified sections structure that excludes CTAs for sections that already have CTA content
       const modifiedSections = sections.map(section => {
-        const sectionHasCtaWithContent = existingCtasWithContent.some(
-          (c: any) => c.section_key === section.key
-        )
-        
-        if (sectionHasCtaWithContent) {
+        if (sectionsWithCtas.has(section.key)) {
           return {
             ...section,
             components: (section.components || []).filter((c: string) => c !== "cta")
@@ -463,20 +476,20 @@ export function EmailStructure({
 
         // Update components from backend response
         if (result.data.components) {
-          // Merge: keep existing CTAs with content, add new generated components
+          // Start with normalized components from backend
           let mergedComponents = normalizeComponentList(result.data.components)
           
-          // If we preserved CTAs, add them back to the merged list
-          if (existingCtasWithContent.length > 0) {
-            // Remove any newly generated CTAs (shouldn't be any since we excluded them, but just in case)
-            const ctaSectionKeys = new Set(existingCtasWithContent.map((c: any) => c.section_key))
+          // ALWAYS remove any CTAs from backend response for sections where we preserved CTAs
+          if (ctasToPreserve.length > 0) {
             mergedComponents = mergedComponents.filter((c: any) => 
-              !(c.component_type === "cta" && ctaSectionKeys.has(c.section_key))
+              !(c.component_type === "cta" && sectionsWithCtas.has(c.section_key))
             )
             // Add back the preserved CTAs
-            mergedComponents = [...mergedComponents, ...existingCtasWithContent]
+            mergedComponents = [...mergedComponents, ...ctasToPreserve]
           }
           
+          // Update the ref immediately
+          latestComponentsRef.current = mergedComponents as any
           onProjectChange("components", mergedComponents as any)
         }
       } else {
@@ -529,12 +542,26 @@ export function EmailStructure({
       const section = sections[sectionIdx]
       if (!section) return
 
-      // Find existing CTA components in this section that have content (e.g., from presets)
-      // These should be preserved and NOT regenerated
-      // Use latestComponentsRef to get the most recent state (avoids stale closure issues)
-      const currentComponents = latestComponentsRef.current || []
+      // CAPTURE CTA state BEFORE any async operations
+      // Check BOTH the ref AND the current project.components
+      const refComponents = latestComponentsRef.current || []
+      const projectComponents = (project.components as any) || []
       
-      const existingCtasWithContent = currentComponents.filter((c: any) => 
+      // Merge both sources to find all CTAs for THIS section
+      const allKnownComponents = [...refComponents]
+      projectComponents.forEach((pc: any) => {
+        const alreadyExists = allKnownComponents.some((rc: any) =>
+          rc.component_type === pc.component_type &&
+          rc.section_key === pc.section_key &&
+          (rc.component_index || 1) === (pc.component_index || 1)
+        )
+        if (!alreadyExists) {
+          allKnownComponents.push(pc)
+        }
+      })
+      
+      // Find CTAs in THIS section that have content (from presets or manual edits)
+      const ctasToPreserve = allKnownComponents.filter((c: any) => 
         c.component_type === "cta" && 
         c.section_key === section.key && 
         c.generated_content?.trim()
@@ -542,11 +569,11 @@ export function EmailStructure({
       
       // Create a modified section structure that excludes CTAs if they already have content
       const ctaCountInSection = (section.components || []).filter((c: string) => c === "cta").length
-      const existingCtaCount = existingCtasWithContent.length
+      const hasCtasToPreserve = ctasToPreserve.length > 0
       
-      // If all CTAs in section already have content, remove CTAs from generation structure
+      // If we have CTAs to preserve, remove CTAs from generation structure
       let modifiedSection = section
-      if (existingCtaCount >= ctaCountInSection && ctaCountInSection > 0) {
+      if (hasCtasToPreserve && ctaCountInSection > 0) {
         modifiedSection = {
           ...section,
           components: (section.components || []).filter((c: string) => c !== "cta")
@@ -554,7 +581,6 @@ export function EmailStructure({
       }
 
       // Use the project-specific generation endpoint but ONLY for this section
-      // We pass a structure containing only this section
       const result = await generateProjectContent(project.id, {
         count: 1,
         image_urls: images.map(img => img.url),
@@ -566,19 +592,20 @@ export function EmailStructure({
         
         // Update components from backend response
         if (result.data.components) {
-          // Merge: keep existing CTAs with content, add new generated components
+          // Start with normalized components from backend
           let mergedComponents = normalizeComponentList(result.data.components)
           
-          // If we preserved CTAs, add them back to the merged list
-          if (existingCtasWithContent.length > 0) {
-            // Remove any newly generated CTAs for this section (shouldn't be any, but just in case)
+          // ALWAYS remove any CTAs from backend response and add back preserved ones
+          if (ctasToPreserve.length > 0) {
             mergedComponents = mergedComponents.filter((c: any) => 
               !(c.component_type === "cta" && c.section_key === section.key)
             )
             // Add back the preserved CTAs
-            mergedComponents = [...mergedComponents, ...existingCtasWithContent]
+            mergedComponents = [...mergedComponents, ...ctasToPreserve]
           }
           
+          // Update the ref immediately
+          latestComponentsRef.current = mergedComponents as any
           onProjectChange("components", mergedComponents as any)
         }
       } else {

@@ -99,6 +99,7 @@ export function normalizeComponentList(list: any[]): any[] {
       translations,
       section_key: c.section_key || 'default',
       section_order: c.section_order ?? 0,
+      component_index: c.component_index ?? 1,
       image: c.image || undefined
     }
   })

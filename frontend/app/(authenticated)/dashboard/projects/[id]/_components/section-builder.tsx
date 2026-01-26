@@ -1610,6 +1610,7 @@ export function SectionBuilder({
                                                       generated_content: englishText,
                                                       translations: presetTranslations,
                                                       section_key: section.key,
+                                                      section_order: idx,
                                                     } as any)
                                                   }
                                                   
