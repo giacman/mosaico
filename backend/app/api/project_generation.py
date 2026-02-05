@@ -19,6 +19,7 @@ from app.models.project_schemas import (
     ComponentResponse
 )
 from app.services.project_service import ProjectService
+from app.utils.text_limits import clamp_push_text, push_limit_violations
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,8 @@ async def generate_project_content(
             
             # Use section-specific content type or default to newsletter
             section_content_type = section.get("content_type", "newsletter")
+            if project.content_type == "push_notification":
+                section_content_type = "push_notification"
             
             # Get section-specific images
             section_image_ids = section.get("image_ids", [])
@@ -179,14 +182,41 @@ async def generate_project_content(
             
             logger.info(f"--- GENERATING SECTION: {section_name} (key: {section_key}) ---")
             
-            # Generate content for this section
-            response_text = await ai_client.generate_with_fixing(
-                prompt=ai_prompt,
-                expected_variations=request.count,
-                temperature=0.7,
-                max_tokens=2048,
-                image_url=image_url
-            )
+            # Generate content for this section (retry if push limits exceeded)
+            max_attempts = 3 if section_content_type == "push_notification" else 1
+            attempt = 0
+            response_text = None
+            while attempt < max_attempts:
+                retry_suffix = ""
+                if attempt > 0 and section_content_type == "push_notification":
+                    retry_suffix = (
+                        "\n\nRETRY: Previous output exceeded push notification limits. "
+                        "Shorten the TITLE to max 20 characters and BODY to max 100 characters."
+                    )
+                response_text = await ai_client.generate_with_fixing(
+                    prompt=ai_prompt + retry_suffix,
+                    expected_variations=request.count,
+                    temperature=0.7,
+                    max_tokens=2048,
+                    image_url=image_url
+                )
+                attempt += 1
+                if section_content_type != "push_notification":
+                    break
+                try:
+                    section_data = json.loads(response_text)
+                    variations = section_data.get("variations", [])
+                    if variations:
+                        generated_content = variations[0]
+                        violations = push_limit_violations(generated_content, "push_notification")
+                        if violations and attempt < max_attempts:
+                            logger.warning(
+                                f"Push limits exceeded for section {section_key} attempt {attempt}: {violations}"
+                            )
+                            continue
+                except Exception:
+                    pass
+                break
             
             try:
                 section_data = json.loads(response_text)
@@ -208,7 +238,7 @@ async def generate_project_content(
                     # Add each component to the list to be saved
                     for key in sorted_keys:
                         value = generated_content[key]
-                        
+
                         # Handle base component type (e.g. "pre_header_1" -> "pre_header")
                         # We use rsplit to only split at the last underscore if it's followed by a number
                         base_type = None
@@ -221,6 +251,8 @@ async def generate_project_content(
                         else:
                             base_type = key
                         
+                        value = clamp_push_text(value, base_type, section_content_type)
+
                         # STRICT FILTER: Only process components that were requested for this section
                         if base_type not in allowed_types:
                             continue
@@ -335,7 +367,9 @@ async def translate_project_content(
                     text=component.generated_content,
                     target_language=lang_code.upper(),
                     source_language="EN",
-                    ai_client=ai_client
+                    ai_client=ai_client,
+                    component_type=component.component_type,
+                    content_type=project.content_type
                 )
                 
                 # Save translation

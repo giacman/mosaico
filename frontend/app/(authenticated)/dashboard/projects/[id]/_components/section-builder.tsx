@@ -690,14 +690,26 @@ export function SectionBuilder({
                               // RETRANSLATE: When viewing non-English, re-translate from English content
                               if (currentLanguage && currentLanguage !== "en") {
                                 const englishContent = found?.generated_content
-                                if (!englishContent) {
-                                  toast.error("No English content to translate from")
+                                const existingTranslations = normalizeTranslationsMap((found as any)?.translations)
+                                const italianTranslation = existingTranslations["it"]
+                                const canUseItalian =
+                                  currentLanguage.toLowerCase() !== "it" &&
+                                  italianTranslation &&
+                                  String(italianTranslation).trim() &&
+                                  !String(italianTranslation).includes("__TRANSLATION_FAILED__")
+
+                                const sourceText = canUseItalian ? String(italianTranslation) : englishContent
+                                const sourceLanguage = canUseItalian ? "it" : "en"
+
+                                if (!sourceText) {
+                                  toast.error("No source content to translate from")
                                   return
                                 }
                                 const result = await translateContent({
-                                  text: englishContent,
+                                  text: sourceText,
                                   target_language: currentLanguage,
-                                  source_language: "en",
+                                  source_language: sourceLanguage,
+                                  component_type: type,
                                   content_type: "newsletter"
                                 })
                                 if (result.success && result.data && onUpdateComponents) {
@@ -749,7 +761,12 @@ export function SectionBuilder({
                                         const translationKey = `header:${type}`
                                         const texts = [{ key: translationKey, content: val }]
                                         const langs = targetLanguages || []
-                                        const res = await batchTranslate(texts, langs, projectId)
+                                        const res = await batchTranslate(
+                                          texts,
+                                          langs,
+                                          projectId,
+                                          contentType || "newsletter"
+                                        )
                                         if (res.success && res.data) {
                                           const t = (res.data[translationKey] || {}) as Record<string, string>
                                           const merged = (components || []).map((c) => {
@@ -1506,14 +1523,26 @@ export function SectionBuilder({
                                                   // RETRANSLATE: When viewing non-English, re-translate from English content
                                                   if (currentLanguage && currentLanguage !== "en") {
                                                     const englishContent = contentObj?.generated_content
-                                                    if (!englishContent) {
-                                                      toast.error("No English content to translate from")
+                                                    const existingTranslations = normalizeTranslationsMap((contentObj as any)?.translations)
+                                                    const italianTranslation = existingTranslations["it"]
+                                                    const canUseItalian =
+                                                      currentLanguage.toLowerCase() !== "it" &&
+                                                      italianTranslation &&
+                                                      String(italianTranslation).trim() &&
+                                                      !String(italianTranslation).includes("__TRANSLATION_FAILED__")
+
+                                                    const sourceText = canUseItalian ? String(italianTranslation) : englishContent
+                                                    const sourceLanguage = canUseItalian ? "it" : "en"
+
+                                                    if (!sourceText) {
+                                                      toast.error("No source content to translate from")
                                                       return
                                                     }
                                                     const result = await translateContent({
-                                                      text: englishContent,
+                                                      text: sourceText,
                                                       target_language: currentLanguage,
-                                                      source_language: "en",
+                                                      source_language: sourceLanguage,
+                                                      component_type: c,
                                                       content_type: contentType || "newsletter"
                                                     })
                                                     if (result.success && result.data && onUpdateComponents) {
@@ -1564,7 +1593,12 @@ export function SectionBuilder({
                                                             const translationKey = `${section.key}:${c}${typeInSectionIdx > 1 ? `_${typeInSectionIdx}` : ""}`
                                                             const texts = [{ key: translationKey, content: finalVal }]
                                                             const langs = targetLanguages || []
-                                                            const res = await batchTranslate(texts, langs, projectId)
+                                                            const res = await batchTranslate(
+                                                              texts,
+                                                              langs,
+                                                              projectId,
+                                                              contentType || "newsletter"
+                                                            )
                                                             if (res.success && res.data) {
                                                               const newTranslations = res.data[translationKey]
                                                               const merged = (components || []).map((item) => {

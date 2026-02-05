@@ -19,6 +19,7 @@ from app.models.project_schemas import (
 )
 from app.services.project_service import ProjectService
 from app.utils.notifications import notify_project_created, notify_content_ready_for_approval, notify_generation_completed
+from app.utils.text_limits import clamp_push_text, push_limit_violations
 
 logger = logging.getLogger(__name__)
 
@@ -376,76 +377,98 @@ async def create_push_from_section(
         
         logger.info(f"Generated prompt for push notification, calling AI...")
         
-        # Generate content
-        response = await ai_client.generate_content(prompt, temperature=0.7)
-        
-        logger.info(f"AI response received: {response[:200]}...")
-        
-        # Parse response
-        try:
-            # Clean markdown code blocks if present
-            clean_response = response.strip()
-            if clean_response.startswith("```"):
-                lines = clean_response.split("\n")
-                clean_response = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-            
-            generated = json.loads(clean_response)
-            logger.info(f"Parsed AI response: {generated}")
-            
-            # Extract the first variation from the response
-            variation = None
-            if "variations" in generated and isinstance(generated["variations"], list) and len(generated["variations"]) > 0:
-                variation = generated["variations"][0]
-            else:
-                # Fallback: maybe the response is already flat
-                variation = generated
-            
-            logger.info(f"Using variation: {variation}")
-            
-            # Create components for push notification (title, body)
-            # These need to be created since create_project doesn't create them
-            title_comp = Component(
-                project_id=push_project.id,
-                section_key="main",
-                section_order=0,
-                component_type="title",
-                component_index=1,
-                generated_content=variation.get("title", "")
-            )
-            body_comp = Component(
-                project_id=push_project.id,
-                section_key="main",
-                section_order=0,
-                component_type="body",
-                component_index=1,
-                generated_content=variation.get("body", "")
-            )
-            db.add_all([title_comp, body_comp])
-            logger.info(f"Created title component with content: {variation.get('title', '')[:50]}...")
-            logger.info(f"Created body component with content: {variation.get('body', '')[:50]}...")
-            
-            # Log content generation
-            ProjectService._log_activity(
-                db, push_project.id, user.id, user.name,
-                "generated_content"
-            )
-            db.commit()
-            logger.info(f"Successfully generated content for push notification {push_project.id}")
-            
-            # Send Slack notification for content generation (non-blocking)
-            asyncio.create_task(
-                notify_generation_completed(
-                    project_name=push_project.name,
-                    project_id=push_project.id,
-                    component_count=2,  # title + body
-                    user_email=user.name  # user.name contains email from Clerk
+        # Generate content (retry if limits exceeded)
+        max_attempts = 3
+        attempt = 0
+        variation = None
+
+        while attempt < max_attempts:
+            retry_suffix = ""
+            if attempt > 0:
+                retry_suffix = (
+                    "\n\nRETRY: Previous output exceeded push notification limits. "
+                    "Shorten the TITLE to max 20 characters and BODY to max 100 characters."
                 )
-            )
+            response = await ai_client.generate_content(prompt + retry_suffix, temperature=0.7)
             
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse AI response for push notification: {e}")
-            logger.warning(f"Raw response was: {response}")
-            # Continue without generated content - user can generate manually
+            logger.info(f"AI response received: {response[:200]}...")
+            
+            # Parse response
+            try:
+                # Clean markdown code blocks if present
+                clean_response = response.strip()
+                if clean_response.startswith("```"):
+                    lines = clean_response.split("\n")
+                    clean_response = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+                
+                generated = json.loads(clean_response)
+                logger.info(f"Parsed AI response: {generated}")
+                
+                # Extract the first variation from the response
+                if "variations" in generated and isinstance(generated["variations"], list) and len(generated["variations"]) > 0:
+                    variation = generated["variations"][0]
+                else:
+                    # Fallback: maybe the response is already flat
+                    variation = generated
+                
+                logger.info(f"Using variation: {variation}")
+
+                violations = push_limit_violations(variation or {}, "push_notification")
+                if violations and attempt < max_attempts - 1:
+                    logger.warning(f"Push limits exceeded attempt {attempt + 1}: {violations}")
+                    attempt += 1
+                    continue
+                break
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse AI response for push notification: {e}")
+                logger.warning(f"Raw response was: {response}")
+                if attempt >= max_attempts - 1:
+                    raise
+                attempt += 1
+                continue
+
+        title_val = clamp_push_text((variation or {}).get("title"), "title", "push_notification")
+        body_val = clamp_push_text((variation or {}).get("body"), "body", "push_notification")
+
+        # Create components for push notification (title, body)
+        # These need to be created since create_project doesn't create them
+        title_comp = Component(
+            project_id=push_project.id,
+            section_key="main",
+            section_order=0,
+            component_type="title",
+            component_index=1,
+            generated_content=title_val or ""
+        )
+        body_comp = Component(
+            project_id=push_project.id,
+            section_key="main",
+            section_order=0,
+            component_type="body",
+            component_index=1,
+            generated_content=body_val or ""
+        )
+        db.add_all([title_comp, body_comp])
+        logger.info(f"Created title component with content: {(title_val or '')[:50]}...")
+        logger.info(f"Created body component with content: {(body_val or '')[:50]}...")
+        
+        # Log content generation
+        ProjectService._log_activity(
+            db, push_project.id, user.id, user.name,
+            "generated_content"
+        )
+        db.commit()
+        logger.info(f"Successfully generated content for push notification {push_project.id}")
+        
+        # Send Slack notification for content generation (non-blocking)
+        asyncio.create_task(
+            notify_generation_completed(
+                project_name=push_project.name,
+                project_id=push_project.id,
+                component_count=2,  # title + body
+                user_email=user.name  # user.name contains email from Clerk
+            )
+        )
             
     except Exception as e:
         logger.error(f"Failed to auto-generate push notification content: {e}", exc_info=True)

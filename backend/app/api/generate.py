@@ -21,6 +21,7 @@ from app.models.schemas import (
 from app.core.vertex_ai import VertexAIClient, get_client
 from app.core.config import settings
 from app.utils.notifications import notify_generation_completed
+from app.utils.text_limits import clamp_push_text, push_limit_violations
 from app.prompts.few_shot_loader import get_few_shot_db
 
 logger = logging.getLogger(__name__)
@@ -173,6 +174,8 @@ BEFORE OUTPUT, COUNT YOUR CHARACTERS:
 - Title must be ≤ 20 characters
 - Body must be ≤ 100 characters
 
+If you are unsure, make the text shorter. Never exceed the limits.
+
 """
     
     # Visual context section - only included when an image is provided
@@ -300,36 +303,74 @@ async def generate_variations(
     # Use Flash model if requested (faster/cheaper for CTAs)
     use_flash = req.use_flash if req.use_flash is not None else False
     
-    raw_variations = await client.generate_with_fixing(
-        prompt,
-        req.count,
-        temperature=temperature,
-        max_tokens=2048,
-        image_url=req.image_url,
-        use_flash=use_flash,
-    )
+    max_attempts = 3 if req.content_type == ContentType.PUSH_NOTIFICATION else 1
+    attempt = 0
+    variations_list = []
 
-    try:
-        # Parse the JSON response
-        response_data = json.loads(raw_variations)
-        
-        # Extract the variations array from the response
-        variations_list = response_data.get("variations", [])
-        
-        logger.info(f"Successfully generated {len(variations_list)} variations")
-        
-        # Send Slack notification (non-blocking)
-        # Note: This endpoint doesn't have project context, so we skip the notification
-        # Project-based generation should use /projects/{id}/generate instead
-        component_count = sum(comp.count for comp in req.structure)
-        # Skipping notification - no project_id available
-        
-        return GenerateVariationsResponse(
-            variations=variations_list,
-            original_text=req.text,
-            tone=req.tone.value
+    while attempt < max_attempts:
+        retry_suffix = ""
+        if attempt > 0 and req.content_type == ContentType.PUSH_NOTIFICATION:
+            retry_suffix = (
+                "\n\nRETRY: Previous output exceeded push notification limits. "
+                "Shorten the TITLE to max 20 characters and BODY to max 100 characters. "
+                "Use shorter words and simplify the phrasing."
+            )
+
+        raw_variations = await client.generate_with_fixing(
+            prompt + retry_suffix,
+            req.count,
+            temperature=temperature,
+            max_tokens=2048,
+            image_url=req.image_url,
+            use_flash=use_flash,
         )
+
+        try:
+            # Parse the JSON response
+            response_data = json.loads(raw_variations)
+            
+            # Extract the variations array from the response
+            variations_list = response_data.get("variations", [])
+
+            if req.content_type == ContentType.PUSH_NOTIFICATION:
+                has_violations = False
+                for variation in variations_list:
+                    if not isinstance(variation, dict):
+                        continue
+                    violations = push_limit_violations(variation, "push_notification")
+                    if violations:
+                        has_violations = True
+                        logger.warning(f"Push limits exceeded on attempt {attempt + 1}: {violations}")
+
+                if has_violations and attempt < max_attempts - 1:
+                    attempt += 1
+                    continue
+
+                if has_violations:
+                    for variation in variations_list:
+                        if not isinstance(variation, dict):
+                            continue
+                        variation["title"] = clamp_push_text(variation.get("title"), "title", "push_notification")
+                        variation["body"] = clamp_push_text(variation.get("body"), "body", "push_notification")
+                        variation["cta"] = clamp_push_text(variation.get("cta"), "cta", "push_notification")
+
+            logger.info(f"Successfully generated {len(variations_list)} variations")
+            break
+        except Exception as e:
+            logger.error(f"Error parsing generation response on attempt {attempt + 1}: {str(e)}")
+            if attempt >= max_attempts - 1:
+                raise
+            attempt += 1
+            continue
         
-    except Exception as e:
-        logger.error(f"Error in generate_variations: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # Send Slack notification (non-blocking)
+    # Note: This endpoint doesn't have project context, so we skip the notification
+    # Project-based generation should use /projects/{id}/generate instead
+    component_count = sum(comp.count for comp in req.structure)
+    # Skipping notification - no project_id available
+    
+    return GenerateVariationsResponse(
+        variations=variations_list,
+        original_text=req.text,
+        tone=req.tone.value
+    )

@@ -67,6 +67,7 @@ class TranslateRequest(BaseModel):
     target_language: str = Field(..., description="Target language code (e.g., 'it', 'en', 'fr')", min_length=2, max_length=5)
     source_language: str | None = Field(default=None, description="Source language code (auto-detect if None)")
     maintain_tone: bool = Field(default=True, description="Maintain original tone and style")
+    component_type: str | None = Field(default=None, description="Component type (subject/title/body/cta) to apply formatting rules")
     content_type: ContentType = Field(default=ContentType.NEWSLETTER, description="Type of content")
 
 

@@ -1,7 +1,7 @@
 # 🎨 Mosaico
 ### Multilingual Content Studio
 
-[![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.7-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/next.js-15.3-black.svg)](https://nextjs.org/)
@@ -26,6 +26,7 @@
   - Gemini 2.5 Pro for cultural nuance and natural phrasing
   - Automatic quality validation with confidence scoring (0-1 scale)
   - Self-healing retry if confidence < 0.7 (auto-corrects poor translations)
+  - Pivot translation via Italian when available (EN → IT → other languages) for tone consistency
   - Language-specific guidance (DE, FR, ES, IT, PT) to avoid literal translations
 - 🎯 **Drag-and-Drop Email Structure**: Visual builder with always-on Subject & Pre-header; add/reorder Title, Body, CTAs, and Images
 - 🖼️ **Image Context**: Generate content based on uploaded product images

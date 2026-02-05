@@ -8,11 +8,13 @@ from slowapi.util import get_remote_address
 import logging
 import json
 import asyncio
+import re
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 
 from app.models.schemas import TranslateRequest, TranslateResponse
 from app.core.vertex_ai import vertex_client
+from app.utils.text_limits import clamp_push_text, get_push_limit
 from app.core.config import settings
 from app.utils.notifications import notify_translation_completed
 from app.core.auth import get_current_user, User
@@ -156,7 +158,9 @@ async def translate_text_content(
     source_language: str = "EN",
     ai_client=None,
     use_validation: bool = True,
-    max_retries: int = 1
+    max_retries: int = 1,
+    component_type: str | None = None,
+    content_type: str | None = None
 ) -> str:
     """
     Helper function to translate text content with optional validation.
@@ -182,6 +186,21 @@ async def translate_text_content(
         source_language=source_language,
         ai_client=ai_client
     )
+    translation = strip_trailing_period(translation, component_type)
+
+    limit = get_push_limit(component_type, content_type)
+    if limit and len(translation) > limit and max_retries > 0:
+        feedback = f"Too long. Must be <= {limit} characters for {component_type}."
+        translation = await translate_with_retry(
+            text=text,
+            target_language=target_language,
+            source_language=source_language,
+            validation_feedback=feedback,
+            ai_client=ai_client
+        )
+        translation = strip_trailing_period(translation, component_type)
+
+    translation = clamp_push_text(translation, component_type, content_type)
     
     # If validation is disabled, return immediately
     if not use_validation:
@@ -226,6 +245,8 @@ Reasoning: {validation.reasoning}"""
                 validation_feedback=feedback,
                 ai_client=ai_client
             )
+            improved_translation = strip_trailing_period(improved_translation, component_type)
+            improved_translation = clamp_push_text(improved_translation, component_type, content_type)
             
             logger.info(f"Retry completed, using improved translation")
             return improved_translation
@@ -246,6 +267,36 @@ LANGUAGE_NAMES = {
     "es": "Spanish",
     "pt": "Portuguese"
 }
+
+COMPONENT_TYPES = ("subject", "pre_header", "title", "body", "cta")
+
+
+def extract_component_type(key: str | None) -> str | None:
+    """
+    Extract component type from a batch translation key.
+    Examples: "header:subject:1" -> subject, "section_2:pre_header:1" -> pre_header
+    """
+    if not key:
+        return None
+    lowered = key.lower()
+    if "pre_header" in lowered:
+        return "pre_header"
+    for comp in COMPONENT_TYPES:
+        if comp in lowered:
+            return comp
+    return None
+
+
+def strip_trailing_period(text: str, component_type: str | None) -> str:
+    """
+    Remove trailing period/full-stop for header-like components.
+    """
+    if not text or not component_type:
+        return text
+    if component_type not in ("subject", "title", "pre_header", "cta"):
+        return text
+    # Remove trailing period variants (., 。, ．, ｡) plus whitespace
+    return re.sub(r"[\.。\uFF0E\uFF61]+\s*$", "", text).rstrip()
 
 
 def build_validation_prompt(
@@ -464,7 +515,9 @@ async def translate_text(
             source_language=req.source_language or "auto",
             ai_client=vertex_client,
             use_validation=True,  # Enable Sequential Validation
-            max_retries=1  # Allow 1 retry if validation fails
+            max_retries=1,  # Allow 1 retry if validation fails
+            component_type=req.component_type,
+            content_type=req.content_type
         )
         
         return TranslateResponse(
@@ -490,6 +543,7 @@ class BatchTranslateRequest(BaseModel):
     target_languages: List[str]
     project_id: Optional[int] = None  # Optional project ID for notifications
     user_email: Optional[str] = None  # Optional user email for notifications
+    content_type: Optional[str] = None  # Optional content type for constraints
 
 
 class BatchTranslateResponse(BaseModel):
@@ -500,7 +554,10 @@ async def translate_single_with_retry(
     text: str,
     target_language: str,
     max_retries: int = 3,
-    use_validation: bool = True
+    use_validation: bool = True,
+    source_language: str = "auto",
+    component_type: str | None = None,
+    content_type: str | None = None
 ) -> str:
     """
     Translate a single text with Sequential Validation Chain.
@@ -520,10 +577,12 @@ async def translate_single_with_retry(
             translation = await translate_text_content(
                 text=text,
                 target_language=target_language,
-                source_language="auto",
+                source_language=source_language,
                 ai_client=vertex_client,
                 use_validation=use_validation,
-                max_retries=1 if use_validation else 0  # Validation has its own retry logic
+                max_retries=1 if use_validation else 0,  # Validation has its own retry logic
+                component_type=component_type,
+                content_type=content_type
             )
             return translation
     
@@ -556,33 +615,100 @@ async def batch_translate(
         )
         
         translations: Dict[str, Dict[str, str]] = {}
-        
-        # Create all translation tasks
-        tasks = []
-        task_metadata = []
-        
-        for text_item in req.texts:
-            translations[text_item.key] = {}
-            
-            for lang in req.target_languages:
-                task = translate_single_with_retry(text_item.content, lang)
-                tasks.append(task)
-                task_metadata.append((text_item.key, lang))
-        
-        # Execute all translations in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Create a lookup for original texts
-        text_lookup = {item.key: item.content for item in req.texts}
-        
-        # Map results back to structure
-        for (key, lang), result in zip(task_metadata, results):
-            if isinstance(result, Exception):
-                logger.error(f"Exception translating {key} to {lang}: {str(result)}")
-                # Strict failure: return marker
-                translations[key][lang] = f"__TRANSLATION_FAILED__:{str(result)[:50]}"
-            else:
-                translations[key][lang] = result
+        component_type_lookup = {item.key: extract_component_type(item.key) for item in req.texts}
+        normalized_languages = [lang.lower() for lang in req.target_languages]
+        pivot_language = "it" if "it" in normalized_languages else None
+        other_languages = [lang for lang in normalized_languages if lang != "it"]
+
+        # Two-step translation: EN -> IT, then IT -> others (if Italian requested)
+        if pivot_language and other_languages:
+            logger.info(f"Batch translate pivot enabled: EN -> IT -> {', '.join(other_languages)}")
+            italian_tasks = []
+            italian_task_keys = []
+            for text_item in req.texts:
+                translations[text_item.key] = {}
+                italian_tasks.append(
+                    translate_single_with_retry(
+                        text_item.content,
+                        "it",
+                        source_language="en",
+                        component_type=component_type_lookup.get(text_item.key),
+                        content_type=req.content_type
+                    )
+                )
+                italian_task_keys.append(text_item.key)
+
+            italian_results = await asyncio.gather(*italian_tasks, return_exceptions=True)
+            italian_lookup: Dict[str, str] = {}
+
+            for key, result in zip(italian_task_keys, italian_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Exception translating {key} to it: {str(result)}")
+                    translations[key]["it"] = f"__TRANSLATION_FAILED__:{str(result)[:50]}"
+                else:
+                    translations[key]["it"] = result
+                    italian_lookup[key] = result
+
+            tasks = []
+            task_metadata = []
+            for text_item in req.texts:
+                component_type = component_type_lookup.get(text_item.key)
+                italian_text = italian_lookup.get(text_item.key)
+                source_text = italian_text if italian_text and not italian_text.startswith("__TRANSLATION_FAILED__") else text_item.content
+                source_language = "it" if source_text == italian_text else "en"
+                logger.info(
+                    f"Batch translate source for {text_item.key}: {source_language} -> {', '.join(other_languages)}"
+                )
+
+                for lang in other_languages:
+                    tasks.append(
+                        translate_single_with_retry(
+                            source_text,
+                            lang,
+                            source_language=source_language,
+                        component_type=component_type,
+                        content_type=req.content_type
+                        )
+                    )
+                    task_metadata.append((text_item.key, lang))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for (key, lang), result in zip(task_metadata, results):
+                if isinstance(result, Exception):
+                    logger.error(f"Exception translating {key} to {lang}: {str(result)}")
+                    translations[key][lang] = f"__TRANSLATION_FAILED__:{str(result)[:50]}"
+                else:
+                    translations[key][lang] = result
+
+        else:
+            logger.info(f"Batch translate direct mode: EN -> {', '.join(normalized_languages)}")
+            # Single-step translation from EN to requested languages
+            tasks = []
+            task_metadata = []
+            for text_item in req.texts:
+                translations[text_item.key] = {}
+                component_type = component_type_lookup.get(text_item.key)
+                for lang in normalized_languages:
+                    tasks.append(
+                        translate_single_with_retry(
+                            text_item.content,
+                            lang,
+                            source_language="en",
+                        component_type=component_type,
+                        content_type=req.content_type
+                        )
+                    )
+                    task_metadata.append((text_item.key, lang))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for (key, lang), result in zip(task_metadata, results):
+                if isinstance(result, Exception):
+                    logger.error(f"Exception translating {key} to {lang}: {str(result)}")
+                    translations[key][lang] = f"__TRANSLATION_FAILED__:{str(result)[:50]}"
+                else:
+                    translations[key][lang] = result
         
         logger.info(f"Batch translation completed successfully")
         
