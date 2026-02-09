@@ -11,6 +11,7 @@ interface TranslateContentInput {
   target_language: string
   source_language?: string
   maintain_tone?: boolean
+  component_type?: string
   content_type?: string
 }
 
@@ -41,6 +42,7 @@ export async function translateContent(
         target_language: input.target_language,
         source_language: input.source_language || "en",
         maintain_tone: input.maintain_tone ?? true,
+        component_type: input.component_type,
         content_type: input.content_type || "newsletter"
       })
     })
@@ -76,7 +78,8 @@ export async function translateContent(
 export async function batchTranslate(
   texts: { key: string; content: string }[],
   targetLanguages: string[],
-  projectId?: number
+  projectId?: number,
+  contentType?: string
 ): Promise<{
   success: boolean
   data?: Record<string, Record<string, string>> // { componentKey: { lang: translatedText } }
@@ -94,7 +97,8 @@ export async function batchTranslate(
       body: JSON.stringify({
         texts: texts,
         target_languages: targetLanguages,
-        ...(projectId && { project_id: projectId })
+        ...(projectId && { project_id: projectId }),
+        ...(contentType && { content_type: contentType })
       })
     })
 

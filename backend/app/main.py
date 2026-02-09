@@ -30,6 +30,9 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+# Silence noisy gRPC / HTTP debug logs from dependencies
+for noisy_logger in ("grpc", "grpc._cython", "grpc._cython.cygrpc", "httpcore", "httpx", "urllib3"):
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Rate limiter

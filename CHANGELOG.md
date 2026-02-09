@@ -2,6 +2,29 @@
 
 All notable changes to the Mosaico project will be documented in this file.
 
+## [1.1.7] - 2026-01-22
+
+### Added
+- **Push notification hard limits**: Title/body/CTA now retry generation when exceeding 20/100/30 chars.
+- **Stronger push prompt**: Explicit "shorter if unsure" guidance to reduce overflows.
+
+### Changed
+- **Push translation constraints**: Batch translation receives content type and enforces limits per component.
+
+---
+
+## [1.1.6] - 2026-01-22
+
+### Added
+- **Translation Pivot (EN → IT → other languages)**: When Italian is among target languages, translations now use Italian as the pivot to improve tone consistency across languages (including push notifications).
+- **Component-aware punctuation cleanup**: Subjects, titles, pre-headers, and CTAs remove trailing periods after translation.
+
+### Changed
+- **Retranslate single component** now uses Italian as source when available; falls back to English when Italian is missing or failed.
+- **Translation payloads** now carry `component_type` so formatting rules are applied consistently.
+
+---
+
 ## [1.1.5] - 2026-01-22
 
 ### Added
